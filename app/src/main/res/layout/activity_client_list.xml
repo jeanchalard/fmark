@@ -24,12 +24,24 @@
      />
   </FrameLayout>
 
-  <android.support.v7.widget.SearchView
+  <EditText
+   android:id="@+id/client_name_search"
+   android:focusedByDefault="false"
    android:layout_width="match_parent"
    android:layout_height="wrap_content"
-   android:background="@color/lightGrey" />
+   android:padding="16dp"
+   android:hint="@string/search_hint"
+   android:textColorHint="@color/lightGrey"
+   android:textSize="24sp"
+   android:textColor="@android:color/white"
+   android:drawableEnd="@drawable/ic_baseline_search_24px"
+   android:background="@color/textBackgroundDark"
+   />
 
   <android.support.v7.widget.RecyclerView
+   android:id="@+id/client_list"
+   android:focusedByDefault="true"
+   app:layoutManager="android.support.v7.widget.LinearLayoutManager"
    android:layout_width="match_parent"
    android:layout_height="0dp"
    android:layout_weight="1" />

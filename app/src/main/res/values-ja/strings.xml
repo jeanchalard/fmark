@@ -3,6 +3,7 @@
   <string name="app_name">FMark</string>
   <string name="title">タイトル</string>
 
+  <string name="search_hint">検索</string>
   <string name="sign_in_fail_instant">サインインに失敗しました</string>
   <string name="sign_in_fail_eventual">サインインはできませんでした</string>
 </resources>

@@ -5,6 +5,7 @@
   <string name="app_name">FMark</string>
   <string name="title">Title</string>
 
+  <string name="search_hint">Search</string>
   <string name="sign_in_fail_instant">Sign in refused</string>
   <string name="sign_in_fail_eventual">Sign in failed</string>
 </resources>
