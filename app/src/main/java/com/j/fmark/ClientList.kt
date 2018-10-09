@@ -15,10 +15,7 @@ import com.google.android.gms.drive.Drive
 import com.google.android.gms.drive.query.*
 import com.j.fmark.drive.FDrive
 import com.j.fmark.drive.SignInException
-import kotlinx.coroutines.experimental.Dispatchers
-import kotlinx.coroutines.experimental.GlobalScope
-import kotlinx.coroutines.experimental.delay
-import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.experimental.*
 import kotlinx.coroutines.experimental.tasks.await
 
 class ClientList : AppCompatActivity(), TextWatcher
@@ -30,6 +27,9 @@ class ClientList : AppCompatActivity(), TextWatcher
 
   private var account : GoogleSignInAccount? = null
   private lateinit var searchField : EditText
+  private val currentSearchLock = Object()
+  private var currentSearch : Job? = null
+    set(newSearch) = synchronized(currentSearchLock) { field?.cancel(); field = newSearch }
 
   override fun onCreate(icicle : Bundle?)
   {
@@ -37,8 +37,7 @@ class ClientList : AppCompatActivity(), TextWatcher
     setContentView(R.layout.activity_client_list)
     searchField = findViewById(R.id.client_name_search)
     searchField.addTextChangedListener(this)
-    GlobalScope.launch(Dispatchers.Main)
-    {
+    GlobalScope.launch(Dispatchers.Main) {
       account = FDrive.getAccount(this@ClientList, GOOGLE_SIGN_IN_CODE)
       populateClientList(0)
     }
@@ -58,12 +57,16 @@ class ClientList : AppCompatActivity(), TextWatcher
     throw SignInException(getString(R.string.sign_in_fail_eventual))
   }
 
+  private fun startSearch(start: CoroutineStart = CoroutineStart.DEFAULT, block: suspend CoroutineScope.() -> Unit)
+  {
+    currentSearch = GlobalScope.launch(Dispatchers.Main, start, { block(); currentSearch = null })
+  }
+
   private fun populateClientList(delayMs : Long)
   {
     val currentAccount = account ?: return
     val searchString = searchField.text?.toString() ?: return
-    GlobalScope.launch(Dispatchers.Main)
-    {
+    startSearch {
       if (delayMs > 0) delay(delayMs)
       readClients(currentAccount, if (searchString.isEmpty() or searchString.isBlank()) null else searchString)
     }
@@ -90,5 +93,5 @@ class ClientList : AppCompatActivity(), TextWatcher
 
   override fun afterTextChanged(s : Editable?) = Unit
   override fun beforeTextChanged(s : CharSequence?, start : Int, count : Int, after : Int) = Unit
-  override fun onTextChanged(s : CharSequence?, start : Int, before : Int, count : Int) = populateClientList(1500)
+  override fun onTextChanged(s : CharSequence?, start : Int, before : Int, count : Int) = populateClientList(if (currentSearch == null) 0 else 1000)
 }
