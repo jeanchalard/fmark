@@ -28,8 +28,8 @@ class ClientList : AppCompatActivity(), TextWatcher
     const val GOOGLE_SIGN_IN_CODE = 1
   }
 
-  var account : GoogleSignInAccount? = null
-  lateinit var searchField : EditText
+  private var account : GoogleSignInAccount? = null
+  private lateinit var searchField : EditText
 
   override fun onCreate(icicle : Bundle?)
   {
