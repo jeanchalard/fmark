@@ -6,4 +6,9 @@
   <string name="search_hint">検索</string>
   <string name="sign_in_fail_instant">サインインに失敗しました</string>
   <string name="sign_in_fail_eventual">サインインはできませんでした</string>
+  <string name="label_name">氏名 :</string>
+  <string name="label_reading">読み :</string>
+  <string name="client_details_title">お客様詳細</string>
+  <string name="ok">Ok</string>
+  <string name="cancel">キャンセル</string>
 </resources>

@@ -6,7 +6,7 @@
  android:orientation="vertical"
  android:layout_width="match_parent"
  android:layout_height="match_parent"
- tools:context=".ClientList">
+ tools:context=".FMark">
 
   <FrameLayout
    android:layout_width="match_parent"
@@ -22,6 +22,15 @@
      android:textSize="48sp"
      android:text="@string/title"
      />
+
+    <android.support.design.widget.FloatingActionButton
+     android:id="@+id/client_add"
+     android:layout_width="wrap_content"
+     android:layout_height="wrap_content"
+     android:layout_gravity="bottom|right"
+     android:layout_margin="8dp"
+     android:clickable="true"
+     app:srcCompat="@drawable/fab"/>
   </FrameLayout>
 
   <EditText
