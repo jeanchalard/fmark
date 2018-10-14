@@ -12,12 +12,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import com.google.android.gms.drive.DriveFolder
 import com.google.android.gms.drive.DriveResourceClient
+import com.google.android.gms.drive.Metadata
 import com.google.android.gms.drive.query.*
 import com.j.fmark.ClientAdapter
 import com.j.fmark.FMark
 import com.j.fmark.R
 import com.j.fmark.drive.FDrive
+import com.j.fmark.drive.FDrive.getFMarkFolder
 import kotlinx.coroutines.experimental.*
 import kotlinx.coroutines.experimental.tasks.await
 
@@ -82,8 +85,10 @@ class ClientList(private val fmarkHost : FMark, private val client : DriveResour
     if (null == list.adapter)
     {
       list.addItemDecoration(DividerItemDecoration(context, (list.layoutManager as LinearLayoutManager).orientation))
-      list.adapter = ClientAdapter(result)
+      list.adapter = ClientAdapter(result, this)
     }
     else (list.adapter as ClientAdapter).setSource(result)
   }
+
+  fun startEditor(clientFolder : Metadata) = fmarkHost.startEditor(client, clientFolder)
 }

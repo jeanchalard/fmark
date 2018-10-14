@@ -8,30 +8,16 @@
  android:layout_height="match_parent"
  tools:context=".FMark">
 
-  <FrameLayout
+  <TextView
    android:layout_width="match_parent"
    android:layout_height="180dp"
-   android:layout_weight="0"
-   android:background="@color/colorPrimaryDark">
-    <TextView
-     android:layout_width="match_parent"
-     android:layout_height="match_parent"
-     android:layout_margin="48dp"
-     android:gravity="center"
-     android:textColor="@android:color/white"
-     android:textSize="48sp"
-     android:text="@string/title"
-     />
-
-    <android.support.design.widget.FloatingActionButton
-     android:id="@+id/client_add"
-     android:layout_width="wrap_content"
-     android:layout_height="wrap_content"
-     android:layout_gravity="bottom|right"
-     android:layout_margin="8dp"
-     android:clickable="true"
-     app:srcCompat="@drawable/fab"/>
-  </FrameLayout>
+   android:padding="48dp"
+   android:gravity="center"
+   android:background="@color/colorPrimaryDark"
+   android:textColor="@android:color/white"
+   android:textSize="48sp"
+   android:text="@string/title"
+   />
 
   <EditText
    android:id="@+id/client_name_search"
@@ -47,12 +33,25 @@
    android:background="@color/textBackgroundDark"
    />
 
-  <android.support.v7.widget.RecyclerView
-   android:id="@+id/client_list"
-   android:focusedByDefault="true"
-   app:layoutManager="android.support.v7.widget.LinearLayoutManager"
+  <FrameLayout
    android:layout_width="match_parent"
    android:layout_height="0dp"
-   android:layout_weight="1" />
+   android:layout_weight="1">
+    <android.support.v7.widget.RecyclerView
+     android:id="@+id/client_list"
+     android:focusedByDefault="true"
+     app:layoutManager="android.support.v7.widget.LinearLayoutManager"
+     android:layout_width="match_parent"
+     android:layout_height="match_parent" />
 
+    <android.support.design.widget.FloatingActionButton
+     android:id="@+id/client_add"
+     android:layout_width="wrap_content"
+     android:layout_height="wrap_content"
+     android:layout_gravity="bottom|end"
+     android:layout_margin="8dp"
+     android:focusable="true"
+     android:clickable="true"
+     app:srcCompat="@drawable/fab"/>
+  </FrameLayout>
 </LinearLayout>

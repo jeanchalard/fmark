@@ -16,5 +16,6 @@
   <string name="cancel">Cancel</string>
 
   <!-- TODO: Remove or change this placeholder text -->
-  <string name="client_already_exists">Hello blank fragment</string>
+  <string name="client_already_exists">%d client(s) with this name already exist(s). Proceed ?</string>
+  <string name="person_honorific">%s</string>
 </resources>
