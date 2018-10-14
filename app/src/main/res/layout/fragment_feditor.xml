@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                                             xmlns:app="http://schemas.android.com/apk/res-auto"
+                                             xmlns:tools="http://schemas.android.com/tools"
+                                             android:layout_width="match_parent"
+                                             android:layout_height="match_parent">
+
+  <FrameLayout
+   android:layout_width="match_parent"
+   android:layout_height="0dp"
+   app:layout_constraintBottom_toTopOf="@id/feditor_separator">
+    <ImageView
+     android:id="@+id/feditor_guide"
+     android:layout_width="wrap_content"
+     android:layout_height="wrap_content"/>
+  </FrameLayout>
+
+  <View
+   android:id="@+id/feditor_separator"
+   android:layout_width="match_parent"
+   android:layout_height="1px"
+   android:background="@color/lightGrey"
+   app:layout_constraintBottom_toTopOf="@id/feditor_face" />
+
+  <ImageButton
+   android:id="@+id/feditor_face"
+   style="@style/Widget.AppCompat.Button.Borderless"
+   android:layout_width="0dp"
+   android:layout_height="48dp"
+   android:src="@drawable/face_thumb"
+   android:scaleType="fitCenter"
+   app:layout_constraintBottom_toBottomOf="parent"
+   app:layout_constraintStart_toStartOf="parent"
+   app:layout_constraintEnd_toStartOf="@id/feditor_hsep1" />
+
+  <View
+   android:id="@+id/feditor_hsep1"
+   android:layout_width="1px"
+   android:layout_height="0dp"
+   android:background="@color/lightGrey"
+   app:layout_constraintTop_toTopOf="@id/feditor_face"
+   app:layout_constraintStart_toEndOf="@id/feditor_face"
+   app:layout_constraintEnd_toStartOf="@id/feditor_front" />
+
+  <ImageButton
+   android:id="@+id/feditor_front"
+   style="@style/Widget.AppCompat.Button.Borderless"
+   android:layout_width="0dp"
+   android:layout_height="48dp"
+   android:src="@drawable/front_thumb"
+   android:scaleType="fitCenter"
+   app:layout_constraintBottom_toBottomOf="parent"
+   app:layout_constraintEnd_toStartOf="@id/feditor_hsep2"
+   app:layout_constraintStart_toEndOf="@id/feditor_hsep1"/>
+
+  <View
+   android:id="@+id/feditor_hsep2"
+   android:layout_width="1px"
+   android:layout_height="0dp"
+   android:background="@color/lightGrey"
+   app:layout_constraintTop_toTopOf="@id/feditor_face"
+   app:layout_constraintStart_toEndOf="@id/feditor_front"
+   app:layout_constraintEnd_toStartOf="@id/feditor_back" />
+
+  <ImageButton
+   android:id="@+id/feditor_back"
+   style="@style/Widget.AppCompat.Button.Borderless"
+   android:layout_width="0dp"
+   android:layout_height="48dp"
+   android:src="@drawable/back_thumb"
+   android:scaleType="fitCenter"
+   app:layout_constraintBottom_toBottomOf="parent"
+   app:layout_constraintStart_toEndOf="@id/feditor_hsep2"
+   app:layout_constraintEnd_toEndOf="parent" />
+
+</android.support.constraint.ConstraintLayout>

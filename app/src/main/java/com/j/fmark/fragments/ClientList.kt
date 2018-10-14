@@ -37,7 +37,7 @@ class ClientList(private val fmarkHost : FMark, private val client : DriveResour
     searchField = view.findViewById(R.id.client_name_search)
     searchField.addTextChangedListener(this)
     view.findViewById<FloatingActionButton>(R.id.client_add).setOnClickListener {
-      fmarkHost.showClientDetails(null)
+      fmarkHost.showClientDetails(client, null)
     }
     return view
   }

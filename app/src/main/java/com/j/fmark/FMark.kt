@@ -8,11 +8,14 @@ import android.view.View
 import com.google.android.gms.auth.api.Auth
 import com.google.android.gms.drive.Drive
 import com.google.android.gms.drive.DriveFolder
-import com.google.android.gms.drive.MetadataChangeSet
+import com.google.android.gms.drive.DriveResourceClient
 import com.j.fmark.drive.FDrive
+import com.j.fmark.drive.FDrive.getFolder
 import com.j.fmark.drive.SignInException
+import com.j.fmark.drive.createFolderForClientName
 import com.j.fmark.fragments.ClientDetails
 import com.j.fmark.fragments.ClientList
+import com.j.fmark.fragments.FEditor
 import kotlinx.coroutines.experimental.Dispatchers
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.launch
@@ -27,8 +30,8 @@ class FMark : AppCompatActivity()
       val account = FDrive.getAccount(this@FMark, GOOGLE_SIGN_IN_CODE)
       if (null != account)
       {
-        val client = Drive.getDriveResourceClient(this@FMark, account)
-        switchToFragment(ClientList(this@FMark, client))
+        val driveResourceClient = Drive.getDriveResourceClient(this@FMark, account)
+        switchToFragment(ClientList(this@FMark, driveResourceClient))
       } // Otherwise, wait for sign in activity → onActivityResult
     }
   }
@@ -53,40 +56,21 @@ class FMark : AppCompatActivity()
     val signInResult = Auth.GoogleSignInApi.getSignInResultFromIntent(data)
     val account = signInResult.signInAccount
     if (!signInResult.isSuccess || null == account) throw SignInException(getString(R.string.sign_in_fail_eventual))
-    val client = Drive.getDriveResourceClient(this@FMark, account)
-    switchToFragment(ClientList(this@FMark, client))
+    val driveResourceClient = Drive.getDriveResourceClient(this@FMark, account)
+    switchToFragment(ClientList(this@FMark, driveResourceClient))
   }
 
-  fun showClientDetails(client : DriveFolder?)
+  fun showClientDetails(driveResourceClient : DriveResourceClient, client : DriveFolder?)
   {
-    val f = ClientDetails(this, client)
+    val f = ClientDetails(this, driveResourceClient, client)
     val transaction = supportFragmentManager.beginTransaction()
      .addToBackStack(null)
     f.show(transaction, "details")
   }
 
-  private fun getFolderChangeset(name : String?, reading : String?) : MetadataChangeSet?
-  {
-    if (null == name || null == reading) return null
-    return MetadataChangeSet.Builder()
-     .setTitle(name)
-     .setDescription(reading)
-     .setIndexableText("${name} - ${reading}")
-     .setMimeType(DriveFolder.MIME_TYPE)
-     .build()
-  }
+  suspend fun startEditor(driveResourceClient : DriveResourceClient, fmarkFolder : DriveFolder, name : String, reading : String) =
+   startEditor(driveResourceClient, createFolderForClientName(driveResourceClient, fmarkFolder, name, reading))
 
-  private fun onCreateClient(data : Intent)
-  {
-//    val client = client ?: throw NoDriveClientException("No DriveClient trying to create client record")
-//    GlobalScope.launch(Dispatchers.Main) {
-//      val spinner = findViewById<Spinner>(R.id.client_list_spinner)
-//      spinner.visibility = VISIBLE
-//      val fmarkFolder = FDrive.getFMarkFolder(client, this@FMark)
-//      val changeSet = getFolderChangeset(data.getStringExtra(EXTRA_KEY_NAME), data.getStringExtra(EXTRA_KEY_READING)) ?: throw IllegalArgumentException("Name or reading incorrect in trying to create client record")
-//      val folder = client.createFolder(fmarkFolder, changeSet).await()
-//      Lancer le fragment d'édition
-//      spinner.visibility = GONE
-//    }
-  }
+  fun startEditor(driveResourceClient : DriveResourceClient, clientFolder : DriveFolder) =
+   switchToFragment(FEditor(driveResourceClient, clientFolder))
 }
