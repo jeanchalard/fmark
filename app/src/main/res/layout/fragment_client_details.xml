@@ -8,7 +8,7 @@
  android:layout_gravity="center"
  android:layout_margin="16dp"
  android:padding="16dp"
- tools:context=".ClientDetailsActivity">
+ tools:context=".fragments.ClientDetails">
 
   <TextView
    android:id="@+id/client_details_title"
@@ -94,7 +94,6 @@
    android:layout_marginEnd="8dp"
    android:layout_marginBottom="8dp"
    android:text="@string/ok"
-   android:onClick="onOk"
    app:layout_constraintBottom_toBottomOf="parent"
    app:layout_constraintEnd_toEndOf="parent"
    app:layout_constraintTop_toBottomOf="@id/client_details_label_reading"/>
@@ -106,7 +105,6 @@
    android:layout_height="wrap_content"
    android:layout_marginEnd="8dp"
    android:text="@string/cancel"
-   android:onClick="onCancel"
    app:layout_constraintBaseline_toBaselineOf="@id/client_details_ok"
    app:layout_constraintBottom_toBottomOf="parent"
    app:layout_constraintEnd_toStartOf="@id/client_details_ok"/>

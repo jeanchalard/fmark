@@ -21,7 +21,7 @@
     </activity>
 
     <activity
-     android:name=".ClientDetailsActivity"
+     android:name=".fragments.ClientDetails"
      android:theme="@style/ClientDetailsTheme">
     </activity>
   </application>

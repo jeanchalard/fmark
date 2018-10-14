@@ -11,6 +11,7 @@ import com.google.android.gms.drive.DriveFolder
 import com.google.android.gms.drive.MetadataChangeSet
 import com.j.fmark.drive.FDrive
 import com.j.fmark.drive.SignInException
+import com.j.fmark.fragments.ClientDetails
 import com.j.fmark.fragments.ClientList
 import kotlinx.coroutines.experimental.Dispatchers
 import kotlinx.coroutines.experimental.GlobalScope
@@ -27,7 +28,7 @@ class FMark : AppCompatActivity()
       if (null != account)
       {
         val client = Drive.getDriveResourceClient(this@FMark, account)
-        switchToFragment(ClientList(account, client))
+        switchToFragment(ClientList(this@FMark, client))
       } // Otherwise, wait for sign in activity → onActivityResult
     }
   }
@@ -53,7 +54,15 @@ class FMark : AppCompatActivity()
     val account = signInResult.signInAccount
     if (!signInResult.isSuccess || null == account) throw SignInException(getString(R.string.sign_in_fail_eventual))
     val client = Drive.getDriveResourceClient(this@FMark, account)
-    switchToFragment(ClientList(account, client))
+    switchToFragment(ClientList(this@FMark, client))
+  }
+
+  fun showClientDetails(client : DriveFolder?)
+  {
+    val f = ClientDetails(this, client)
+    val transaction = supportFragmentManager.beginTransaction()
+     .addToBackStack(null)
+    f.show(transaction, "details")
   }
 
   private fun getFolderChangeset(name : String?, reading : String?) : MetadataChangeSet?

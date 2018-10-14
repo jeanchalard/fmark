@@ -1,6 +1,5 @@
 package com.j.fmark.fragments
 
-import android.content.Intent
 import android.os.Bundle
 import android.support.design.widget.FloatingActionButton
 import android.support.v4.app.Fragment
@@ -13,11 +12,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.drive.DriveResourceClient
 import com.google.android.gms.drive.query.*
 import com.j.fmark.ClientAdapter
-import com.j.fmark.ClientDetailsActivity
+import com.j.fmark.FMark
 import com.j.fmark.R
 import com.j.fmark.drive.FDrive
 import kotlinx.coroutines.experimental.*
@@ -26,7 +24,7 @@ import kotlinx.coroutines.experimental.tasks.await
 /**
  * A fragment implementing the client list.
  */
-class ClientList(private val account : GoogleSignInAccount, private val client : DriveResourceClient) : Fragment(), TextWatcher
+class ClientList(private val fmarkHost : FMark, private val client : DriveResourceClient) : Fragment(), TextWatcher
 {
   private lateinit var searchField : EditText
   private val currentSearchLock = Object()
@@ -39,8 +37,7 @@ class ClientList(private val account : GoogleSignInAccount, private val client :
     searchField = view.findViewById(R.id.client_name_search)
     searchField.addTextChangedListener(this)
     view.findViewById<FloatingActionButton>(R.id.client_add).setOnClickListener {
-      val intent = Intent(view.context, ClientDetailsActivity::class.java)
-      startActivity(intent)
+      fmarkHost.showClientDetails(null)
     }
     return view
   }
