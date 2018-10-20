@@ -15,4 +15,6 @@
   <string name="titlebar_editor">%sさん</string>
   <string name="titlebar_client_details">お客さん詳細</string>
   <string name="titlebar_main">FMark</string>
+  <string name="last_update">最新更新日 :</string>
+  <string name="creation_date">作成日 :</string>
 </resources>

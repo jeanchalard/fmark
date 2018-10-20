@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
 import com.google.android.gms.drive.DriveFolder
 import com.google.android.gms.drive.DriveResourceClient
 import com.google.android.gms.drive.Metadata
@@ -22,6 +23,8 @@ import com.j.fmark.drive.getFoldersForClientName
 import kotlinx.coroutines.experimental.Dispatchers
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.launch
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 class ClientDetails(private val fmarkHost : FMark, private val driveResourceClient : DriveResourceClient, private val clientFolder : Metadata?) : DialogFragment()
@@ -33,9 +36,11 @@ class ClientDetails(private val fmarkHost : FMark, private val driveResourceClie
     view.findViewById<Button>(R.id.client_details_cancel).setOnClickListener { _ -> onFinish(false) }
     if (null != clientFolder)
     {
-      view?.findViewById<EditText>(R.id.client_details_name)?.setText(decodeName(clientFolder))
-      view?.findViewById<EditText>(R.id.client_details_reading)?.setText(decodeReading(clientFolder))
+      view.findViewById<EditText>(R.id.client_details_name)?.setText(decodeName(clientFolder))
+      view.findViewById<EditText>(R.id.client_details_reading)?.setText(decodeReading(clientFolder))
     }
+    view.findViewById<TextView>(R.id.client_details_creation_date_value)?.setText(formatDate(clientFolder?.modifiedDate))
+    view.findViewById<TextView>(R.id.client_details_last_update_date_value)?.setText(formatDate(clientFolder?.createdDate))
     dialog.window.setBackgroundDrawableResource(R.drawable.rounded_square)
     return view
   }
@@ -79,4 +84,6 @@ class ClientDetails(private val fmarkHost : FMark, private val driveResourceClie
     // I've spent too much valuable time on this. This solution sucks but it works.
     fmarkHost.window.decorView.post { fmarkHost.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(fmarkHost.window.decorView.windowToken, 0) }
   }
+
+  private fun formatDate(date : Date?) : String = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date ?: Date())
 }

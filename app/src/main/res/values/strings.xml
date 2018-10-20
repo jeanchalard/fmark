@@ -20,4 +20,6 @@
   <string name="titlebar_editor">%s</string>
   <string name="titlebar_client_details">Client details</string>
   <string name="titlebar_main">FMark</string>
+  <string name="last_update">Last update :</string>
+  <string name="creation_date">Creation date :</string>
 </resources>

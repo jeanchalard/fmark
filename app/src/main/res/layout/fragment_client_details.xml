@@ -54,12 +54,32 @@
    app:layout_constraintTop_toBottomOf="@id/client_details_label_name"
    />
 
+  <TextView
+   android:id="@+id/client_details_last_update_date_label"
+   android:layout_width="wrap_content"
+   android:layout_height="wrap_content"
+   android:layout_marginTop="24dp"
+   android:text="@string/last_update"
+   app:layout_constraintStart_toStartOf="@id/client_details_label_name"
+   app:layout_constraintTop_toBottomOf="@id/client_details_label_reading"
+   />
+
+  <TextView
+   android:id="@+id/client_details_creation_date_label"
+   android:layout_width="wrap_content"
+   android:layout_height="wrap_content"
+   android:layout_marginTop="24dp"
+   android:text="@string/creation_date"
+   app:layout_constraintStart_toStartOf="@id/client_details_label_name"
+   app:layout_constraintTop_toBottomOf="@id/client_details_last_update_date_label"
+   />
+
   <android.support.constraint.Barrier
    android:id="@+id/client_details_form_barrier"
    android:layout_width="wrap_content"
    android:layout_height="wrap_content"
    app:barrierDirection="end"
-   app:constraint_referenced_ids="client_details_label_name,client_details_label_reading" />
+   app:constraint_referenced_ids="client_details_label_name,client_details_label_reading,client_details_last_update_date_label,client_details_creation_date_label" />
 
   <EditText
    android:id="@+id/client_details_name"
@@ -85,6 +105,26 @@
    app:layout_constraintEnd_toEndOf="parent"
    app:layout_constraintStart_toEndOf="@id/client_details_form_barrier" />
 
+  <TextView
+   android:id="@+id/client_details_last_update_date_value"
+   android:layout_width="0dp"
+   android:layout_height="wrap_content"
+   android:layout_marginStart="8dp"
+   android:layout_marginEnd="8dp"
+   app:layout_constraintBaseline_toBaselineOf="@id/client_details_last_update_date_label"
+   app:layout_constraintEnd_toEndOf="parent"
+   app:layout_constraintStart_toEndOf="@id/client_details_form_barrier" />
+
+  <TextView
+   android:id="@+id/client_details_creation_date_value"
+   android:layout_width="0dp"
+   android:layout_height="wrap_content"
+   android:layout_marginStart="8dp"
+   android:layout_marginEnd="8dp"
+   app:layout_constraintBaseline_toBaselineOf="@id/client_details_creation_date_label"
+   app:layout_constraintEnd_toEndOf="parent"
+   app:layout_constraintStart_toEndOf="@id/client_details_form_barrier" />
+
   <Button
    android:id="@+id/client_details_ok"
    style="@style/Widget.AppCompat.Button.Borderless.Colored"
@@ -96,7 +136,7 @@
    android:text="@string/ok"
    app:layout_constraintBottom_toBottomOf="parent"
    app:layout_constraintEnd_toEndOf="parent"
-   app:layout_constraintTop_toBottomOf="@id/client_details_label_reading"/>
+   app:layout_constraintTop_toBottomOf="@id/client_details_creation_date_label" />
 
   <Button
    android:id="@+id/client_details_cancel"
