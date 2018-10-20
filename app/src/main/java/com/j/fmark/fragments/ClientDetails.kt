@@ -11,31 +11,38 @@ import android.widget.Button
 import android.widget.EditText
 import com.google.android.gms.drive.DriveFolder
 import com.google.android.gms.drive.DriveResourceClient
+import com.google.android.gms.drive.Metadata
 import com.j.fmark.FMark
 import com.j.fmark.R
 import com.j.fmark.drive.FDrive.getFMarkFolder
+import com.j.fmark.drive.createFolderForClientName
+import com.j.fmark.drive.decodeName
+import com.j.fmark.drive.decodeReading
 import com.j.fmark.drive.getFoldersForClientName
 import kotlinx.coroutines.experimental.Dispatchers
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.launch
-import java.lang.NullPointerException
-import java.util.*
+import java.util.Locale
 
-class ClientDetails(private val fmarkHost : FMark, private val driveResourceClient : DriveResourceClient, private val clientFolder : DriveFolder?) : DialogFragment()
+class ClientDetails(private val fmarkHost : FMark, private val driveResourceClient : DriveResourceClient, private val clientFolder : Metadata?) : DialogFragment()
 {
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View?
   {
     val view = inflater.inflate(R.layout.fragment_client_details, container, false)
-    view.findViewById<Button>(R.id.client_details_ok).setOnClickListener { v -> onFinish(true) }
-    view.findViewById<Button>(R.id.client_details_cancel).setOnClickListener { v -> onFinish(false) }
+    view.findViewById<Button>(R.id.client_details_ok).setOnClickListener { _ -> onFinish(true) }
+    view.findViewById<Button>(R.id.client_details_cancel).setOnClickListener { _ -> onFinish(false) }
+    if (null != clientFolder)
+    {
+      view?.findViewById<EditText>(R.id.client_details_name)?.setText(decodeName(clientFolder))
+      view?.findViewById<EditText>(R.id.client_details_reading)?.setText(decodeReading(clientFolder))
+    }
     dialog.window.setBackgroundDrawableResource(R.drawable.rounded_square)
     return view
   }
 
   private fun onFinish(ok : Boolean)
   {
-    fmarkHost.supportFragmentManager.popBackStack()
-    if (!ok) return
+    if (!ok) { fmarkHost.supportFragmentManager.popBackStack(); return }
     val name = view?.findViewById<EditText>(R.id.client_details_name)?.text?.toString()
     val reading = view?.findViewById<EditText>(R.id.client_details_reading)?.text?.toString()
     if (null == name || null == reading) throw NullPointerException("Neither name or reading can be null when validating the dialog")
@@ -43,17 +50,26 @@ class ClientDetails(private val fmarkHost : FMark, private val driveResourceClie
       val fmarkFolder = getFMarkFolder(driveResourceClient, fmarkHost)
       val existingFolders = getFoldersForClientName(driveResourceClient, fmarkFolder, name, reading)
       if (existingFolders.count == 0)
-        fmarkHost.startEditor(driveResourceClient, fmarkFolder, name, reading)
+        validateDetails(fmarkFolder, name, reading)
       else
       {
         val message = String.format(Locale.getDefault(), fmarkHost.getString(R.string.client_already_exists), existingFolders.count)
         AlertDialog.Builder(fmarkHost)
          .setMessage(message)
-         .setPositiveButton(R.string.ok) { _, _ -> GlobalScope.launch(Dispatchers.Main) { fmarkHost.startEditor(driveResourceClient, fmarkFolder, name, reading) } }
+         .setPositiveButton(R.string.ok) { _, _ -> GlobalScope.launch(Dispatchers.Main) { validateDetails(fmarkFolder, name, reading) } }
          .setNegativeButton(R.string.cancel) { dialog, _ -> dialog.dismiss() }
          .show()
       }
     }
+  }
+
+  private suspend fun validateDetails(fmarkFolder : DriveFolder, name : String, reading : String)
+  {
+    fmarkHost.supportFragmentManager.popBackStack()
+    if (null == clientFolder)
+      fmarkHost.startEditor(driveResourceClient, createFolderForClientName(driveResourceClient, fmarkFolder, name, reading)) // It's a new client.
+    else
+      fmarkHost.renameClient(driveResourceClient, clientFolder, name, reading)
   }
 
   override fun onDetach()

@@ -3,7 +3,8 @@
               android:orientation="vertical"
               android:padding="12sp"
               android:layout_width="match_parent"
-              android:layout_height="wrap_content">
+              android:layout_height="wrap_content"
+              android:background="?attr/selectableItemBackground">
 
   <TextView
    android:id="@+id/client_name"

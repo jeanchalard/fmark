@@ -19,17 +19,25 @@ suspend fun getFoldersForClientName(driveResourceClient : DriveResourceClient, f
   return driveResourceClient.queryChildren(fmarkFolder, query).await()
 }
 
-suspend fun createFolderForClientName(driveResourceClient : DriveResourceClient, fmarkFolder : DriveFolder, name : String, reading : String) : Metadata
-{
-  val cs = MetadataChangeSet.Builder()
-   .setTitle("${name} -- ${reading}")
+private fun metadataForClient(name : String, reading : String) = MetadataChangeSet.Builder()
+   .setTitle(encodeFolderName(name, reading))
    .setDescription(reading)
-   .setIndexableText("${name} ${reading}")
+   .setIndexableText(encodeIndexableText(name, reading))
    .setMimeType(DriveFolder.MIME_TYPE)
    .build()
-  val folder = driveResourceClient.createFolder(fmarkFolder, cs).await()
+
+suspend fun createFolderForClientName(driveResourceClient : DriveResourceClient, fmarkFolder : DriveFolder, name : String, reading : String) : Metadata
+{
+  val folder = driveResourceClient.createFolder(fmarkFolder, metadataForClient(name, reading)).await()
   return driveResourceClient.getMetadata(folder).await()
 }
 
-fun getName(folder : Metadata) = folder.title.split(" -- ")[0]
-fun getReading(folder : Metadata) = folder.title.split(" -- ")[1]
+suspend fun renameFolder(driveResourceClient : DriveResourceClient, clientFolder : DriveFolder, name : String, reading : String) : Metadata?
+{
+  return driveResourceClient.updateMetadata(clientFolder, metadataForClient(name, reading)).await()
+}
+
+fun encodeFolderName(name : String, reading : String) = "${name} -- ${reading}"
+fun encodeIndexableText(name : String, reading : String) = "${name} ${reading}"
+fun decodeName(folder : Metadata) = folder.title.let { if (it.indexOf("--") != -1) it.split(" -- ")[0] else it }
+fun decodeReading(folder : Metadata) = folder.title.let { if (it.indexOf("--") != -1) it.split(" -- ")[1] else it }

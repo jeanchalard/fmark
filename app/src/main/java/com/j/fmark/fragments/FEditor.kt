@@ -9,21 +9,19 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-import android.widget.TextView
 import com.google.android.gms.drive.DriveResourceClient
 import com.google.android.gms.drive.Metadata
 import com.j.fmark.FMark
 import com.j.fmark.R
-import java.util.*
+import com.j.fmark.drive.decodeName
 
 class FEditor(private val fmarkHost : FMark, private val driveResourceClient : DriveResourceClient, private val clientFolder : Metadata) : Fragment()
 {
+  val name = decodeName(clientFolder)
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View?
   {
     val view = inflater.inflate(R.layout.fragment_feditor, container, false)
     view.setOnKeyListener { v, keycode, event -> if (KeyEvent.KEYCODE_BACK == keycode) { fmarkHost.supportFragmentManager.popBackStack(); true } else false }
-    val name = String.format(Locale.getDefault(), fmarkHost.getString(R.string.person_honorific), clientFolder.title)
-    view.findViewById<TextView>(R.id.feditor_client_name).text = name
     view.findViewById<AppCompatImageButton>(R.id.feditor_face).setOnClickListener { _ -> switchDrawing(R.id.feditor_face) }
     view.findViewById<AppCompatImageButton>(R.id.feditor_front).setOnClickListener { _ -> switchDrawing(R.id.feditor_front) }
     view.findViewById<AppCompatImageButton>(R.id.feditor_back).setOnClickListener { _ -> switchDrawing(R.id.feditor_back) }

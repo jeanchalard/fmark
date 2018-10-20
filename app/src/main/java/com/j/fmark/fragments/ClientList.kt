@@ -12,16 +12,24 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
-import com.google.android.gms.drive.DriveFolder
 import com.google.android.gms.drive.DriveResourceClient
 import com.google.android.gms.drive.Metadata
-import com.google.android.gms.drive.query.*
+import com.google.android.gms.drive.query.Filters
+import com.google.android.gms.drive.query.Query
+import com.google.android.gms.drive.query.SearchableField
+import com.google.android.gms.drive.query.SortOrder
+import com.google.android.gms.drive.query.SortableField
 import com.j.fmark.ClientAdapter
 import com.j.fmark.FMark
 import com.j.fmark.R
 import com.j.fmark.drive.FDrive
-import com.j.fmark.drive.FDrive.getFMarkFolder
-import kotlinx.coroutines.experimental.*
+import kotlinx.coroutines.experimental.CoroutineScope
+import kotlinx.coroutines.experimental.CoroutineStart
+import kotlinx.coroutines.experimental.Dispatchers
+import kotlinx.coroutines.experimental.GlobalScope
+import kotlinx.coroutines.experimental.Job
+import kotlinx.coroutines.experimental.delay
+import kotlinx.coroutines.experimental.launch
 import kotlinx.coroutines.experimental.tasks.await
 
 /**
@@ -90,5 +98,7 @@ class ClientList(private val fmarkHost : FMark, private val client : DriveResour
     else (list.adapter as ClientAdapter).setSource(result)
   }
 
+  fun showClientDetails(clientFolder : Metadata) = fmarkHost.showClientDetails(client, clientFolder)
   fun startEditor(clientFolder : Metadata) = fmarkHost.startEditor(client, clientFolder)
+  fun notifyRenamed(clientFolder : Metadata) = (view?.findViewById<RecyclerView>(R.id.client_list)?.adapter as ClientAdapter?)?.notifyRenamed(clientFolder)
 }
