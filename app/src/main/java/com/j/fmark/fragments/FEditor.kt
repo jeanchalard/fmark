@@ -8,7 +8,6 @@ import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v7.widget.AppCompatImageButton
-import android.util.Log
 import android.util.SparseArray
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -37,6 +36,7 @@ import java.io.FileInputStream
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.io.StreamCorruptedException
+import kotlin.math.roundToInt
 
 const val DATA_FILE_NAME = "data"
 const val FACE_IMAGE_NAME = "顔"
@@ -156,14 +156,36 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
 
   private suspend fun savePicture(picToSave : Drawing, drawnBitmap : Bitmap, guide : Drawable)
   {
+    // Get the file on Drive
     val file = driveApi.findFile(clientFolder.driveId.asDriveFolder(), picToSave.fileName)
     val contents = (if (file != null) driveApi.openFile(file, DriveFile.MODE_WRITE_ONLY) else driveApi.createContents()).await()
+
+    // Create a new bitmap to compose and floodfill it with white.
     val composedBitmap = Bitmap.createBitmap(drawnBitmap.width, drawnBitmap.height, drawnBitmap.config)
     val canvas = Canvas(composedBitmap)
     canvas.drawColor(color(0xFFFFFFFF))
-    guide.setBounds(0, 0, composedBitmap.width, composedBitmap.height)
+
+    // Compute the aspect-ratio-respecting size of the guide and blit it.
+    val srcAspect = guide.intrinsicWidth.toDouble() / guide.intrinsicHeight
+    val dstAspect = composedBitmap.width.toDouble() / composedBitmap.height
+    if (srcAspect < dstAspect) // Guide is taller (relative to its width) than Dst : fit the height and center in width
+    {
+      val width = (composedBitmap.height * srcAspect).roundToInt()
+      val x = (composedBitmap.width - width) / 2
+      guide.setBounds(x, 0, x + width, composedBitmap.height)
+    }
+    else // Fit the width and center in height
+    {
+      val height = (composedBitmap.width / srcAspect).roundToInt()
+      val y = (composedBitmap.height - height) / 2
+      guide.setBounds(0, y, composedBitmap.width, y + height)
+    }
     guide.draw(canvas)
+
+    // Blit the drawing.
     canvas.drawBitmap(drawnBitmap, 0f, 0f, Paint())
+
+    // Compress the image and save it to Drive.
     composedBitmap.compress(Bitmap.CompressFormat.PNG, 85, contents.outputStream)
     val cs = MetadataChangeSet.Builder()
      .setTitle(picToSave.fileName)
