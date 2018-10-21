@@ -22,4 +22,6 @@
   <string name="titlebar_main">FMark</string>
   <string name="last_update">Last update :</string>
   <string name="creation_date">Creation date :</string>
+  <string name="label_undo">Undo</string>
+  <string name="label_save">Save</string>
 </resources>

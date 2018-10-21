@@ -3,30 +3,36 @@ package com.j.fmark
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.util.AttributeSet
-import android.util.Log
 import android.view.MotionEvent
 import android.view.View
+import com.j.fmark.fragments.FEditorDataType
 
 const val BASE_STROKE_WIDTH = 48f
+const val CODE_ACTION_DOWN : FEditorDataType = 0.0
+const val CODE_ACTION_MOVE : FEditorDataType = 1.0
+const val CODE_ACTION_UP : FEditorDataType = 2.0
 
 class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : View(context, attrs, defStyleAttr, defStyleRes)
 {
+  private var data : ArrayList<FEditorDataType> = ArrayList()
   private var pic : Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
   private var canvas : Canvas = Canvas(pic)
   private val paint = Paint().apply { color = color(0xFF005F00); isAntiAlias = true; style = Paint.Style.STROKE; strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND; strokeWidth = BASE_STROKE_WIDTH }
   private val path = Path()
-
-  private fun color(l : Long) : Int
-  {
-    return (l and -1L).toInt()
-  }
+  private var width : Double = 0.0
+  private var height : Double = 0.0
+  private var lastX : FEditorDataType = 0.0
+  private var lastY : FEditorDataType = 0.0
 
   override fun onSizeChanged(w : Int, h : Int, oldw : Int, oldh : Int)
   {
     super.onSizeChanged(w, h, oldw, oldh)
+    width = w.toDouble()
+    height = h.toDouble()
     pic = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     canvas = Canvas(pic)
   }
@@ -38,33 +44,71 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     canvas.drawPath(path, paint)
   }
 
-  private var lastX : Float = 0f
-  private var lastY : Float = 0f
+  fun getBitmap() = pic.copy(pic.config, false)
+  fun saveData(dest : ArrayList<FEditorDataType>) = dest.apply { clear(); addAll(data) }
+  fun readData(source : ArrayList<FEditorDataType>) = replayData(source)
+
   override fun onTouchEvent(event : MotionEvent?) : Boolean
   {
     if (null == event) return false
-    paint.strokeWidth = BASE_STROKE_WIDTH * event.pressure * event.pressure
     when (event.action)
     {
-      MotionEvent.ACTION_DOWN -> path.moveTo(event.x, event.y)
-      MotionEvent.ACTION_MOVE ->
-      {
-        val x = (lastX + event.x) / 2; val y = (lastY + event.y) / 2
-        path.quadTo(lastX, lastY, x, y)
-        canvas.drawPath(path, paint)
-        path.reset()
-        path.moveTo(x, y)
-      }
-      MotionEvent.ACTION_UP ->
-      {
-        path.lineTo(event.x, event.y)
-        canvas.drawPath(path, paint)
-        path.reset()
-      }
+      MotionEvent.ACTION_DOWN -> addDown(event.x / width, event.y / height, (event.pressure * event.pressure).toDouble())
+      MotionEvent.ACTION_MOVE -> addMove(event.x / width, event.y / height, (event.pressure * event.pressure).toDouble())
+      MotionEvent.ACTION_UP ->   addUp(event.x / width, event.y / height)
     }
-    lastX = event.x
-    lastY = event.y
     invalidate()
     return true
+  }
+
+  private fun replayData(replayData : ArrayList<FEditorDataType>)
+  {
+    data.clear()
+    pic.eraseColor(Color.TRANSPARENT)
+    var i = 0
+    while (i < replayData.size)
+      when (replayData[i++])
+      {
+        CODE_ACTION_DOWN -> addDown(replayData[i++], replayData[i++], replayData[i++])
+        CODE_ACTION_MOVE -> addMove(replayData[i++], replayData[i++], replayData[i++])
+        CODE_ACTION_UP ->   addUp(replayData[i++], replayData[i++])
+      }
+    invalidate()
+  }
+
+  private fun addDown(x : FEditorDataType, y : FEditorDataType, pressure : FEditorDataType)
+  {
+    val screenX = (x * width).toFloat()
+    val screenY = (y * height).toFloat()
+    paint.strokeWidth = (BASE_STROKE_WIDTH * pressure).toFloat()
+    path.moveTo(screenX, screenY)
+    data.add(CODE_ACTION_DOWN)
+    data.add(x); data.add(y); data.add(pressure)
+    lastX = x; lastY = y
+  }
+
+  private fun addMove(x : FEditorDataType, y : FEditorDataType, pressure : FEditorDataType)
+  {
+    val screenX = (((lastX + x) / 2) * width).toFloat(); val screenY = (((lastY + y) / 2) * height).toFloat()
+    paint.strokeWidth = (BASE_STROKE_WIDTH * pressure).toFloat()
+    path.quadTo((lastX * width).toFloat(), (lastY * height).toFloat(), screenX, screenY)
+    canvas.drawPath(path, paint)
+    path.reset()
+    path.moveTo(screenX, screenY)
+    data.add(CODE_ACTION_MOVE)
+    data.add(x); data.add(y); data.add(pressure)
+    lastX = x; lastY = y
+  }
+
+  private fun addUp(x : FEditorDataType, y : FEditorDataType)
+  {
+    val screenX = (x * width).toFloat()
+    val screenY = (y * height).toFloat()
+    path.lineTo(screenX, screenY)
+    canvas.drawPath(path, paint)
+    path.reset()
+    data.add(CODE_ACTION_UP)
+    data.add(x); data.add(y)
+    lastX = x; lastY = y
   }
 }

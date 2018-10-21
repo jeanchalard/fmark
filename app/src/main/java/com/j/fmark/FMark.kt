@@ -2,7 +2,10 @@ package com.j.fmark
 
 import android.content.Intent
 import android.os.Bundle
+import android.support.v4.app.Fragment
 import android.support.v7.app.AppCompatActivity
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import com.google.android.gms.auth.api.Auth
 import com.google.android.gms.drive.Drive
@@ -21,6 +24,9 @@ import java.util.Locale
 
 class FMark : AppCompatActivity()
 {
+  private val shownFragment : Fragment
+    get() = supportFragmentManager.fragments.last()
+
   override fun onCreate(icicle : Bundle?)
   {
     super.onCreate(null)
@@ -35,13 +41,43 @@ class FMark : AppCompatActivity()
       } // Otherwise, wait for sign in activity → onActivityResult
     }
     supportFragmentManager.addOnBackStackChangedListener {
-      val fragment = supportFragmentManager.fragments.last()
+      val actionBar = supportActionBar ?: return@addOnBackStackChangedListener
+      val fragment = shownFragment
       when (fragment) {
-        is ClientList -> supportActionBar?.setTitle(R.string.titlebar_main)
-        is ClientDetails -> supportActionBar?.setTitle(R.string.titlebar_client_details)
-        is FEditor -> supportActionBar?.setTitle(String.format(Locale.getDefault(), getString(R.string.titlebar_editor), fragment.name))
+        is ClientList -> actionBar.setTitle(R.string.titlebar_main)
+        is ClientDetails -> actionBar.setTitle(R.string.titlebar_client_details)
+        is FEditor -> actionBar.title = String.format(Locale.getDefault(), getString(R.string.titlebar_editor), fragment.name)
       }
+      invalidateOptionsMenu()
     }
+  }
+
+  override fun onPrepareOptionsMenu(menu : Menu?) : Boolean
+  {
+    val menu = menu ?: return super.onPrepareOptionsMenu(menu)
+    val visible = when (shownFragment) {
+      is ClientList, is ClientDetails -> false
+      is FEditor -> true
+      else -> false
+    }
+    menu.findItem(R.id.action_button_undo).isVisible = visible
+    menu.findItem(R.id.action_button_save).isVisible = visible
+    return super.onPrepareOptionsMenu(menu)
+  }
+
+  override fun onCreateOptionsMenu(menu : Menu) : Boolean
+  {
+    menuInflater.inflate(R.menu.menu_feditor, menu)
+    return super.onCreateOptionsMenu(menu)
+  }
+
+  override fun onOptionsItemSelected(item : MenuItem?) : Boolean
+  {
+    val fragment = shownFragment
+    when (fragment) {
+      is FEditor -> return fragment.onOptionsItemSelected(item)
+    }
+    return super.onOptionsItemSelected(item)
   }
 
   override fun onActivityResult(requestCode : Int, resultCode : Int, data : Intent?)

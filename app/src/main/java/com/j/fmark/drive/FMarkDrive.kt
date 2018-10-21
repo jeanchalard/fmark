@@ -1,5 +1,6 @@
 package com.j.fmark.drive
 
+import com.google.android.gms.drive.DriveFile
 import com.google.android.gms.drive.DriveFolder
 import com.google.android.gms.drive.DriveResourceClient
 import com.google.android.gms.drive.Metadata
@@ -35,6 +36,16 @@ suspend fun createFolderForClientName(driveResourceClient : DriveResourceClient,
 suspend fun renameFolder(driveResourceClient : DriveResourceClient, clientFolder : DriveFolder, name : String, reading : String) : Metadata?
 {
   return driveResourceClient.updateMetadata(clientFolder, metadataForClient(name, reading)).await()
+}
+
+suspend fun DriveResourceClient.findFile(clientFolder : DriveFolder, fileName : String) : DriveFile?
+{
+  val query = Query.Builder()
+   .addFilter(Filters.eq(SearchableField.TITLE, fileName))
+   .addFilter(Filters.eq(SearchableField.TRASHED, false))
+   .build()
+  val result = queryChildren(clientFolder, query).await()
+  return if (result.count > 0) result[0].driveId.asDriveFile() else null
 }
 
 fun encodeFolderName(name : String, reading : String) = "${name} -- ${reading}"

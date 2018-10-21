@@ -33,6 +33,7 @@
      android:layout_height="match_parent"
      android:scaleType="fitCenter" />
     <com.j.fmark.CanvasView
+     android:id="@+id/feditor_canvas"
      android:layout_width="match_parent"
      android:layout_height="match_parent" />
   </FrameLayout>

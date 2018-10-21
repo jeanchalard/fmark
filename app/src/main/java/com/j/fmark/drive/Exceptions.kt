@@ -5,4 +5,5 @@ import java.lang.Exception
 class SignInException(s : String) : Exception(s)
 class FolderNotUniqueException(s : String) : Exception(s)
 class NotAFolderException(s : String) : Exception(s)
+class NoDataFile(s : String) : Exception(s)
 class NoDriveClientException(s : String) : Exception(s)
