@@ -5,33 +5,36 @@
                                              android:layout_width="match_parent"
                                              android:layout_height="match_parent">
 
-  <TextView
-   android:id="@+id/feditor_client_name"
+  <LinearLayout
+   android:id="@+id/feditor_palette"
+   android:orientation="horizontal"
    android:layout_width="match_parent"
    android:layout_height="wrap_content"
-   android:textColor="@android:color/black"
-   android:textSize="24sp"
-   android:padding="12sp"
-   app:layout_constraintTop_toTopOf="parent"/>
+   app:layout_constraintTop_toTopOf="parent">
+    Mettre ici les couleurs et la gomme
+  </LinearLayout>
 
   <View
    android:id="@+id/feditor_vsep1"
    android:layout_width="match_parent"
    android:layout_height="1px"
    android:background="@color/lightGrey"
-   app:layout_constraintTop_toBottomOf="@id/feditor_client_name" />
+   app:layout_constraintTop_toBottomOf="@id/feditor_palette" />
 
   <FrameLayout
    android:layout_width="match_parent"
    android:layout_height="0dp"
+   android:padding="8dp"
    app:layout_constraintTop_toBottomOf="@id/feditor_vsep1"
    app:layout_constraintBottom_toTopOf="@id/feditor_vsep2">
     <ImageView
      android:id="@+id/feditor_guide"
      android:layout_width="match_parent"
      android:layout_height="match_parent"
-     android:layout_margin="8dp"
      android:scaleType="fitCenter" />
+    <com.j.fmark.CanvasView
+     android:layout_width="match_parent"
+     android:layout_height="match_parent" />
   </FrameLayout>
 
   <View
