@@ -18,7 +18,8 @@ const val CODE_ACTION_UP : FEditorDataType = 2.0
 
 class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : View(context, attrs, defStyleAttr, defStyleRes)
 {
-  private var data : ArrayList<FEditorDataType> = ArrayList()
+  private val data : ArrayList<FEditorDataType> = ArrayList()
+  private val startCommandIndices : ArrayList<Int> = ArrayList()
   private var pic : Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
   private var canvas : Canvas = Canvas(pic)
   private val paint = Paint().apply { color = color(0xFF005F00); isAntiAlias = true; style = Paint.Style.STROKE; strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND; strokeWidth = BASE_STROKE_WIDTH }
@@ -76,12 +77,19 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     invalidate()
   }
 
+  fun undo()
+  {
+    val index = startCommandIndices.removeAt(startCommandIndices.size - 1)
+    replayData(ArrayList(data.subList(0, index)))
+  }
+
   private fun addDown(x : FEditorDataType, y : FEditorDataType, pressure : FEditorDataType)
   {
     val screenX = (x * width).toFloat()
     val screenY = (y * height).toFloat()
     paint.strokeWidth = (BASE_STROKE_WIDTH * pressure).toFloat()
     path.moveTo(screenX, screenY)
+    startCommandIndices.add(data.size)
     data.add(CODE_ACTION_DOWN)
     data.add(x); data.add(y); data.add(pressure)
     lastX = x; lastY = y

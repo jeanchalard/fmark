@@ -120,7 +120,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     val item = item ?: return super.onOptionsItemSelected(item)
     when (item.itemId) {
       R.id.action_button_save -> savePicture()
-      R.id.action_button_undo -> {}
+      R.id.action_button_undo -> view?.findViewById<CanvasView>(R.id.feditor_canvas)?.undo()
     }
     return true
   }
