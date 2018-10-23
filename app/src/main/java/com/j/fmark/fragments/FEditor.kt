@@ -15,10 +15,12 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.LinearLayout
 import com.google.android.gms.drive.DriveFile
 import com.google.android.gms.drive.DriveResourceClient
 import com.google.android.gms.drive.Metadata
 import com.google.android.gms.drive.MetadataChangeSet
+import com.j.fmark.BrushView
 import com.j.fmark.CanvasView
 import com.j.fmark.FMark
 import com.j.fmark.R
@@ -51,6 +53,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
   val name : String = decodeName(clientFolder)
   private val contents = SparseArray<Drawing>()
   private lateinit var shownPicture : Drawing
+  private val brushViews = ArrayList<BrushView>()
 
   val initJob : Job
   init
@@ -98,6 +101,18 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     val canvasView = view.findViewById<CanvasView>(R.id.feditor_canvas)
     canvasView.readData(shownPicture.data)
 
+    val palette = view.findViewById<LinearLayout>(R.id.feditor_palette)
+    for (i in 0 until palette.childCount)
+    {
+      val child = palette.getChildAt(i)
+      if (child is BrushView) brushViews.add(child)
+    }
+    brushViews.forEach { it.setOnClickListener { v ->
+      val bv = v as BrushView
+      canvasView.brush = bv.brush
+      brushViews.forEach { it.isActivated = (it == bv) }
+    }}
+    brushViews.first().isActivated = true
     return view
   }
 
@@ -115,9 +130,9 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     canvasView.readData(drawing.data)
   }
 
-  override fun onOptionsItemSelected(item : MenuItem?) : Boolean
+  override fun onOptionsItemSelected(menuItem : MenuItem?) : Boolean
   {
-    val item = item ?: return super.onOptionsItemSelected(item)
+    val item = menuItem ?: return super.onOptionsItemSelected(menuItem)
     when (item.itemId) {
       R.id.action_button_save -> savePicture()
       R.id.action_button_undo -> view?.findViewById<CanvasView>(R.id.feditor_canvas)?.undo()

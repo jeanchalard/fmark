@@ -8,4 +8,6 @@
 
   <color name="textBackgroundDark">#FF3F3F3F</color>
   <color name="textBackgroundLight">#FF6F6F6F</color>
+
+  <color name="defaultBrushColor">#FFE53935</color>
 </resources>

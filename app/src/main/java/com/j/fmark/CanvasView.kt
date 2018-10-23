@@ -6,28 +6,53 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.widget.ImageView
 import com.j.fmark.fragments.FEditorDataType
 
 const val BASE_STROKE_WIDTH = 48f
-const val CODE_ACTION_DOWN : FEditorDataType = 0.0
-const val CODE_ACTION_MOVE : FEditorDataType = 1.0
-const val CODE_ACTION_UP : FEditorDataType = 2.0
+enum class Action(val value : FEditorDataType)
+{
+  NONE(0.0), DOWN(1.0), MOVE(2.0), UP(3.0)
+}
 
+data class Brush(val mode : PorterDuff.Mode, val color : Int)
+abstract class BrushView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : ImageView(context, attrs, defStyleAttr, defStyleRes)
+{
+  abstract val brush : Brush
+}
+class PaletteView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : BrushView(context, attrs, defStyleAttr, defStyleRes)
+{
+  override val brush : Brush = Brush(PorterDuff.Mode.SRC_OVER, imageTintList.defaultColor)
+}
+class EraserView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : BrushView(context, attrs, defStyleAttr, defStyleRes)
+{
+  companion object { val CLEAR_BRUSH = Brush(PorterDuff.Mode.CLEAR, 0) }
+  override val brush : Brush = CLEAR_BRUSH
+}
 class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : View(context, attrs, defStyleAttr, defStyleRes)
 {
-  private val data : ArrayList<FEditorDataType> = ArrayList()
-  private val startCommandIndices : ArrayList<Int> = ArrayList()
-  private var pic : Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-  private var canvas : Canvas = Canvas(pic)
-  private val paint = Paint().apply { color = color(0xFF005F00); isAntiAlias = true; style = Paint.Style.STROKE; strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND; strokeWidth = BASE_STROKE_WIDTH }
+  class CommandList : ArrayList<FEditorDataType>()
+  {
+    fun addCommand(command : Action) = add(command.value)
+  }
+  private val data = CommandList()
+  private val defaultColor = context.getColor(R.color.defaultBrushColor)
+  private val startCommandIndices = ArrayList<Int>()
+  private var pic = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+  private var canvas = Canvas(pic)
+  private val bitmapPaint = Paint()
+  private val paint = Paint().apply { color = defaultColor; isAntiAlias = true; style = Paint.Style.STROKE; strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND; strokeWidth = BASE_STROKE_WIDTH }
   private val path = Path()
   private var width : Double = 0.0
   private var height : Double = 0.0
   private var lastX : FEditorDataType = 0.0
   private var lastY : FEditorDataType = 0.0
+  var brush : Brush = Brush(PorterDuff.Mode.SRC_OVER, defaultColor)
 
   override fun onSizeChanged(w : Int, h : Int, oldw : Int, oldh : Int)
   {
@@ -41,11 +66,11 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   override fun onDraw(canvas : Canvas?)
   {
     if (null == canvas) return
-    canvas.drawBitmap(pic, 0f, 0f, paint)
+    canvas.drawBitmap(pic, 0f, 0f, bitmapPaint)
     canvas.drawPath(path, paint)
   }
 
-  fun getBitmap() = pic.copy(pic.config, false)
+  fun getBitmap() : Bitmap = pic.copy(pic.config, false)
   fun saveData(dest : ArrayList<FEditorDataType>) = dest.apply { clear(); addAll(data) }
   fun readData(source : ArrayList<FEditorDataType>) = replayData(source)
 
@@ -54,7 +79,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     if (null == event) return false
     when (event.action)
     {
-      MotionEvent.ACTION_DOWN -> addDown(event.x / width, event.y / height, (event.pressure * event.pressure).toDouble())
+      MotionEvent.ACTION_DOWN -> addDown(event.x / width, event.y / height, (event.pressure * event.pressure).toDouble(), brush.mode.toInt().toDouble(), brush.color.toDouble())
       MotionEvent.ACTION_MOVE -> addMove(event.x / width, event.y / height, (event.pressure * event.pressure).toDouble())
       MotionEvent.ACTION_UP ->   addUp(event.x / width, event.y / height)
     }
@@ -70,9 +95,9 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     while (i < replayData.size)
       when (replayData[i++])
       {
-        CODE_ACTION_DOWN -> addDown(replayData[i++], replayData[i++], replayData[i++])
-        CODE_ACTION_MOVE -> addMove(replayData[i++], replayData[i++], replayData[i++])
-        CODE_ACTION_UP ->   addUp(replayData[i++], replayData[i++])
+        Action.DOWN.value ->  addDown(replayData[i++], replayData[i++], replayData[i++], replayData[i++], replayData[i++])
+        Action.MOVE.value ->  addMove(replayData[i++], replayData[i++], replayData[i++])
+        Action.UP.value ->    addUp(replayData[i++], replayData[i++])
       }
     invalidate()
   }
@@ -83,15 +108,18 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     replayData(ArrayList(data.subList(0, index)))
   }
 
-  private fun addDown(x : FEditorDataType, y : FEditorDataType, pressure : FEditorDataType)
+  private fun addDown(x : FEditorDataType, y : FEditorDataType, pressure : FEditorDataType, mode : FEditorDataType, color : FEditorDataType)
   {
     val screenX = (x * width).toFloat()
     val screenY = (y * height).toFloat()
+    paint.xfermode = PorterDuffXfermode(mode.toInt().toPorterDuffMode())
+    paint.color = color.toInt()
     paint.strokeWidth = (BASE_STROKE_WIDTH * pressure).toFloat()
     path.moveTo(screenX, screenY)
     startCommandIndices.add(data.size)
-    data.add(CODE_ACTION_DOWN)
+    data.addCommand(Action.DOWN)
     data.add(x); data.add(y); data.add(pressure)
+    data.add(mode); data.add(color)
     lastX = x; lastY = y
   }
 
@@ -103,7 +131,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     canvas.drawPath(path, paint)
     path.reset()
     path.moveTo(screenX, screenY)
-    data.add(CODE_ACTION_MOVE)
+    data.addCommand(Action.MOVE)
     data.add(x); data.add(y); data.add(pressure)
     lastX = x; lastY = y
   }
@@ -115,7 +143,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     path.lineTo(screenX, screenY)
     canvas.drawPath(path, paint)
     path.reset()
-    data.add(CODE_ACTION_UP)
+    data.addCommand(Action.UP)
     data.add(x); data.add(y)
     lastX = x; lastY = y
   }

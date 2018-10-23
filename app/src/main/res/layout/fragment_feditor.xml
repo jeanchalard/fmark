@@ -11,7 +11,53 @@
    android:layout_width="match_parent"
    android:layout_height="wrap_content"
    app:layout_constraintTop_toTopOf="parent">
-    Mettre ici les couleurs et la gomme
+
+    <com.j.fmark.PaletteView
+     android:layout_width="48dp"
+     android:layout_height="48dp"
+     android:layout_margin="8dp"
+     android:background="@drawable/palette_view_background"
+     android:src="@drawable/brush"
+     android:tint="@color/defaultBrushColor" />
+    <com.j.fmark.PaletteView
+     android:layout_width="48dp"
+     android:layout_height="48dp"
+     android:layout_margin="8dp"
+     android:background="@drawable/palette_view_background"
+     android:src="@drawable/brush"
+     android:tint="#FFC0CA33" />
+    <com.j.fmark.PaletteView
+     android:layout_width="48dp"
+     android:layout_height="48dp"
+     android:layout_margin="8dp"
+     android:background="@drawable/palette_view_background"
+     android:src="@drawable/brush"
+     android:tint="#FF43A047" />
+    <com.j.fmark.PaletteView
+     android:layout_width="48dp"
+     android:layout_height="48dp"
+     android:layout_margin="8dp"
+     android:background="@drawable/palette_view_background"
+     android:src="@drawable/brush"
+     android:tint="#FF1E88E5" />
+    <com.j.fmark.PaletteView
+     android:layout_width="48dp"
+     android:layout_height="48dp"
+     android:layout_margin="8dp"
+     android:background="@drawable/palette_view_background"
+     android:src="@drawable/brush"
+     android:tint="#FF8E24AA" />
+    <View
+     android:layout_width="0dp"
+     android:layout_height="0dp"
+     android:layout_weight="1" />
+    <com.j.fmark.EraserView
+     android:layout_width="48dp"
+     android:layout_height="48dp"
+     android:layout_margin="8dp"
+     android:background="@drawable/palette_view_background"
+     android:src="@drawable/eraser" />
+
   </LinearLayout>
 
   <View
@@ -49,7 +95,7 @@
    android:id="@+id/feditor_face"
    style="@style/Widget.AppCompat.Button.Borderless"
    android:layout_width="0dp"
-   android:layout_height="48dp"
+   android:layout_height="96dp"
    android:src="@drawable/face_thumb"
    android:scaleType="fitCenter"
    app:layout_constraintBottom_toBottomOf="parent"
@@ -69,7 +115,7 @@
    android:id="@+id/feditor_front"
    style="@style/Widget.AppCompat.Button.Borderless"
    android:layout_width="0dp"
-   android:layout_height="48dp"
+   android:layout_height="96dp"
    android:src="@drawable/front_thumb"
    android:scaleType="fitCenter"
    app:layout_constraintBottom_toBottomOf="parent"
@@ -89,7 +135,7 @@
    android:id="@+id/feditor_back"
    style="@style/Widget.AppCompat.Button.Borderless"
    android:layout_width="0dp"
-   android:layout_height="48dp"
+   android:layout_height="96dp"
    android:src="@drawable/back_thumb"
    android:scaleType="fitCenter"
    app:layout_constraintBottom_toBottomOf="parent"
