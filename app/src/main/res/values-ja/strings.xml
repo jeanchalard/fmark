@@ -19,4 +19,5 @@
   <string name="creation_date">作成日 :</string>
   <string name="label_undo">取消</string>
   <string name="label_save">保存</string>
+  <string name="label_clear">初期化</string>
 </resources>

@@ -41,6 +41,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     fun addCommand(command : Action) = add(command.value)
   }
   private val data = CommandList()
+  private val oldData = CommandList()
   private val defaultColor = context.getColor(R.color.defaultBrushColor)
   private val startCommandIndices = ArrayList<Int>()
   private var pic = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
@@ -90,6 +91,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   private fun replayData(replayData : ArrayList<FEditorDataType>)
   {
     data.clear()
+    startCommandIndices.clear()
     pic.eraseColor(Color.TRANSPARENT)
     var i = 0
     while (i < replayData.size)
@@ -102,10 +104,25 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     invalidate()
   }
 
+  fun clear()
+  {
+    oldData.clear()
+    oldData.addAll(data)
+    replayData(ArrayList())
+  }
+
   fun undo()
   {
-    val index = startCommandIndices.removeAt(startCommandIndices.size - 1)
-    replayData(ArrayList(data.subList(0, index)))
+    if (startCommandIndices.size > 0)
+    {
+      val index = startCommandIndices.removeAt(startCommandIndices.size - 1)
+      replayData(ArrayList(data.subList(0, index)))
+    }
+    else
+    {
+      replayData(oldData)
+      oldData.clear()
+    }
   }
 
   private fun addDown(x : FEditorDataType, y : FEditorDataType, pressure : FEditorDataType, mode : FEditorDataType, color : FEditorDataType)

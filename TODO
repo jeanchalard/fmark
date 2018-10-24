@@ -1,5 +1,5 @@
 - Move the eraser to a larger brush with a visible circle.
-- Add a clear button.
+- Fix the bug where different ratios give different images.
 - Implement the screen blocking interaction while loading and saving.
 - Straighten up the save interaction (right now the save button saves
   all data but not all pictures, that's idiotic)

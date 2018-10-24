@@ -44,6 +44,9 @@ const val DATA_FILE_NAME = "data"
 const val FACE_IMAGE_NAME = "顔"
 const val FRONT_IMAGE_NAME = "前"
 const val BACK_IMAGE_NAME = "後"
+const val FACE_CODE = 0
+const val FRONT_CODE = 1
+const val BACK_CODE = 2
 
 typealias FEditorDataType = Double
 data class Drawing(val code : Int, val guideId : Int, val fileName : String, val data : ArrayList<FEditorDataType>)
@@ -51,16 +54,16 @@ data class Drawing(val code : Int, val guideId : Int, val fileName : String, val
 class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val clientFolder : Metadata) : Fragment()
 {
   val name : String = decodeName(clientFolder)
-  private val contents = SparseArray<Drawing>()
+  private val contents = ArrayList<Drawing>()
   private lateinit var shownPicture : Drawing
   private val brushViews = ArrayList<BrushView>()
 
-  val initJob : Job
+  private val initJob : Job
   init
   {
-    contents.put(R.id.feditor_face,  Drawing(R.id.feditor_face,  R.drawable.face,  FACE_IMAGE_NAME,  ArrayList()))
-    contents.put(R.id.feditor_front, Drawing(R.id.feditor_front, R.drawable.front, FRONT_IMAGE_NAME, ArrayList()))
-    contents.put(R.id.feditor_back,  Drawing(R.id.feditor_back,  R.drawable.back,  BACK_IMAGE_NAME,  ArrayList()))
+    contents.add(FACE_CODE,  Drawing(FACE_CODE,  R.drawable.face,  FACE_IMAGE_NAME,  ArrayList()))
+    contents.add(FRONT_CODE, Drawing(FRONT_CODE, R.drawable.front, FRONT_IMAGE_NAME, ArrayList()))
+    contents.add(BACK_CODE,  Drawing(BACK_CODE,  R.drawable.back,  BACK_IMAGE_NAME,  ArrayList()))
     initJob = GlobalScope.launch {
       val folder = clientFolder.driveId.asDriveFolder()
       val file = driveApi.findFile(folder, DATA_FILE_NAME) ?: driveApi.createFile(folder, MetadataChangeSet.Builder().setTitle(DATA_FILE_NAME).build(), null).await()
@@ -91,12 +94,11 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     val view = inflater.inflate(R.layout.fragment_feditor, container, false)
     view.setOnKeyListener { v, keycode, event -> if (KeyEvent.KEYCODE_BACK == keycode) { fmarkHost.supportFragmentManager.popBackStack(); true } else false }
 
-    for (i in 0 until contents.size()) { // Come on SparseArray not iterable ? Really ? :(
-      val it = contents.valueAt(i)
-      view.findViewById<AppCompatImageButton>(it.code).setOnClickListener { _ -> switchDrawing(it) }
-    }
+    view.findViewById<AppCompatImageButton>(R.id.feditor_face) .setOnClickListener { _ -> switchDrawing(contents[FACE_CODE]) }
+    view.findViewById<AppCompatImageButton>(R.id.feditor_front).setOnClickListener { _ -> switchDrawing(contents[FRONT_CODE]) }
+    view.findViewById<AppCompatImageButton>(R.id.feditor_back) .setOnClickListener { _ -> switchDrawing(contents[BACK_CODE]) }
 
-    shownPicture = contents[R.id.feditor_face]
+    shownPicture = contents[FACE_CODE]
     view.findViewById<ImageView>(R.id.feditor_guide)?.setImageResource(shownPicture.guideId)
     val canvasView = view.findViewById<CanvasView>(R.id.feditor_canvas)
     canvasView.readData(shownPicture.data)
@@ -136,6 +138,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     when (item.itemId) {
       R.id.action_button_save -> savePicture()
       R.id.action_button_undo -> view?.findViewById<CanvasView>(R.id.feditor_canvas)?.undo()
+      R.id.action_button_clear -> view?.findViewById<CanvasView>(R.id.feditor_canvas)?.clear()
     }
     return true
   }
@@ -159,8 +162,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     val dataFile = driveApi.findFile(clientFolder.driveId.asDriveFolder(), DATA_FILE_NAME) ?: return
     val dataContents = driveApi.openFile(dataFile, DriveFile.MODE_WRITE_ONLY).await()
     val os = ObjectOutputStream(dataContents.outputStream)
-    for (i in 0 until contents.size()) { // SparseArray still not iterable since the start of this file ? Seriously.
-      val it = contents.valueAt(i)
+    contents.forEach {
       os.writeInt(it.code)
       os.writeObject(it.data)
     }
