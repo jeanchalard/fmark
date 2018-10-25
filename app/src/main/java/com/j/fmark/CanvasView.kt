@@ -19,8 +19,12 @@ enum class Action(val value : FEditorDataType)
 {
   NONE(0.0), DOWN(1.0), MOVE(2.0), UP(3.0)
 }
-
+const val DRAW = 1.0
+const val ERASE = 2.0
 data class Brush(val mode : PorterDuff.Mode, val color : Int)
+{
+  companion object { @JvmStatic fun isEraser(v : FEditorDataType) = v == ERASE }
+}
 abstract class BrushView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : ImageView(context, attrs, defStyleAttr, defStyleRes)
 {
   abstract val brush : Brush
@@ -53,6 +57,9 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   private var height : Double = 0.0
   private var lastX : FEditorDataType = 0.0
   private var lastY : FEditorDataType = 0.0
+  private val eraserFeedbackPaint = Paint().apply { color = color(0xFF000000); isAntiAlias = true; style = Paint.Style.STROKE; strokeWidth = 1f}
+  private val eraserRadius = context.resources.getDimension(R.dimen.eraserRadius)
+  private var eraserX = -1.0f; private var eraserY = -1.0f
   var brush : Brush = Brush(PorterDuff.Mode.SRC_OVER, defaultColor)
 
   override fun onSizeChanged(w : Int, h : Int, oldw : Int, oldh : Int)
@@ -69,6 +76,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     if (null == canvas) return
     canvas.drawBitmap(pic, 0f, 0f, bitmapPaint)
     canvas.drawPath(path, paint)
+    if (eraserX > 0f) canvas.drawCircle(eraserX, eraserY, eraserRadius, eraserFeedbackPaint)
   }
 
   fun getBitmap() : Bitmap = pic.copy(pic.config, false)
@@ -81,7 +89,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     when (event.action)
     {
       MotionEvent.ACTION_DOWN -> addDown(event.x / width, event.y / height, (event.pressure * event.pressure).toDouble(), brush.mode.toInt().toDouble(), brush.color.toDouble())
-      MotionEvent.ACTION_MOVE -> addMove(event.x / width, event.y / height, (event.pressure * event.pressure).toDouble())
+      MotionEvent.ACTION_MOVE -> addMove(event.x / width, event.y / height, (event.pressure * event.pressure).toDouble(), if (brush.mode == PorterDuff.Mode.CLEAR) ERASE else DRAW)
       MotionEvent.ACTION_UP ->   addUp(event.x / width, event.y / height)
     }
     invalidate()
@@ -98,7 +106,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
       when (replayData[i++])
       {
         Action.DOWN.value ->  addDown(replayData[i++], replayData[i++], replayData[i++], replayData[i++], replayData[i++])
-        Action.MOVE.value ->  addMove(replayData[i++], replayData[i++], replayData[i++])
+        Action.MOVE.value ->  addMove(replayData[i++], replayData[i++], replayData[i++], replayData[i++])
         Action.UP.value ->    addUp(replayData[i++], replayData[i++])
       }
     invalidate()
@@ -138,18 +146,36 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     data.add(x); data.add(y); data.add(pressure)
     data.add(mode); data.add(color)
     lastX = x; lastY = y
+    if (brush.mode == PorterDuff.Mode.CLEAR)
+    {
+      eraserX = screenX; eraserY = screenY
+    }
   }
 
-  private fun addMove(x : FEditorDataType, y : FEditorDataType, pressure : FEditorDataType)
+  private fun addMove(x : FEditorDataType, y : FEditorDataType, pressure : FEditorDataType, erase : FEditorDataType)
   {
-    val screenX = (((lastX + x) / 2) * width).toFloat(); val screenY = (((lastY + y) / 2) * height).toFloat()
-    paint.strokeWidth = (BASE_STROKE_WIDTH * pressure).toFloat()
+    val isEraser = Brush.isEraser(erase)
+    val screenX : Float; val screenY : Float
+    if (isEraser)
+    {
+      screenX = (x * width).toFloat()
+      screenY = (y * height).toFloat()
+      eraserX = screenX; eraserY = screenY
+      paint.strokeWidth = eraserRadius * 2
+      path.lineTo(screenX, screenY)
+    }
+    else
+    {
+      screenX = (((lastX + x) / 2) * width).toFloat()
+      screenY = (((lastY + y) / 2) * height).toFloat()
+      paint.strokeWidth = (BASE_STROKE_WIDTH * pressure).toFloat()
+    }
     path.quadTo((lastX * width).toFloat(), (lastY * height).toFloat(), screenX, screenY)
     canvas.drawPath(path, paint)
     path.reset()
     path.moveTo(screenX, screenY)
     data.addCommand(Action.MOVE)
-    data.add(x); data.add(y); data.add(pressure)
+    data.add(x); data.add(y); data.add(pressure); data.add(erase)
     lastX = x; lastY = y
   }
 
@@ -163,5 +189,6 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     data.addCommand(Action.UP)
     data.add(x); data.add(y)
     lastX = x; lastY = y
+    eraserX = -1.0f; eraserY = -1.0f
   }
 }
