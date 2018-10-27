@@ -8,7 +8,6 @@ import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v7.widget.AppCompatImageButton
-import android.util.SparseArray
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MenuItem
@@ -99,8 +98,8 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     view.findViewById<AppCompatImageButton>(R.id.feditor_back) .setOnClickListener { _ -> switchDrawing(contents[BACK_CODE]) }
 
     shownPicture = contents[FACE_CODE]
-    view.findViewById<ImageView>(R.id.feditor_guide)?.setImageResource(shownPicture.guideId)
     val canvasView = view.findViewById<CanvasView>(R.id.feditor_canvas)
+    canvasView.setImageResource(shownPicture.guideId)
     canvasView.readData(shownPicture.data)
 
     val palette = view.findViewById<LinearLayout>(R.id.feditor_palette)
@@ -128,7 +127,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     val canvasView = view.findViewById<CanvasView>(R.id.feditor_canvas)
     canvasView.saveData(shownPicture.data)
     shownPicture = drawing
-    view.findViewById<ImageView>(R.id.feditor_guide)?.setImageResource(guideId)
+    canvasView.setImageResource(guideId)
     canvasView.readData(drawing.data)
   }
 

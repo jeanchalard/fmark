@@ -4,17 +4,16 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.util.AttributeSet
 import android.view.MotionEvent
-import android.view.View
 import android.widget.ImageView
 import com.j.fmark.fragments.FEditorDataType
 
-const val BASE_STROKE_WIDTH = 48f
 enum class Action(val value : FEditorDataType)
 {
   NONE(0.0), DOWN(1.0), MOVE(2.0), UP(3.0)
@@ -38,7 +37,7 @@ class EraserView @JvmOverloads constructor(context : Context, attrs : AttributeS
   companion object { val CLEAR_BRUSH = Brush(PorterDuff.Mode.CLEAR, 0) }
   override val brush : Brush = CLEAR_BRUSH
 }
-class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : View(context, attrs, defStyleAttr, defStyleRes)
+class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : ImageView(context, attrs, defStyleAttr, defStyleRes)
 {
   class CommandList : ArrayList<FEditorDataType>()
   {
@@ -48,17 +47,18 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   private val oldData = CommandList()
   private val defaultColor = context.getColor(R.color.defaultBrushColor)
   private val startCommandIndices = ArrayList<Int>()
+  private val baseStrokeWidth = context.resources.getDimension(R.dimen.baseStrokeWidth)
+  private val eraserRadius = context.resources.getDimension(R.dimen.eraserRadius)
   private var pic = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
   private var canvas = Canvas(pic)
   private val bitmapPaint = Paint()
-  private val paint = Paint().apply { color = defaultColor; isAntiAlias = true; style = Paint.Style.STROKE; strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND; strokeWidth = BASE_STROKE_WIDTH }
+  private val paint = Paint().apply { color = defaultColor; isAntiAlias = true; style = Paint.Style.STROKE; strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND; strokeWidth = baseStrokeWidth }
   private val path = Path()
   private var width : Double = 0.0
   private var height : Double = 0.0
-  private var lastX : FEditorDataType = 0.0
-  private var lastY : FEditorDataType = 0.0
+  private var lastX : Float = 0.0f
+  private var lastY : Float = 0.0f
   private val eraserFeedbackPaint = Paint().apply { color = color(0xFF000000); isAntiAlias = true; style = Paint.Style.STROKE; strokeWidth = 1f}
-  private val eraserRadius = context.resources.getDimension(R.dimen.eraserRadius)
   private var eraserX = -1.0f; private var eraserY = -1.0f
   var brush : Brush = Brush(PorterDuff.Mode.SRC_OVER, defaultColor)
 
@@ -71,9 +71,19 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     canvas = Canvas(pic)
   }
 
+  var viewToImage = Matrix()
+  override fun onLayout(changed : Boolean, left : Int, top : Int, right : Int, bottom : Int)
+  {
+    super.onLayout(changed, left, top, right, bottom)
+    imageMatrix.invert(viewToImage)
+    cacheVector[0] = drawable.intrinsicWidth.toFloat(); cacheVector[1] = drawable.intrinsicHeight.toFloat()
+    imageMatrix.mapPoints(cacheVector)
+  }
+
   override fun onDraw(canvas : Canvas?)
   {
     if (null == canvas) return
+    super.onDraw(canvas)
     canvas.drawBitmap(pic, 0f, 0f, bitmapPaint)
     canvas.drawPath(path, paint)
     if (eraserX > 0f) canvas.drawCircle(eraserX, eraserY, eraserRadius, eraserFeedbackPaint)
@@ -83,14 +93,17 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   fun saveData(dest : ArrayList<FEditorDataType>) = dest.apply { clear(); addAll(data) }
   fun readData(source : ArrayList<FEditorDataType>) = replayData(source)
 
+  var cacheVector = FloatArray(2)
   override fun onTouchEvent(event : MotionEvent?) : Boolean
   {
     if (null == event) return false
+    cacheVector[0] = event.x; cacheVector[1] = event.y
+    viewToImage.mapPoints(cacheVector)
     when (event.action)
     {
-      MotionEvent.ACTION_DOWN -> addDown(event.x / width, event.y / height, (event.pressure * event.pressure).toDouble(), brush.mode.toInt().toDouble(), brush.color.toDouble())
-      MotionEvent.ACTION_MOVE -> addMove(event.x / width, event.y / height, (event.pressure * event.pressure).toDouble(), if (brush.mode == PorterDuff.Mode.CLEAR) ERASE else DRAW)
-      MotionEvent.ACTION_UP ->   addUp(event.x / width, event.y / height)
+      MotionEvent.ACTION_DOWN -> addDown(cacheVector[0].toDouble(), cacheVector[1].toDouble(), (event.pressure * event.pressure).toDouble(), brush.mode.toInt().toDouble(), brush.color.toDouble())
+      MotionEvent.ACTION_MOVE -> addMove(cacheVector[0].toDouble(), cacheVector[1].toDouble(), (event.pressure * event.pressure).toDouble(), if (brush.mode == PorterDuff.Mode.CLEAR) ERASE else DRAW)
+      MotionEvent.ACTION_UP ->   addUp(cacheVector[0].toDouble(), cacheVector[1].toDouble())
     }
     invalidate()
     return true
@@ -135,17 +148,18 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
 
   private fun addDown(x : FEditorDataType, y : FEditorDataType, pressure : FEditorDataType, mode : FEditorDataType, color : FEditorDataType)
   {
-    val screenX = (x * width).toFloat()
-    val screenY = (y * height).toFloat()
+    cacheVector[0] = x.toFloat(); cacheVector[1] = y.toFloat()
+    imageMatrix.mapPoints(cacheVector)
+    val screenX = cacheVector[0]; val screenY = cacheVector[1]
     paint.xfermode = PorterDuffXfermode(mode.toInt().toPorterDuffMode())
     paint.color = color.toInt()
-    paint.strokeWidth = (BASE_STROKE_WIDTH * pressure).toFloat()
+    paint.strokeWidth = (baseStrokeWidth * pressure).toFloat()
     path.moveTo(screenX, screenY)
     startCommandIndices.add(data.size)
     data.addCommand(Action.DOWN)
     data.add(x); data.add(y); data.add(pressure)
     data.add(mode); data.add(color)
-    lastX = x; lastY = y
+    lastX = cacheVector[0]; lastY = cacheVector[1]
     if (brush.mode == PorterDuff.Mode.CLEAR)
     {
       eraserX = screenX; eraserY = screenY
@@ -155,40 +169,42 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   private fun addMove(x : FEditorDataType, y : FEditorDataType, pressure : FEditorDataType, erase : FEditorDataType)
   {
     val isEraser = Brush.isEraser(erase)
+    cacheVector[0] = x.toFloat(); cacheVector[1] = y.toFloat()
+    imageMatrix.mapPoints(cacheVector)
     val screenX : Float; val screenY : Float
     if (isEraser)
     {
-      screenX = (x * width).toFloat()
-      screenY = (y * height).toFloat()
+      screenX = cacheVector[0]; screenY = cacheVector[1]
       eraserX = screenX; eraserY = screenY
       paint.strokeWidth = eraserRadius * 2
       path.lineTo(screenX, screenY)
     }
     else
     {
-      screenX = (((lastX + x) / 2) * width).toFloat()
-      screenY = (((lastY + y) / 2) * height).toFloat()
-      paint.strokeWidth = (BASE_STROKE_WIDTH * pressure).toFloat()
+      screenX = ((lastX + cacheVector[0]) / 2)
+      screenY = ((lastY + cacheVector[1]) / 2)
+      paint.strokeWidth = (baseStrokeWidth * pressure).toFloat()
     }
-    path.quadTo((lastX * width).toFloat(), (lastY * height).toFloat(), screenX, screenY)
+    path.quadTo(lastX, lastY, screenX, screenY)
     canvas.drawPath(path, paint)
     path.reset()
     path.moveTo(screenX, screenY)
     data.addCommand(Action.MOVE)
     data.add(x); data.add(y); data.add(pressure); data.add(erase)
-    lastX = x; lastY = y
+    lastX = cacheVector[0]; lastY = cacheVector[1]
   }
 
   private fun addUp(x : FEditorDataType, y : FEditorDataType)
   {
-    val screenX = (x * width).toFloat()
-    val screenY = (y * height).toFloat()
+    cacheVector[0] = x.toFloat(); cacheVector[1] = y.toFloat()
+    imageMatrix.mapPoints(cacheVector)
+    val screenX = cacheVector[0]; val screenY = cacheVector[1]
     path.lineTo(screenX, screenY)
     canvas.drawPath(path, paint)
     path.reset()
     data.addCommand(Action.UP)
     data.add(x); data.add(y)
-    lastX = x; lastY = y
+    lastX = cacheVector[0]; lastY = cacheVector[1]
     eraserX = -1.0f; eraserY = -1.0f
   }
 }
