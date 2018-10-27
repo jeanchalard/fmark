@@ -47,12 +47,11 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   private val oldData = CommandList()
   private val defaultColor = context.getColor(R.color.defaultBrushColor)
   private val startCommandIndices = ArrayList<Int>()
-  private val baseStrokeWidth = context.resources.getDimension(R.dimen.baseStrokeWidth)
   private val eraserRadius = context.resources.getDimension(R.dimen.eraserRadius)
   private var pic = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
   private var canvas = Canvas(pic)
   private val bitmapPaint = Paint()
-  private val paint = Paint().apply { color = defaultColor; isAntiAlias = true; style = Paint.Style.STROKE; strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND; strokeWidth = baseStrokeWidth }
+  private val paint = Paint().apply { color = defaultColor; isAntiAlias = true; style = Paint.Style.STROKE; strokeJoin = Paint.Join.ROUND; strokeCap = Paint.Cap.ROUND; strokeWidth = 1f }
   private val path = Path()
   private var width : Double = 0.0
   private var height : Double = 0.0
@@ -93,16 +92,19 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   fun saveData(dest : ArrayList<FEditorDataType>) = dest.apply { clear(); addAll(data) }
   fun readData(source : ArrayList<FEditorDataType>) = replayData(source)
 
+  private fun clamp(i : Float, min : Float, max : Float) = if (i < min) min else if (max < i) max else i
+
   var cacheVector = FloatArray(2)
   override fun onTouchEvent(event : MotionEvent?) : Boolean
   {
     if (null == event) return false
     cacheVector[0] = event.x; cacheVector[1] = event.y
     viewToImage.mapPoints(cacheVector)
+    val radius = clamp(event.touchMajor / 2, 5f, 250f)
     when (event.action)
     {
-      MotionEvent.ACTION_DOWN -> addDown(cacheVector[0].toDouble(), cacheVector[1].toDouble(), (event.pressure * event.pressure).toDouble(), brush.mode.toInt().toDouble(), brush.color.toDouble())
-      MotionEvent.ACTION_MOVE -> addMove(cacheVector[0].toDouble(), cacheVector[1].toDouble(), (event.pressure * event.pressure).toDouble(), if (brush.mode == PorterDuff.Mode.CLEAR) ERASE else DRAW)
+      MotionEvent.ACTION_DOWN -> addDown(cacheVector[0].toDouble(), cacheVector[1].toDouble(), viewToImage.mapRadius(radius).toDouble(), brush.mode.toInt().toDouble(), brush.color.toDouble())
+      MotionEvent.ACTION_MOVE -> addMove(cacheVector[0].toDouble(), cacheVector[1].toDouble(), viewToImage.mapRadius(radius).toDouble(), if (brush.mode == PorterDuff.Mode.CLEAR) ERASE else DRAW)
       MotionEvent.ACTION_UP ->   addUp(cacheVector[0].toDouble(), cacheVector[1].toDouble())
     }
     invalidate()
@@ -150,10 +152,11 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   {
     cacheVector[0] = x.toFloat(); cacheVector[1] = y.toFloat()
     imageMatrix.mapPoints(cacheVector)
+    val radius = imageMatrix.mapRadius(pressure.toFloat())
     val screenX = cacheVector[0]; val screenY = cacheVector[1]
     paint.xfermode = PorterDuffXfermode(mode.toInt().toPorterDuffMode())
     paint.color = color.toInt()
-    paint.strokeWidth = (baseStrokeWidth * pressure).toFloat()
+    paint.strokeWidth = radius
     path.moveTo(screenX, screenY)
     startCommandIndices.add(data.size)
     data.addCommand(Action.DOWN)
@@ -171,6 +174,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     val isEraser = Brush.isEraser(erase)
     cacheVector[0] = x.toFloat(); cacheVector[1] = y.toFloat()
     imageMatrix.mapPoints(cacheVector)
+    val radius = imageMatrix.mapRadius(pressure.toFloat())
     val screenX : Float; val screenY : Float
     if (isEraser)
     {
@@ -183,7 +187,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     {
       screenX = ((lastX + cacheVector[0]) / 2)
       screenY = ((lastY + cacheVector[1]) / 2)
-      paint.strokeWidth = (baseStrokeWidth * pressure).toFloat()
+      paint.strokeWidth = radius
     }
     path.quadTo(lastX, lastY, screenX, screenY)
     canvas.drawPath(path, paint)
