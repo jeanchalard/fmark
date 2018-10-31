@@ -8,6 +8,7 @@ import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v7.widget.AppCompatImageButton
+import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MenuItem
@@ -37,6 +38,7 @@ import java.io.FileInputStream
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.io.StreamCorruptedException
+import java.lang.Exception
 import kotlin.math.roundToInt
 
 const val DATA_FILE_NAME = "data"
@@ -154,8 +156,15 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     val guide = fmarkHost.getDrawable(picToSave.guideId)
     GlobalScope.launch {
       initJob.join()
-      saveData()
-      savePicture(picToSave, drawnBitmap, guide)
+      try
+      {
+        saveData()
+        savePicture(picToSave, drawnBitmap, guide)
+      }
+      catch (e : Exception)
+      {
+        Log.e("Argh", "" + e.message, e)
+      }
     }
   }
 

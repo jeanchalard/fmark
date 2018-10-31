@@ -7,7 +7,7 @@
 
   <string name="search_hint">Search</string>
   <string name="sign_in_fail_instant">Sign in refused</string>
-  <string name="sign_in_fail_eventual">Sign in failed</string>
+  <string name="sign_in_fail_eventual">Sign in failed. Please check your Internet connection.</string>
 
   <string name="label_name">Name :</string>
   <string name="label_reading">Reading :</string>
@@ -25,4 +25,7 @@
   <string name="label_undo">Undo</string>
   <string name="label_save">Save</string>
   <string name="label_clear">Clear</string>
+  <string name="sign_in_fail_try_again">Try again</string>
+  <string name="label_refresh">Refresh</string>
+  <string name="fail_data_fetch">Can\'t fetch data. Please check your data connection.</string>
 </resources>

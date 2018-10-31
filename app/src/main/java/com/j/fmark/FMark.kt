@@ -9,6 +9,7 @@ import android.view.MenuItem
 import android.view.View
 import com.google.android.gms.auth.api.Auth
 import com.google.android.gms.drive.Drive
+import com.google.android.gms.drive.DriveClient
 import com.google.android.gms.drive.DriveResourceClient
 import com.google.android.gms.drive.Metadata
 import com.j.fmark.drive.FDrive
@@ -17,6 +18,7 @@ import com.j.fmark.drive.renameFolder
 import com.j.fmark.fragments.ClientDetails
 import com.j.fmark.fragments.ClientList
 import com.j.fmark.fragments.FEditor
+import com.j.fmark.fragments.SignInErrorFragment
 import kotlinx.coroutines.experimental.Dispatchers
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.launch
@@ -36,15 +38,6 @@ class FMark : AppCompatActivity()
     super.onCreate(null)
     setContentView(R.layout.activity_fmark)
     loadingSpinner = findViewById<View>(R.id.main_loading)
-    GlobalScope.launch(Dispatchers.Main) {
-      val account = FDrive.getAccount(this@FMark, GOOGLE_SIGN_IN_CODE)
-      if (null != account)
-      {
-        val driveResourceClient = Drive.getDriveResourceClient(this@FMark, account)
-        spinnerVisible = false
-        supportFragmentManager.beginTransaction().replace(R.id.main_fragment, ClientList(this@FMark, driveResourceClient)).commit()
-      } // Otherwise, wait for sign in activity → onActivityResult
-    }
     supportFragmentManager.addOnBackStackChangedListener {
       val actionBar = supportActionBar ?: return@addOnBackStackChangedListener
       val fragment = shownFragment
@@ -55,19 +48,47 @@ class FMark : AppCompatActivity()
       }
       invalidateOptionsMenu()
     }
+    startSignIn()
+  }
+
+  private fun startSignIn()
+  {
+    spinnerVisible = true
+    GlobalScope.launch(Dispatchers.Main) {
+      try
+      {
+        val account = FDrive.getAccount(this@FMark, GOOGLE_SIGN_IN_CODE)
+        if (null != account)
+        {
+          val driveResourceClient = Drive.getDriveResourceClient(this@FMark, account)
+          val refreshClient = Drive.getDriveClient(this@FMark, account)
+          spinnerVisible = false
+          supportFragmentManager.beginTransaction().replace(R.id.main_fragment, ClientList(this@FMark, driveResourceClient, refreshClient)).commit()
+        } // Otherwise, wait for sign in activity → onActivityResult
+      } catch (e : SignInException) {
+        offlineError(e.message)
+      }
+    }
+  }
+
+  fun offlineError(msgId : Int) = offlineError(resources.getString(msgId))
+  fun offlineError(msg : String?)
+  {
+    supportFragmentManager.beginTransaction().replace(R.id.main_fragment, SignInErrorFragment(msg, ::startSignIn)).commit()
   }
 
   override fun onPrepareOptionsMenu(menu : Menu?) : Boolean
   {
     val menu = menu ?: return super.onPrepareOptionsMenu(menu)
-    val visible = when (shownFragment) {
-      is ClientList, is ClientDetails -> false
-      is FEditor -> true
-      else -> false
+    val isHome = when (shownFragment) {
+      is ClientList, is ClientDetails -> true
+      is FEditor -> false
+      else -> true
     }
-    menu.findItem(R.id.action_button_clear).isVisible = visible
-    menu.findItem(R.id.action_button_undo).isVisible = visible
-    menu.findItem(R.id.action_button_save).isVisible = visible
+    menu.findItem(R.id.action_button_refresh).isVisible = isHome
+    menu.findItem(R.id.action_button_clear).isVisible = !isHome
+    menu.findItem(R.id.action_button_undo).isVisible = !isHome
+    menu.findItem(R.id.action_button_save).isVisible = !isHome
     return super.onPrepareOptionsMenu(menu)
   }
 
@@ -82,6 +103,7 @@ class FMark : AppCompatActivity()
     val fragment = shownFragment
     when (fragment) {
       is FEditor -> return fragment.onOptionsItemSelected(item)
+      is ClientList -> fragment.refresh()
     }
     return super.onOptionsItemSelected(item)
   }
@@ -97,22 +119,30 @@ class FMark : AppCompatActivity()
   {
     val signInResult = Auth.GoogleSignInApi.getSignInResultFromIntent(data)
     val account = signInResult.signInAccount
-    if (!signInResult.isSuccess || null == account) throw SignInException(getString(R.string.sign_in_fail_eventual))
-    val driveResourceClient = Drive.getDriveResourceClient(this@FMark, account)
-    findViewById<View>(R.id.main_loading).visibility = View.GONE
-    supportFragmentManager.beginTransaction().replace(R.id.main_fragment, ClientList(this@FMark, driveResourceClient)).commit()
+    if (!signInResult.isSuccess || null == account)
+    {
+      findViewById<View>(R.id.main_loading).visibility = View.GONE
+      offlineError(R.string.sign_in_fail_eventual)
+    }
+    else
+    {
+      val resourceClient = Drive.getDriveResourceClient(this@FMark, account)
+      val refreshClient = Drive.getDriveClient(this@FMark, account)
+      findViewById<View>(R.id.main_loading).visibility = View.GONE
+      supportFragmentManager.beginTransaction().replace(R.id.main_fragment, ClientList(this@FMark, resourceClient, refreshClient)).commit()
+    }
   }
 
-  fun showClientDetails(driveResourceClient : DriveResourceClient, client : Metadata?)
+  fun showClientDetails(resourceClient : DriveResourceClient, client : Metadata?)
   {
-    val f = ClientDetails(this, driveResourceClient, client)
+    val f = ClientDetails(this, resourceClient, client)
     val transaction = supportFragmentManager.beginTransaction()
      .addToBackStack(null)
     f.show(transaction, "details")
   }
 
-  fun startEditor(driveResourceClient : DriveResourceClient, clientFolder : Metadata) =
-   supportFragmentManager.beginTransaction().addToBackStack("editor").replace(R.id.main_fragment, FEditor(this, driveResourceClient, clientFolder), "editor").commit()
+  fun startEditor(resourceClient : DriveResourceClient, clientFolder : Metadata) =
+   supportFragmentManager.beginTransaction().addToBackStack("editor").replace(R.id.main_fragment, FEditor(this, resourceClient, clientFolder), "editor").commit()
 
   suspend fun renameClient(driveResourceClient : DriveResourceClient, clientFolder : Metadata, name : String, reading : String)
   {

@@ -12,6 +12,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.drive.DriveClient
 import com.google.android.gms.drive.DriveResourceClient
 import com.google.android.gms.drive.Metadata
 import com.google.android.gms.drive.query.Filters
@@ -35,12 +37,13 @@ import kotlinx.coroutines.experimental.tasks.await
 /**
  * A fragment implementing the client list.
  */
-class ClientList(private val fmarkHost : FMark, private val client : DriveResourceClient) : Fragment(), TextWatcher
+class ClientList(private val fmarkHost : FMark, private val client : DriveResourceClient, private val refreshClient : DriveClient) : Fragment(), TextWatcher
 {
   private lateinit var searchField : EditText
   private val currentSearchLock = Object()
   private var currentSearch : Job? = null
     set(newSearch) = synchronized(currentSearchLock) { field?.cancel(); field = newSearch }
+  private var refreshRequested = true
 
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View
   {
@@ -56,6 +59,13 @@ class ClientList(private val fmarkHost : FMark, private val client : DriveResour
   override fun onResume()
   {
     super.onResume()
+    refresh()
+  }
+
+  fun refresh()
+  {
+    fmarkHost.spinnerVisible = true
+    refreshRequested = true
     populateClientList(0L)
   }
 
@@ -68,12 +78,27 @@ class ClientList(private val fmarkHost : FMark, private val client : DriveResour
     currentSearch = GlobalScope.launch(Dispatchers.Main, start, { block(); currentSearch = null })
   }
 
+  // If a refresh client is passed, this function will request a sync to make sure the data is fresh.
   private fun populateClientList(delayMs : Long)
   {
     val searchString = searchField.text?.toString() ?: return
     startSearch {
       if (delayMs > 0) delay(delayMs)
-      readClients(if (searchString.isEmpty() or searchString.isBlank()) null else searchString)
+      try
+      {
+        if (refreshRequested)
+        {
+          refreshClient.requestSync()?.await()
+          refreshRequested = false
+        }
+        readClients(if (searchString.isEmpty() or searchString.isBlank()) null else searchString)
+      }
+      catch (e : ApiException)
+      {
+        // Can't reach Google servers
+        fmarkHost.offlineError(R.string.fail_data_fetch)
+      }
+      fmarkHost.spinnerVisible = false
     }
   }
 
