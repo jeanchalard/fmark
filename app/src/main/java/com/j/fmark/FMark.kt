@@ -24,8 +24,8 @@ import java.util.Locale
 
 class FMark : AppCompatActivity()
 {
-  private val shownFragment : Fragment
-    get() = supportFragmentManager.fragments.last()
+  private val shownFragment : Fragment?
+    get() = supportFragmentManager.fragments.lastOrNull()
   private lateinit var loadingSpinner : View
   var spinnerVisible : Boolean
     get() = loadingSpinner.visibility == View.VISIBLE
@@ -65,6 +65,7 @@ class FMark : AppCompatActivity()
       is FEditor -> true
       else -> false
     }
+    menu.findItem(R.id.action_button_clear).isVisible = visible
     menu.findItem(R.id.action_button_undo).isVisible = visible
     menu.findItem(R.id.action_button_save).isVisible = visible
     return super.onPrepareOptionsMenu(menu)
