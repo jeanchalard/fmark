@@ -63,6 +63,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     contents.add(FACE_CODE,  Drawing(FACE_CODE,  R.drawable.face,  FACE_IMAGE_NAME,  ArrayList()))
     contents.add(FRONT_CODE, Drawing(FRONT_CODE, R.drawable.front, FRONT_IMAGE_NAME, ArrayList()))
     contents.add(BACK_CODE,  Drawing(BACK_CODE,  R.drawable.back,  BACK_IMAGE_NAME,  ArrayList()))
+    fmarkHost.spinnerVisible = true
     initJob = GlobalScope.launch {
       val folder = clientFolder.driveId.asDriveFolder()
       val file = driveApi.findFile(folder, DATA_FILE_NAME) ?: driveApi.createFile(folder, MetadataChangeSet.Builder().setTitle(DATA_FILE_NAME).build(), null).await()
@@ -84,6 +85,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
         val view = view ?: return@launch
         val canvasView = view.findViewById<CanvasView>(R.id.feditor_canvas)
         canvasView.readData(shownPicture.data)
+        fmarkHost.spinnerVisible = false
       }
     }
   }
@@ -133,6 +135,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
 
   override fun onOptionsItemSelected(menuItem : MenuItem?) : Boolean
   {
+    if (!fmarkHost.spinnerVisible) return false
     val item = menuItem ?: return super.onOptionsItemSelected(menuItem)
     when (item.itemId) {
       R.id.action_button_save -> savePicture()

@@ -26,17 +26,22 @@ class FMark : AppCompatActivity()
 {
   private val shownFragment : Fragment
     get() = supportFragmentManager.fragments.last()
+  private lateinit var loadingSpinner : View
+  var spinnerVisible : Boolean
+    get() = loadingSpinner.visibility == View.VISIBLE
+    set(v) { loadingSpinner.visibility = if (v) View.VISIBLE else View.GONE }
 
   override fun onCreate(icicle : Bundle?)
   {
     super.onCreate(null)
     setContentView(R.layout.activity_fmark)
+    loadingSpinner = findViewById<View>(R.id.main_loading)
     GlobalScope.launch(Dispatchers.Main) {
       val account = FDrive.getAccount(this@FMark, GOOGLE_SIGN_IN_CODE)
       if (null != account)
       {
         val driveResourceClient = Drive.getDriveResourceClient(this@FMark, account)
-        findViewById<View>(R.id.main_loading).visibility = View.GONE
+        spinnerVisible = false
         supportFragmentManager.beginTransaction().replace(R.id.main_fragment, ClientList(this@FMark, driveResourceClient)).commit()
       } // Otherwise, wait for sign in activity → onActivityResult
     }
@@ -106,7 +111,7 @@ class FMark : AppCompatActivity()
   }
 
   fun startEditor(driveResourceClient : DriveResourceClient, clientFolder : Metadata) =
-   supportFragmentManager.beginTransaction().addToBackStack("editor").replace(R.id.main_fragment,FEditor(this, driveResourceClient, clientFolder), "editor").commit()
+   supportFragmentManager.beginTransaction().addToBackStack("editor").replace(R.id.main_fragment, FEditor(this, driveResourceClient, clientFolder), "editor").commit()
 
   suspend fun renameClient(driveResourceClient : DriveResourceClient, clientFolder : Metadata, name : String, reading : String)
   {
