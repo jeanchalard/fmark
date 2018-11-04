@@ -110,8 +110,8 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     val radius = clamp(event.touchMajor / 2, 5f, 250f)
     when (event.action)
     {
-      MotionEvent.ACTION_DOWN -> addDown(cacheVector[0].toDouble(), cacheVector[1].toDouble(), viewToImage.mapRadius(radius).toDouble(), brush.mode.toInt().toDouble(), brush.color.toDouble())
-      MotionEvent.ACTION_MOVE -> addMove(cacheVector[0].toDouble(), cacheVector[1].toDouble(), viewToImage.mapRadius(radius).toDouble(), if (brush.mode == PorterDuff.Mode.CLEAR) ERASE else DRAW)
+      MotionEvent.ACTION_DOWN -> addDown(cacheVector[0].toDouble(), cacheVector[1].toDouble(), viewToImage.mapRadius(radius / 2).toDouble(), brush.mode.toInt().toDouble(), brush.color.toDouble())
+      MotionEvent.ACTION_MOVE -> addMove(cacheVector[0].toDouble(), cacheVector[1].toDouble(), viewToImage.mapRadius(radius / 2).toDouble(), if (brush.mode == PorterDuff.Mode.CLEAR) ERASE else DRAW)
       MotionEvent.ACTION_UP ->   addUp(cacheVector[0].toDouble(), cacheVector[1].toDouble())
     }
     changeDelegate?.onDataChanged()
@@ -154,6 +154,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
       replayData(oldData)
       oldData.clear()
     }
+    changeDelegate?.onDataChanged()
   }
 
   private fun addDown(x : FEditorDataType, y : FEditorDataType, pressure : FEditorDataType, mode : FEditorDataType, color : FEditorDataType)
@@ -195,7 +196,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     {
       screenX = ((lastX + cacheVector[0]) / 2)
       screenY = ((lastY + cacheVector[1]) / 2)
-      paint.strokeWidth = radius
+      paint.strokeWidth = (paint.strokeWidth * 9 + radius) / 10
     }
     path.quadTo(lastX, lastY, screenX, screenY)
     canvas.drawPath(path, paint)
