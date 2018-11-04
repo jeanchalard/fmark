@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.j.fmark.SaveIndicator xmlns:android="http://schemas.android.com/apk/res/android"
+                                             android:layout_width="match_parent"
+                                             android:layout_height="match_parent">
+  <ImageView
+   android:id="@+id/save_inprogress"
+   android:src="@drawable/save_inprogress"
+   android:layout_width="wrap_content"
+   android:layout_height="wrap_content"
+   android:layout_gravity="center"
+   android:visibility="invisible" />
+  <ImageView
+   android:id="@+id/save_error"
+   android:src="@drawable/save_error"
+   android:layout_width="wrap_content"
+   android:layout_height="wrap_content"
+   android:layout_gravity="center"
+   android:visibility="invisible" />
+  <ImageView
+   android:id="@+id/save_ok"
+   android:src="@drawable/save_ok"
+   android:layout_width="wrap_content"
+   android:layout_height="wrap_content"
+   android:layout_gravity="center"
+   android:visibility="invisible" />
+</com.j.fmark.SaveIndicator>

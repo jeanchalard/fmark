@@ -37,7 +37,7 @@ import kotlinx.coroutines.experimental.tasks.await
 /**
  * A fragment implementing the client list.
  */
-class ClientList(private val fmarkHost : FMark, private val client : DriveResourceClient, private val refreshClient : DriveClient) : Fragment(), TextWatcher
+class ClientList(private val fmarkHost : FMark, private val driveClient : DriveResourceClient, private val refreshClient : DriveClient) : Fragment(), TextWatcher
 {
   private lateinit var searchField : EditText
   private val currentSearchLock = Object()
@@ -51,7 +51,7 @@ class ClientList(private val fmarkHost : FMark, private val client : DriveResour
     searchField = view.findViewById(R.id.client_name_search)
     searchField.addTextChangedListener(this)
     view.findViewById<FloatingActionButton>(R.id.client_add).setOnClickListener {
-      fmarkHost.showClientDetails(client, null)
+      fmarkHost.showClientDetails(driveClient, refreshClient, null)
     }
     return view
   }
@@ -107,13 +107,13 @@ class ClientList(private val fmarkHost : FMark, private val client : DriveResour
     val context = context ?: return
     val view = view ?: return
 
-    val folder = FDrive.getFMarkFolder(client, context)
+    val folder = FDrive.getFMarkFolder(driveClient, context)
     val query = Query.Builder().apply {
       if (null != searchString) addFilter(Filters.contains(SearchableField.TITLE, searchString))
       addFilter(Filters.eq(SearchableField.TRASHED, false))
       setSortOrder(SortOrder.Builder().addSortAscending(SortableField.TITLE).build())
     }.build()
-    val result = client.queryChildren(folder, query).await()
+    val result = driveClient.queryChildren(folder, query).await()
     val list = view.findViewById<RecyclerView>(R.id.client_list)
     if (null == list.adapter)
     {
@@ -123,7 +123,7 @@ class ClientList(private val fmarkHost : FMark, private val client : DriveResour
     else (list.adapter as ClientAdapter).setSource(result)
   }
 
-  fun showClientDetails(clientFolder : Metadata) = fmarkHost.showClientDetails(client, clientFolder)
-  fun startEditor(clientFolder : Metadata) = fmarkHost.startEditor(client, clientFolder)
+  fun showClientDetails(clientFolder : Metadata) = fmarkHost.showClientDetails(driveClient, refreshClient, clientFolder)
+  fun startEditor(clientFolder : Metadata) = fmarkHost.startEditor(driveClient, refreshClient, clientFolder)
   fun notifyRenamed(clientFolder : Metadata) = (view?.findViewById<RecyclerView>(R.id.client_list)?.adapter as ClientAdapter?)?.notifyRenamed(clientFolder)
 }

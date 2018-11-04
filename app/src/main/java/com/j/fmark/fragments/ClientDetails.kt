@@ -10,6 +10,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
+import com.google.android.gms.drive.DriveClient
 import com.google.android.gms.drive.DriveFolder
 import com.google.android.gms.drive.DriveResourceClient
 import com.google.android.gms.drive.Metadata
@@ -27,7 +28,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class ClientDetails(private val fmarkHost : FMark, private val driveResourceClient : DriveResourceClient, private val clientFolder : Metadata?) : DialogFragment()
+class ClientDetails(private val fmarkHost : FMark, private val resourceClient : DriveResourceClient, private val refreshClient : DriveClient, private val clientFolder : Metadata?) : DialogFragment()
 {
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View?
   {
@@ -39,8 +40,8 @@ class ClientDetails(private val fmarkHost : FMark, private val driveResourceClie
       view.findViewById<EditText>(R.id.client_details_name)?.setText(decodeName(clientFolder))
       view.findViewById<EditText>(R.id.client_details_reading)?.setText(decodeReading(clientFolder))
     }
-    view.findViewById<TextView>(R.id.client_details_creation_date_value)?.setText(formatDate(clientFolder?.modifiedDate))
-    view.findViewById<TextView>(R.id.client_details_last_update_date_value)?.setText(formatDate(clientFolder?.createdDate))
+    view.findViewById<TextView>(R.id.client_details_creation_date_value)?.text = formatDate(clientFolder?.modifiedDate)
+    view.findViewById<TextView>(R.id.client_details_last_update_date_value)?.text = formatDate(clientFolder?.createdDate)
     dialog.window.setBackgroundDrawableResource(R.drawable.rounded_square)
     return view
   }
@@ -52,8 +53,8 @@ class ClientDetails(private val fmarkHost : FMark, private val driveResourceClie
     val reading = view?.findViewById<EditText>(R.id.client_details_reading)?.text?.toString()
     if (null == name || null == reading) throw NullPointerException("Neither name or reading can be null when validating the dialog")
     GlobalScope.launch(Dispatchers.Main) {
-      val fmarkFolder = getFMarkFolder(driveResourceClient, fmarkHost)
-      val existingFolders = getFoldersForClientName(driveResourceClient, fmarkFolder, name, reading)
+      val fmarkFolder = getFMarkFolder(resourceClient, fmarkHost)
+      val existingFolders = getFoldersForClientName(resourceClient, fmarkFolder, name, reading)
       if (existingFolders.count == 0)
         validateDetails(fmarkFolder, name, reading)
       else
@@ -72,9 +73,9 @@ class ClientDetails(private val fmarkHost : FMark, private val driveResourceClie
   {
     fmarkHost.supportFragmentManager.popBackStack()
     if (null == clientFolder)
-      fmarkHost.startEditor(driveResourceClient, createFolderForClientName(driveResourceClient, fmarkFolder, name, reading)) // It's a new client.
+      fmarkHost.startEditor(resourceClient, refreshClient, createFolderForClientName(resourceClient, fmarkFolder, name, reading)) // It's a new client.
     else
-      fmarkHost.renameClient(driveResourceClient, clientFolder, name, reading)
+      fmarkHost.renameClient(resourceClient, clientFolder, name, reading)
   }
 
   override fun onDetach()

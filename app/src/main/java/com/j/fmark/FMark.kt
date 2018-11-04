@@ -7,6 +7,8 @@ import android.support.v7.app.AppCompatActivity
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import com.google.android.gms.auth.api.Auth
 import com.google.android.gms.drive.Drive
 import com.google.android.gms.drive.DriveClient
@@ -32,12 +34,14 @@ class FMark : AppCompatActivity()
   var spinnerVisible : Boolean
     get() = loadingSpinner.visibility == View.VISIBLE
     set(v) { loadingSpinner.visibility = if (v) View.VISIBLE else View.GONE }
+  lateinit var saveIndicator : SaveIndicator
 
   override fun onCreate(icicle : Bundle?)
   {
     super.onCreate(null)
     setContentView(R.layout.activity_fmark)
     loadingSpinner = findViewById<View>(R.id.main_loading)
+    saveIndicator = createSaveIndicator(findViewById<FrameLayout>(R.id.action_bar_container))
     supportFragmentManager.addOnBackStackChangedListener {
       val actionBar = supportActionBar ?: return@addOnBackStackChangedListener
       val fragment = shownFragment
@@ -49,6 +53,13 @@ class FMark : AppCompatActivity()
       invalidateOptionsMenu()
     }
     startSignIn()
+  }
+
+  private fun createSaveIndicator(parent : ViewGroup) : SaveIndicator
+  {
+    val indicator = layoutInflater.inflate(R.layout.save_indicator, parent as ViewGroup, false) as SaveIndicator
+    parent.addView(indicator)
+    return indicator
   }
 
   private fun startSignIn()
@@ -133,16 +144,16 @@ class FMark : AppCompatActivity()
     }
   }
 
-  fun showClientDetails(resourceClient : DriveResourceClient, client : Metadata?)
+  fun showClientDetails(resourceClient : DriveResourceClient, refreshClient : DriveClient, client : Metadata?)
   {
-    val f = ClientDetails(this, resourceClient, client)
+    val f = ClientDetails(this, resourceClient, refreshClient, client)
     val transaction = supportFragmentManager.beginTransaction()
      .addToBackStack(null)
     f.show(transaction, "details")
   }
 
-  fun startEditor(resourceClient : DriveResourceClient, clientFolder : Metadata) =
-   supportFragmentManager.beginTransaction().addToBackStack("editor").replace(R.id.main_fragment, FEditor(this, resourceClient, clientFolder), "editor").commit()
+  fun startEditor(resourceClient : DriveResourceClient, refreshClient : DriveClient, clientFolder : Metadata) =
+   supportFragmentManager.beginTransaction().addToBackStack("editor").replace(R.id.main_fragment, FEditor(this, resourceClient, refreshClient, clientFolder), "editor").commit()
 
   suspend fun renameClient(driveResourceClient : DriveResourceClient, clientFolder : Metadata, name : String, reading : String)
   {

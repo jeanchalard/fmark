@@ -16,6 +16,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.drive.DriveClient
 import com.google.android.gms.drive.DriveFile
 import com.google.android.gms.drive.DriveResourceClient
 import com.google.android.gms.drive.Metadata
@@ -31,6 +33,7 @@ import kotlinx.coroutines.experimental.Dispatchers
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.experimental.runBlocking
 import kotlinx.coroutines.experimental.tasks.await
 import java.io.BufferedInputStream
 import java.io.EOFException
@@ -52,7 +55,7 @@ const val BACK_CODE = 2
 typealias FEditorDataType = Double
 data class Drawing(val code : Int, val guideId : Int, val fileName : String, val data : ArrayList<FEditorDataType>)
 
-class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val clientFolder : Metadata) : Fragment()
+class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val driveRefreshClient : DriveClient, private val clientFolder : Metadata) : Fragment()
 {
   val name : String = decodeName(clientFolder)
   private val contents = ArrayList<Drawing>()
@@ -137,7 +140,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
 
   override fun onOptionsItemSelected(menuItem : MenuItem?) : Boolean
   {
-    if (!fmarkHost.spinnerVisible) return false
+    if (fmarkHost.spinnerVisible) return false
     val item = menuItem ?: return super.onOptionsItemSelected(menuItem)
     when (item.itemId) {
       R.id.action_button_save -> savePicture()
@@ -147,6 +150,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     return true
   }
 
+  var saveJob : Job? = null
   private fun savePicture()
   {
     val canvasView = view?.findViewById<CanvasView>(R.id.feditor_canvas) ?: return
@@ -154,16 +158,22 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     canvasView.saveData(shownPicture.data)
     val picToSave = shownPicture
     val guide = fmarkHost.getDrawable(picToSave.guideId)
-    GlobalScope.launch {
+    fmarkHost.saveIndicator.showInProgress()
+    saveJob.apply { this?.cancel() }
+    saveJob = GlobalScope.launch {
       initJob.join()
-      try
-      {
+      runBlocking {
         saveData()
         savePicture(picToSave, drawnBitmap, guide)
-      }
-      catch (e : Exception)
-      {
-        Log.e("Argh", "" + e.message, e)
+        try
+        {
+          driveRefreshClient.requestSync()
+          runBlocking(Dispatchers.Main) { fmarkHost.saveIndicator.showOk() }
+        }
+        catch (e : ApiException)
+        {
+          runBlocking(Dispatchers.Main) { fmarkHost.saveIndicator.showError() }
+        }
       }
     }
   }
