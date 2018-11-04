@@ -21,6 +21,7 @@ import com.google.android.gms.drive.query.Query
 import com.google.android.gms.drive.query.SearchableField
 import com.google.android.gms.drive.query.SortOrder
 import com.google.android.gms.drive.query.SortableField
+import com.j.fmark.CanvasView
 import com.j.fmark.ClientAdapter
 import com.j.fmark.FMark
 import com.j.fmark.R

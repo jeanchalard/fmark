@@ -43,6 +43,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   {
     fun addCommand(command : Action) = add(command.value)
   }
+  interface ChangeDelegate { fun onDataChanged() }
   private val data = CommandList()
   private val oldData = CommandList()
   private val defaultColor = context.getColor(R.color.defaultBrushColor)
@@ -59,7 +60,13 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   private var lastY : Float = 0.0f
   private val eraserFeedbackPaint = Paint().apply { color = color(0xFF000000); isAntiAlias = true; style = Paint.Style.STROKE; strokeWidth = 1f}
   private var eraserX = -1.0f; private var eraserY = -1.0f
+  private var changeDelegate : ChangeDelegate? = null
   var brush : Brush = Brush(PorterDuff.Mode.SRC_OVER, defaultColor)
+
+  fun setOnChangeDelegate(cd : ChangeDelegate)
+  {
+    changeDelegate = cd
+  }
 
   override fun onSizeChanged(w : Int, h : Int, oldw : Int, oldh : Int)
   {
@@ -107,6 +114,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
       MotionEvent.ACTION_MOVE -> addMove(cacheVector[0].toDouble(), cacheVector[1].toDouble(), viewToImage.mapRadius(radius).toDouble(), if (brush.mode == PorterDuff.Mode.CLEAR) ERASE else DRAW)
       MotionEvent.ACTION_UP ->   addUp(cacheVector[0].toDouble(), cacheVector[1].toDouble())
     }
+    changeDelegate?.onDataChanged()
     invalidate()
     return true
   }
