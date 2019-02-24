@@ -20,22 +20,30 @@ enum class Action(val value : FEditorDataType)
 }
 const val DRAW = 1.0
 const val ERASE = 2.0
-data class Brush(val mode : PorterDuff.Mode, val color : Int)
+data class Brush(val mode : PorterDuff.Mode, val color : Int, val width : Float)
 {
   companion object { @JvmStatic fun isEraser(v : FEditorDataType) = v == ERASE }
 }
 abstract class BrushView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : ImageView(context, attrs, defStyleAttr, defStyleRes)
 {
-  abstract val brush : Brush
+  abstract fun changeBrush(brush : Brush) : Brush
+  abstract fun isActive(brush : Brush) : Boolean
 }
 class PaletteView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : BrushView(context, attrs, defStyleAttr, defStyleRes)
 {
-  override val brush : Brush = Brush(PorterDuff.Mode.SRC_OVER, imageTintList.defaultColor)
+  override fun changeBrush(brush : Brush) : Brush = Brush(PorterDuff.Mode.SRC_OVER, imageTintList.defaultColor, brush.width)
+  override fun isActive(brush : Brush) : Boolean = brush.color == imageTintList.defaultColor && brush.mode == PorterDuff.Mode.SRC_OVER
+}
+class BrushWidthView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : BrushView(context, attrs, defStyleAttr, defStyleRes)
+{
+  private val width : Float = context.obtainStyledAttributes(attrs, R.styleable.BrushWidthView, defStyleAttr, defStyleRes)?.getFloat(R.styleable.BrushWidthView_widthFactor, 1.0f) ?: 1.0f
+  override fun changeBrush(brush : Brush) : Brush = Brush(brush.mode, brush.color, width)
+  override fun isActive(brush : Brush) : Boolean = brush.width == width && brush.mode == PorterDuff.Mode.SRC_OVER
 }
 class EraserView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : BrushView(context, attrs, defStyleAttr, defStyleRes)
 {
-  companion object { val CLEAR_BRUSH = Brush(PorterDuff.Mode.CLEAR, 0) }
-  override val brush : Brush = CLEAR_BRUSH
+  override fun changeBrush(brush : Brush) : Brush = Brush(PorterDuff.Mode.CLEAR, brush.color, brush.width)
+  override fun isActive(brush : Brush) : Boolean = brush.mode == PorterDuff.Mode.CLEAR
 }
 class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : ImageView(context, attrs, defStyleAttr, defStyleRes)
 {
@@ -47,6 +55,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   private val data = CommandList()
   private val oldData = CommandList()
   private val defaultColor = context.getColor(R.color.defaultBrushColor)
+  private val defaultWidth = 1.0f
   private val startCommandIndices = ArrayList<Int>()
   private val eraserRadius = context.resources.getDimension(R.dimen.eraserRadius)
   private var pic = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
@@ -61,7 +70,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   private val eraserFeedbackPaint = Paint().apply { color = color(0xFF000000); isAntiAlias = true; style = Paint.Style.STROKE; strokeWidth = 1f}
   private var eraserX = -1.0f; private var eraserY = -1.0f
   private var changeDelegate : ChangeDelegate? = null
-  var brush : Brush = Brush(PorterDuff.Mode.SRC_OVER, defaultColor)
+  var brush : Brush = Brush(PorterDuff.Mode.SRC_OVER, defaultColor, defaultWidth)
 
   fun setOnChangeDelegate(cd : ChangeDelegate)
   {
@@ -107,7 +116,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     if (null == event) return false
     cacheVector[0] = event.x; cacheVector[1] = event.y
     viewToImage.mapPoints(cacheVector)
-    val radius = clamp(event.touchMajor / 2, 5f, 250f)
+    val radius = clamp(event.touchMajor / 12, 5f, 250f) * brush.width
     when (event.action)
     {
       MotionEvent.ACTION_DOWN -> addDown(cacheVector[0].toDouble(), cacheVector[1].toDouble(), viewToImage.mapRadius(radius / 2).toDouble(), brush.mode.toInt().toDouble(), brush.color.toDouble())

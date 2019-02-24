@@ -5,67 +5,104 @@
                                              android:layout_width="match_parent"
                                              android:layout_height="match_parent">
 
-  <LinearLayout
-   android:id="@+id/feditor_palette"
-   android:orientation="horizontal"
-   android:layout_width="match_parent"
+  <HorizontalScrollView
+   android:id="@+id/feditor_palette_scroll"
+   android:layout_width="wrap_content"
    android:layout_height="wrap_content"
    app:layout_constraintTop_toTopOf="parent">
 
-    <com.j.fmark.PaletteView
-     android:layout_width="48dp"
-     android:layout_height="48dp"
-     android:layout_margin="8dp"
-     android:background="@drawable/palette_view_background"
-     android:src="@drawable/brush"
-     android:tint="@color/defaultBrushColor" />
-    <com.j.fmark.PaletteView
-     android:layout_width="48dp"
-     android:layout_height="48dp"
-     android:layout_margin="8dp"
-     android:background="@drawable/palette_view_background"
-     android:src="@drawable/brush"
-     android:tint="#FFC0CA33" />
-    <com.j.fmark.PaletteView
-     android:layout_width="48dp"
-     android:layout_height="48dp"
-     android:layout_margin="8dp"
-     android:background="@drawable/palette_view_background"
-     android:src="@drawable/brush"
-     android:tint="#FF43A047" />
-    <com.j.fmark.PaletteView
-     android:layout_width="48dp"
-     android:layout_height="48dp"
-     android:layout_margin="8dp"
-     android:background="@drawable/palette_view_background"
-     android:src="@drawable/brush"
-     android:tint="#FF1E88E5" />
-    <com.j.fmark.PaletteView
-     android:layout_width="48dp"
-     android:layout_height="48dp"
-     android:layout_margin="8dp"
-     android:background="@drawable/palette_view_background"
-     android:src="@drawable/brush"
-     android:tint="#FF8E24AA" />
-    <View
-     android:layout_width="0dp"
-     android:layout_height="0dp"
-     android:layout_weight="1" />
-    <com.j.fmark.EraserView
-     android:layout_width="48dp"
-     android:layout_height="48dp"
-     android:layout_margin="8dp"
-     android:background="@drawable/palette_view_background"
-     android:src="@drawable/eraser" />
+    <LinearLayout
+     android:id="@+id/feditor_palette"
+     android:orientation="horizontal"
+     android:layout_width="wrap_content"
+     android:layout_height="wrap_content">
 
-  </LinearLayout>
+      <com.j.fmark.PaletteView
+       android:layout_width="48dp"
+       android:layout_height="48dp"
+       android:layout_margin="8dp"
+       android:background="@drawable/palette_view_background"
+       android:src="@drawable/brush"
+       android:tint="@color/defaultBrushColor" />
+      <com.j.fmark.PaletteView
+       android:layout_width="48dp"
+       android:layout_height="48dp"
+       android:layout_margin="8dp"
+       android:background="@drawable/palette_view_background"
+       android:src="@drawable/brush"
+       android:tint="#FFC0CA33" />
+      <com.j.fmark.PaletteView
+       android:layout_width="48dp"
+       android:layout_height="48dp"
+       android:layout_margin="8dp"
+       android:background="@drawable/palette_view_background"
+       android:src="@drawable/brush"
+       android:tint="#FF43A047" />
+      <com.j.fmark.PaletteView
+       android:layout_width="48dp"
+       android:layout_height="48dp"
+       android:layout_margin="8dp"
+       android:background="@drawable/palette_view_background"
+       android:src="@drawable/brush"
+       android:tint="#FF1E88E5" />
+      <com.j.fmark.PaletteView
+       android:layout_width="48dp"
+       android:layout_height="48dp"
+       android:layout_margin="8dp"
+       android:background="@drawable/palette_view_background"
+       android:src="@drawable/brush"
+       android:tint="#FF8E24AA" />
+
+      <View
+       android:layout_width="0dp"
+       android:layout_height="0dp"
+       android:layout_weight="1" />
+
+      <com.j.fmark.EraserView
+       android:layout_width="48dp"
+       android:layout_height="48dp"
+       android:layout_margin="8dp"
+       android:background="@drawable/palette_view_background"
+       android:src="@drawable/eraser" />
+
+      <View
+       android:layout_width="0dp"
+       android:layout_height="0dp"
+       android:layout_weight="1" />
+
+      <com.j.fmark.BrushWidthView
+       android:layout_width="48dp"
+       android:layout_height="48dp"
+       android:layout_marginLeft="2dp"
+       android:layout_marginRight="2dp"
+       android:layout_marginTop="8dp"
+       android:layout_marginBottom="8dp"
+       android:background="@drawable/palette_view_background"
+       android:src="@drawable/narrow_brush"
+       android:scaleType="center"
+       app:widthFactor="1.0" />
+      <com.j.fmark.BrushWidthView
+       android:layout_width="48dp"
+       android:layout_height="48dp"
+       android:layout_marginLeft="2dp"
+       android:layout_marginRight="8dp"
+       android:layout_marginTop="8dp"
+       android:layout_marginBottom="8dp"
+       android:background="@drawable/palette_view_background"
+       android:src="@drawable/wide_brush"
+       android:scaleType="center"
+       app:widthFactor="8.0" />
+
+    </LinearLayout>
+
+  </HorizontalScrollView>
 
   <View
    android:id="@+id/feditor_vsep1"
    android:layout_width="match_parent"
    android:layout_height="1px"
    android:background="@color/lightGrey"
-   app:layout_constraintTop_toBottomOf="@id/feditor_palette" />
+   app:layout_constraintTop_toBottomOf="@id/feditor_palette_scroll" />
 
   <FrameLayout
    android:layout_width="match_parent"

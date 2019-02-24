@@ -26,6 +26,7 @@ import com.j.fmark.BrushView
 import com.j.fmark.CanvasView
 import com.j.fmark.FMark
 import com.j.fmark.R
+import com.j.fmark.R.drawable.brush
 import com.j.fmark.color
 import com.j.fmark.drive.decodeName
 import com.j.fmark.drive.findFile
@@ -132,10 +133,10 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     }
     brushViews.forEach { it.setOnClickListener { v ->
       val bv = v as BrushView
-      canvasView.brush = bv.brush
-      brushViews.forEach { it.isActivated = (it == bv) }
+      canvasView.brush = bv.changeBrush(canvasView.brush)
+      brushViews.forEach { it.isActivated = it.isActive(canvasView.brush) }
     }}
-    brushViews.first().isActivated = true
+    brushViews.forEach { it.isActivated = it.isActive(canvasView.brush) }
     return view
   }
 
