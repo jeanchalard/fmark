@@ -18,6 +18,7 @@ import com.j.fmark.drive.FDrive
 import com.j.fmark.drive.SignInException
 import com.j.fmark.drive.renameFolder
 import com.j.fmark.fragments.ClientDetails
+import com.j.fmark.fragments.ClientEditor
 import com.j.fmark.fragments.ClientList
 import com.j.fmark.fragments.FEditor
 import com.j.fmark.fragments.SignInErrorFragment
@@ -48,7 +49,7 @@ class FMark : AppCompatActivity()
       when (fragment) {
         is ClientList -> actionBar.setTitle(R.string.titlebar_main)
         is ClientDetails -> actionBar.setTitle(R.string.titlebar_client_details)
-        is FEditor -> actionBar.title = String.format(Locale.getDefault(), getString(R.string.titlebar_editor), fragment.name)
+        is ClientEditor -> actionBar.title = String.format(Locale.getDefault(), getString(R.string.titlebar_editor), fragment.name)
       }
       invalidateOptionsMenu()
     }
@@ -152,8 +153,11 @@ class FMark : AppCompatActivity()
     f.show(transaction, "details")
   }
 
-  fun startEditor(resourceClient : DriveResourceClient, refreshClient : DriveClient, clientFolder : Metadata) =
-   supportFragmentManager.beginTransaction().addToBackStack("editor").replace(R.id.main_fragment, FEditor(this, resourceClient, refreshClient, clientFolder), "editor").commit()
+  fun startClientEditor(resourceClient : DriveResourceClient, refreshClient : DriveClient, sessionFolder : Metadata) =
+   supportFragmentManager.beginTransaction().addToBackStack("client").replace(R.id.main_fragment, ClientEditor(this, resourceClient, refreshClient, sessionFolder), "client").commit()
+
+  fun startSessionEditor(resourceClient : DriveResourceClient, refreshClient : DriveClient, sessionFolder : Metadata) =
+   supportFragmentManager.beginTransaction().addToBackStack("editor").replace(R.id.main_fragment, FEditor(this, resourceClient, refreshClient, sessionFolder), "editor").commit()
 
   suspend fun renameClient(driveResourceClient : DriveResourceClient, clientFolder : Metadata, name : String, reading : String)
   {

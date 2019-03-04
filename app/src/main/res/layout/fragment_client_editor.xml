@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical"
+              xmlns:app="http://schemas.android.com/apk/res-auto">
+
+  <LinearLayout
+     android:id="@+id/new_session_button"
+     android:orientation="horizontal"
+     android:layout_width="match_parent"
+     android:layout_height="96dp"
+     android:background="?attr/selectableItemBackground">
+    <android.support.design.widget.FloatingActionButton
+     android:id="@+id/client_history_new_session_fab"
+     android:layout_width="wrap_content"
+     android:layout_height="wrap_content"
+     android:layout_marginTop="8dp"
+     android:layout_marginBottom="8dp"
+     android:layout_marginLeft="48dp"
+     android:layout_marginRight="48dp"
+     android:layout_gravity="center_vertical|start"
+     android:src="@drawable/fab"
+     app:srcCompat="@drawable/fab" />
+    <TextView
+     android:id="@+id/new_session_date"
+     android:textColor="@android:color/black"
+     android:textSize="24sp"
+     android:text="@string/new_session"
+     android:layout_width="wrap_content"
+     android:layout_height="wrap_content"
+     android:layout_gravity="center_vertical|start" />
+  </LinearLayout>
+
+  <android.support.v7.widget.RecyclerView
+   android:id="@+id/client_history"
+   app:layoutManager="android.support.v7.widget.LinearLayoutManager"
+   android:layout_width="match_parent"
+   android:layout_height="0dp"
+   android:layout_weight="1">
+
+  </android.support.v7.widget.RecyclerView>
+</LinearLayout>

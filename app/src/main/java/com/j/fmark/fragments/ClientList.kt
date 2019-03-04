@@ -21,7 +21,6 @@ import com.google.android.gms.drive.query.Query
 import com.google.android.gms.drive.query.SearchableField
 import com.google.android.gms.drive.query.SortOrder
 import com.google.android.gms.drive.query.SortableField
-import com.j.fmark.CanvasView
 import com.j.fmark.ClientAdapter
 import com.j.fmark.FMark
 import com.j.fmark.R
@@ -60,7 +59,8 @@ class ClientList(private val fmarkHost : FMark, private val driveClient : DriveR
   override fun onResume()
   {
     super.onResume()
-    refresh()
+    fmarkHost.spinnerVisible = true
+    populateClientList(0L)
   }
 
   fun refresh()
@@ -76,10 +76,10 @@ class ClientList(private val fmarkHost : FMark, private val driveClient : DriveR
 
   private fun startSearch(start: CoroutineStart = CoroutineStart.DEFAULT, block: suspend CoroutineScope.() -> Unit)
   {
-    currentSearch = GlobalScope.launch(Dispatchers.Main, start, { block(); currentSearch = null })
+    currentSearch = GlobalScope.launch(Dispatchers.Main, start) { block(); currentSearch = null }
   }
 
-  // If a refresh client is passed, this function will request a sync to make sure the data is fresh.
+  // If refresh is requested, this function will request a sync to make sure the data is fresh.
   private fun populateClientList(delayMs : Long)
   {
     val searchString = searchField.text?.toString() ?: return
@@ -125,6 +125,7 @@ class ClientList(private val fmarkHost : FMark, private val driveClient : DriveR
   }
 
   fun showClientDetails(clientFolder : Metadata) = fmarkHost.showClientDetails(driveClient, refreshClient, clientFolder)
-  fun startEditor(clientFolder : Metadata) = fmarkHost.startEditor(driveClient, refreshClient, clientFolder)
+  fun startClientEditor(clientFolder : Metadata) = fmarkHost.startClientEditor(driveClient, refreshClient, clientFolder)
+  fun startSessionEditor(sessionFolder : Metadata) = fmarkHost.startSessionEditor(driveClient, refreshClient, sessionFolder)
   fun notifyRenamed(clientFolder : Metadata) = (view?.findViewById<RecyclerView>(R.id.client_list)?.adapter as ClientAdapter?)?.notifyRenamed(clientFolder)
 }

@@ -21,6 +21,7 @@ import com.j.fmark.drive.createFolderForClientName
 import com.j.fmark.drive.decodeName
 import com.j.fmark.drive.decodeReading
 import com.j.fmark.drive.getFoldersForClientName
+import com.j.fmark.formatDate
 import kotlinx.coroutines.experimental.Dispatchers
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.launch
@@ -33,8 +34,8 @@ class ClientDetails(private val fmarkHost : FMark, private val resourceClient : 
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View?
   {
     val view = inflater.inflate(R.layout.fragment_client_details, container, false)
-    view.findViewById<Button>(R.id.client_details_ok).setOnClickListener { _ -> onFinish(true) }
-    view.findViewById<Button>(R.id.client_details_cancel).setOnClickListener { _ -> onFinish(false) }
+    view.findViewById<Button>(R.id.client_details_ok).setOnClickListener { onFinish(true) }
+    view.findViewById<Button>(R.id.client_details_cancel).setOnClickListener { onFinish(false) }
     if (null != clientFolder)
     {
       view.findViewById<EditText>(R.id.client_details_name)?.setText(decodeName(clientFolder))
@@ -66,6 +67,7 @@ class ClientDetails(private val fmarkHost : FMark, private val resourceClient : 
          .setNegativeButton(R.string.cancel) { dialog, _ -> dialog.dismiss() }
          .show()
       }
+      existingFolders.release()
     }
   }
 
@@ -73,7 +75,7 @@ class ClientDetails(private val fmarkHost : FMark, private val resourceClient : 
   {
     fmarkHost.supportFragmentManager.popBackStack()
     if (null == clientFolder)
-      fmarkHost.startEditor(resourceClient, refreshClient, createFolderForClientName(resourceClient, fmarkFolder, name, reading)) // It's a new client.
+      fmarkHost.startSessionEditor(resourceClient, refreshClient, createFolderForClientName(resourceClient, fmarkFolder, name, reading)) // It's a new client.
     else
       fmarkHost.renameClient(resourceClient, clientFolder, name, reading)
   }
@@ -85,6 +87,4 @@ class ClientDetails(private val fmarkHost : FMark, private val resourceClient : 
     // I've spent too much valuable time on this. This solution sucks but it works.
     fmarkHost.window.decorView.post { fmarkHost.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(fmarkHost.window.decorView.windowToken, 0) }
   }
-
-  private fun formatDate(date : Date?) : String = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date ?: Date())
 }

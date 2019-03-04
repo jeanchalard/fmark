@@ -9,6 +9,8 @@ import com.google.android.gms.drive.MetadataChangeSet
 import com.google.android.gms.drive.query.Filters
 import com.google.android.gms.drive.query.Query
 import com.google.android.gms.drive.query.SearchableField
+import com.j.fmark.LocalSecond
+import com.j.fmark.parseLocalSecond
 import kotlinx.coroutines.experimental.tasks.await
 
 suspend fun getFoldersForClientName(driveResourceClient : DriveResourceClient, fmarkFolder : DriveFolder, name : String, reading : String) : MetadataBuffer
@@ -21,7 +23,7 @@ suspend fun getFoldersForClientName(driveResourceClient : DriveResourceClient, f
 }
 
 private fun metadataForClient(name : String, reading : String) = MetadataChangeSet.Builder()
-   .setTitle(encodeFolderName(name, reading))
+   .setTitle(encodeClientFolderName(name, reading))
    .setDescription(reading)
    .setIndexableText(encodeIndexableText(name, reading))
    .setMimeType(DriveFolder.MIME_TYPE)
@@ -30,6 +32,18 @@ private fun metadataForClient(name : String, reading : String) = MetadataChangeS
 suspend fun createFolderForClientName(driveResourceClient : DriveResourceClient, fmarkFolder : DriveFolder, name : String, reading : String) : Metadata
 {
   val folder = driveResourceClient.createFolder(fmarkFolder, metadataForClient(name, reading)).await()
+  return driveResourceClient.getMetadata(folder).await()
+}
+
+private fun metadataForSession(date : LocalSecond) = MetadataChangeSet.Builder()
+   .setTitle(encodeSessionFolderName(date))
+   .setDescription(date.toString())
+   .setMimeType(DriveFolder.MIME_TYPE)
+   .build()
+
+suspend fun createSessionForClient(driveResourceClient : DriveResourceClient, clientFolder : DriveFolder, date : LocalSecond) : Metadata
+{
+  val folder = driveResourceClient.createFolder(clientFolder, metadataForSession(date)).await()
   return driveResourceClient.getMetadata(folder).await()
 }
 
@@ -48,7 +62,9 @@ suspend fun DriveResourceClient.findFile(clientFolder : DriveFolder, fileName : 
   return if (result.count > 0) result[0].driveId.asDriveFile() else null
 }
 
-fun encodeFolderName(name : String, reading : String) = "${name} -- ${reading}"
+fun encodeClientFolderName(name : String, reading : String) = "${name} -- ${reading}"
+fun encodeSessionFolderName(date : LocalSecond) = date.toString()
 fun encodeIndexableText(name : String, reading : String) = "${name} ${reading}"
 fun decodeName(folder : Metadata) = folder.title.let { if (it.indexOf("--") != -1) it.split(" -- ")[0] else it }
 fun decodeReading(folder : Metadata) = folder.title.let { if (it.indexOf("--") != -1) it.split(" -- ")[1] else it }
+fun decodeSessionDate(folder : Metadata) = parseLocalSecond(folder.title)

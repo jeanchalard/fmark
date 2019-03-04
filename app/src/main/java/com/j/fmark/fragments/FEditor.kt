@@ -22,11 +22,14 @@ import com.google.android.gms.drive.DriveFile
 import com.google.android.gms.drive.DriveResourceClient
 import com.google.android.gms.drive.Metadata
 import com.google.android.gms.drive.MetadataChangeSet
+import com.j.fmark.BACK_IMAGE_NAME
 import com.j.fmark.BrushView
 import com.j.fmark.CanvasView
+import com.j.fmark.DATA_FILE_NAME
+import com.j.fmark.FACE_IMAGE_NAME
 import com.j.fmark.FMark
+import com.j.fmark.FRONT_IMAGE_NAME
 import com.j.fmark.R
-import com.j.fmark.R.drawable.brush
 import com.j.fmark.color
 import com.j.fmark.drive.decodeName
 import com.j.fmark.drive.findFile
@@ -44,14 +47,10 @@ import java.io.ObjectOutputStream
 import java.io.StreamCorruptedException
 import kotlin.math.roundToInt
 
-const val DATA_FILE_NAME = "data"
-const val FACE_IMAGE_NAME = "顔"
-const val FRONT_IMAGE_NAME = "前"
-const val BACK_IMAGE_NAME = "後"
-const val FACE_CODE = 0
-const val FRONT_CODE = 1
-const val BACK_CODE = 2
-const val SAVE_PICTURE = 1
+private const val FACE_CODE = 0
+private const val FRONT_CODE = 1
+private const val BACK_CODE = 2
+private const val SAVE_PICTURE = 1
 
 typealias FEditorDataType = Double
 data class Drawing(val code : Int, val guideId : Int, val fileName : String, val data : ArrayList<FEditorDataType>)
@@ -59,7 +58,7 @@ data class Drawing(val code : Int, val guideId : Int, val fileName : String, val
 class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val driveRefreshClient : DriveClient, private val clientFolder : Metadata) : Fragment(), CanvasView.ChangeDelegate
 {
   val name : String = decodeName(clientFolder)
-  private val handler = FEditorHandler()
+  private val handler = FEditorHandler(this)
   private val contents = ArrayList<Drawing>()
   private lateinit var shownPicture : Drawing
   private val brushViews = ArrayList<BrushView>()
@@ -99,14 +98,14 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     }
   }
 
-  private inner class FEditorHandler : Handler()
+  private class FEditorHandler(private val parent : FEditor) : Handler()
   {
     override fun handleMessage(msg : Message?)
     {
       if (null == msg) return
       when (msg.what)
       {
-        SAVE_PICTURE -> startSave()
+        SAVE_PICTURE -> parent.startSave()
       }
     }
   }
@@ -116,9 +115,9 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     val view = inflater.inflate(R.layout.fragment_feditor, container, false)
     view.setOnKeyListener { v, keycode, event -> if (KeyEvent.KEYCODE_BACK == keycode) { fmarkHost.supportFragmentManager.popBackStack(); true } else false }
 
-    view.findViewById<AppCompatImageButton>(R.id.feditor_face) .setOnClickListener { _ -> switchDrawing(contents[FACE_CODE]) }
-    view.findViewById<AppCompatImageButton>(R.id.feditor_front).setOnClickListener { _ -> switchDrawing(contents[FRONT_CODE]) }
-    view.findViewById<AppCompatImageButton>(R.id.feditor_back) .setOnClickListener { _ -> switchDrawing(contents[BACK_CODE]) }
+    view.findViewById<AppCompatImageButton>(R.id.feditor_face) .setOnClickListener { switchDrawing(contents[FACE_CODE]) }
+    view.findViewById<AppCompatImageButton>(R.id.feditor_front).setOnClickListener { switchDrawing(contents[FRONT_CODE]) }
+    view.findViewById<AppCompatImageButton>(R.id.feditor_back) .setOnClickListener { switchDrawing(contents[BACK_CODE]) }
 
     shownPicture = contents[FACE_CODE]
     val canvasView = view.findViewById<CanvasView>(R.id.feditor_canvas)

@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:orientation="vertical"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:background="?attr/selectableItemBackground">
+
+  <TextView
+   android:id="@+id/client_history_date"
+   android:paddingStart="48dp"
+   android:paddingEnd="48dp"
+   android:layout_width="match_parent"
+   android:layout_height="wrap_content"
+   android:layout_marginBottom="8dp"
+   android:background="@color/lightGrey"
+   android:textStyle="bold"
+   android:textColor="@android:color/black"
+   android:textSize="22sp"/>
+
+  <FrameLayout
+   android:layout_width="match_parent"
+   android:layout_height="0dp"
+   android:layout_weight="1"
+   android:layout_marginBottom="8dp">
+    <TextView
+     android:id="@+id/client_history_comment"
+     android:layout_width="match_parent"
+     android:layout_height="match_parent"/>
+    <ProgressBar
+     style="?android:attr/progressBarStyle"
+     android:id="@+id/client_history_comment_loading"
+     android:layout_width="wrap_content"
+     android:layout_height="wrap_content"
+     android:layout_gravity="center_vertical|center_horizontal" />
+  </FrameLayout>
+
+  <TextView
+   android:id="@+id/client_history_last_update"
+   android:paddingStart="48dp"
+   android:paddingEnd="48dp"
+   android:layout_width="match_parent"
+   android:layout_height="wrap_content"
+   android:layout_marginBottom="8dp"
+   android:gravity="end"
+   android:textColor="@android:color/darker_gray"
+   android:textSize="14sp" />
+
+  <LinearLayout
+   android:orientation="vertical"
+   android:layout_width="match_parent"
+   android:layout_height="wrap_content"
+   android:layout_marginBottom="16dp">
+
+    <View
+     android:layout_width="match_parent"
+     android:layout_height="1px"
+     android:layout_gravity="center"
+     android:background="@color/lightGrey"/>
+
+    <LinearLayout
+     android:id="@+id/client_history_images"
+     android:orientation="horizontal"
+     android:layout_width="match_parent"
+     android:layout_height="108dp">
+
+      <FrameLayout
+       android:layout_width="match_parent"
+       android:layout_height="match_parent"
+       android:layout_weight="1">
+        <ImageView
+         android:id="@+id/client_history_face"
+         android:layout_width="match_parent"
+         android:layout_height="match_parent"
+         android:src="@drawable/face" />
+        <ProgressBar
+         style="?android:attr/progressBarStyle"
+         android:id="@+id/client_history_face_loading"
+         android:layout_width="wrap_content"
+         android:layout_height="wrap_content"
+         android:layout_gravity="center_vertical|center_horizontal" />
+      </FrameLayout>
+
+      <View
+       android:layout_width="1px"
+       android:layout_height="match_parent"
+       android:layout_marginLeft="8dp"
+       android:layout_marginRight="8dp"
+       android:layout_gravity="center"
+       android:background="@color/lightGrey"/>
+
+      <FrameLayout
+       android:layout_width="match_parent"
+       android:layout_height="match_parent"
+       android:layout_weight="1">
+        <ImageView
+         android:id="@+id/client_history_front"
+         android:layout_width="match_parent"
+         android:layout_height="match_parent"
+         android:src="@drawable/front" />
+        <ProgressBar
+         style="?android:attr/progressBarStyle"
+         android:id="@+id/client_history_front_loading"
+         android:layout_width="wrap_content"
+         android:layout_height="wrap_content"
+         android:layout_gravity="center_vertical|center_horizontal" />
+      </FrameLayout>
+
+      <View
+       android:layout_width="1px"
+       android:layout_height="match_parent"
+       android:layout_marginLeft="8dp"
+       android:layout_marginRight="8dp"
+       android:layout_gravity="center"
+       android:background="@color/lightGrey"/>
+
+      <FrameLayout
+       android:layout_width="match_parent"
+       android:layout_height="match_parent"
+       android:layout_weight="1">
+        <ImageView
+         android:id="@+id/client_history_back"
+         android:layout_width="match_parent"
+         android:layout_height="match_parent"
+         android:src="@drawable/back" />
+        <ProgressBar
+         style="?android:attr/progressBarStyle"
+         android:id="@+id/client_history_back_loading"
+         android:layout_width="wrap_content"
+         android:layout_height="wrap_content"
+         android:layout_gravity="center_vertical|center_horizontal" />
+      </FrameLayout>
+
+    </LinearLayout>
+  </LinearLayout>
+</LinearLayout>

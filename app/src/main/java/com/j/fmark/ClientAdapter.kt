@@ -14,7 +14,7 @@ import com.j.fmark.fragments.ClientList
 
 class ClientAdapter(private var source : MetadataBuffer, private val clientList : ClientList) : RecyclerView.Adapter<ClientAdapter.Holder>()
 {
-  val updated : SparseArray<Metadata> = SparseArray() // To cache out-of-band updates, so that there is no need to re-fetch everything for known updates.
+  private val updated : SparseArray<Metadata> = SparseArray() // To cache out-of-band updates, so that there is no need to re-fetch everything for known updates.
 
   class Holder(private val adapter : ClientAdapter, private val view : View) : RecyclerView.ViewHolder(view), View.OnClickListener, View.OnLongClickListener
   {
@@ -26,7 +26,7 @@ class ClientAdapter(private var source : MetadataBuffer, private val clientList 
     override fun onClick(v : View?)
     {
       val source = source ?: return
-      adapter.clientList.startEditor(source)
+      adapter.clientList.startClientEditor(source)
     }
 
     override fun onLongClick(v : View?) : Boolean
