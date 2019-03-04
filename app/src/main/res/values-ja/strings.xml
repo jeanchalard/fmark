@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <string name="app_name">FMark</string>
+  <string name="app_name">Clients</string>
   <string name="title">タイトル</string>
 
   <string name="search_hint">検索</string>

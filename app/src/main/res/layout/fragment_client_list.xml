@@ -8,15 +8,15 @@
  android:layout_height="match_parent"
  tools:context=".FMark">
 
-  <TextView
+  <ImageView
    android:layout_width="match_parent"
-   android:layout_height="180dp"
-   android:padding="48dp"
+   android:layout_height="200dp"
    android:gravity="center"
    android:background="@color/colorPrimaryDark"
    android:textColor="@android:color/white"
    android:textSize="48sp"
-   android:text="@string/title"
+   android:scaleType="centerCrop"
+   android:src="@drawable/cover"
    />
 
   <EditText
