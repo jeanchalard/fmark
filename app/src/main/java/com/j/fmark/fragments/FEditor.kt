@@ -194,17 +194,15 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     saveJob = GlobalScope.launch {
       initJob.join()
       oldSaveJob?.join()
-      runBlocking {
-        try
-        {
-          saveData()
-          savePicture(picToSave, drawnBitmap, guide)
-          runBlocking(Dispatchers.Main) { fmarkHost.saveIndicator.showOk() }
-        }
-        catch (e : ApiException)
-        {
-          runBlocking(Dispatchers.Main) { fmarkHost.saveIndicator.showError() }
-        }
+      try
+      {
+        saveData()
+        savePicture(picToSave, drawnBitmap, guide)
+        launch(Dispatchers.Main) { fmarkHost.saveIndicator.showOk() }
+      }
+      catch (e : ApiException)
+      {
+        launch(Dispatchers.Main) { fmarkHost.saveIndicator.showError() }
       }
     }
   }
