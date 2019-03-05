@@ -68,7 +68,7 @@ private class Poke
 {
   interface Pokable { fun poke() }
   @Volatile var listener : Pokable? = null
-  fun poke() { Log.e("POKE", "" + this + " " + listener); listener?.poke() }
+  fun poke() = listener?.poke()
 }
 
 
@@ -102,13 +102,11 @@ class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveRe
   private suspend fun loadFile(file : DriveFile) = driveApi.openFile(file, DriveFile.MODE_READ_ONLY)?.await()?.inputStream
   private fun loadComment(file : DriveFile, poke : Poke) = GlobalScope.async {
     val res = loadFile(file)?.bufferedReader()?.readText() ?: ""
-    Log.e("AsyncLC ${t()}", "Loaded bitmap")
     poke.poke()
     res
   }
   private fun loadImage(file : DriveFile, poke : Poke) = GlobalScope.async {
     val bitmap = loadFile(file).decodeBitmap()
-    Log.e("AsyncLI ${t()}", "Loaded bitmap")
     poke.poke()
     bitmap
   }
@@ -124,23 +122,18 @@ class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveRe
         setSortOrder(SortOrder.Builder().addSortDescending(SortableField.TITLE).build())
       }.build()
       val result = driveApi.queryChildren(clientFolder, query).await()
-      Log.e("Launch2 ${t()}", "Finished loading session list " + result.count)
       val inProgress = result.mapNotNull { folderMetadata ->
         if (null == folderMetadata || !folderMetadata.isFolder) return@mapNotNull null
         val sessionFolder = folderMetadata.driveId?.asDriveFolder() ?: return@mapNotNull null
-        Log.e("Launch2 ${t()}", "Creating async for ${sessionFolder}")
         val poke = Poke()
         Session(folderMetadata, poke, async(start = CoroutineStart.LAZY) {
-          Log.e("Async1 ${t()}", "Start loading contents of folder ${folderMetadata.title}")
           val sessionContents = driveApi.queryChildren(sessionFolder, Query.Builder().addFilter(Filters.eq(SearchableField.TRASHED, false)).build()).await()
-          Log.e("Async2 ${t()}", "Folder loaded ${folderMetadata.title}")
           var comment : Deferred<String>? = null
           var face : Deferred<Bitmap>? = null
           var front : Deferred<Bitmap>? = null
           var back : Deferred<Bitmap>? = null
           sessionContents.forEach { metadata ->
             if (metadata.isFolder) return@forEach
-            Log.e("Async2 ${t()}", "File in ${folderMetadata.title} : ${metadata.title}")
             val file = metadata.driveId.asDriveFile()
             when (metadata.title)
             {
