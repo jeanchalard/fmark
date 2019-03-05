@@ -33,10 +33,6 @@ import com.j.fmark.R
 import com.j.fmark.color
 import com.j.fmark.drive.decodeName
 import com.j.fmark.drive.findFile
-import kotlinx.coroutines.experimental.Dispatchers
-import kotlinx.coroutines.experimental.GlobalScope
-import kotlinx.coroutines.experimental.Job
-import kotlinx.coroutines.experimental.launch
 import kotlinx.coroutines.experimental.runBlocking
 import kotlinx.coroutines.experimental.tasks.await
 import java.io.BufferedInputStream
@@ -45,6 +41,7 @@ import java.io.FileInputStream
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.io.StreamCorruptedException
+import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
 private const val FACE_CODE = 0
@@ -62,8 +59,8 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
   private val contents = ArrayList<Drawing>()
   private lateinit var shownPicture : Drawing
   private val brushViews = ArrayList<BrushView>()
+  private val executor = Executors.newSingleThreadExecutor()
 
-  private val initJob : Job
   init
   {
     contents.add(FACE_CODE,  Drawing(FACE_CODE,  R.drawable.face,  FACE_IMAGE_NAME,  ArrayList()))
@@ -71,7 +68,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     contents.add(BACK_CODE,  Drawing(BACK_CODE,  R.drawable.back,  BACK_IMAGE_NAME,  ArrayList()))
     fmarkHost.spinnerVisible = true
     fmarkHost.saveIndicator.hideOk()
-    initJob = GlobalScope.launch {
+    executor.execute { runBlocking {
       val folder = clientFolder.driveId.asDriveFolder()
       val file = driveApi.findFile(folder, DATA_FILE_NAME) ?: driveApi.createFile(folder, MetadataChangeSet.Builder().setTitle(DATA_FILE_NAME).build(), null).await()
       val dataContents = driveApi.openFile(file, DriveFile.MODE_READ_WRITE).await()
@@ -88,14 +85,14 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
       }
       catch (e : EOFException) { /* done */ }
       catch (e : StreamCorruptedException) { /* done */ }
-      GlobalScope.launch(Dispatchers.Main) {
-        val view = view ?: return@launch
+      fmarkHost.runOnUiThread {
+        val view = view ?: return@runOnUiThread
         val canvasView = view.findViewById<CanvasView>(R.id.feditor_canvas)
         canvasView.setOnChangeDelegate(this@FEditor)
         canvasView.readData(shownPicture.data)
         fmarkHost.spinnerVisible = false
       }
-    }
+    }}
   }
 
   private class FEditorHandler(private val parent : FEditor) : Handler()
@@ -113,7 +110,15 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View?
   {
     val view = inflater.inflate(R.layout.fragment_feditor, container, false)
-    view.setOnKeyListener { v, keycode, event -> if (KeyEvent.KEYCODE_BACK == keycode) { fmarkHost.supportFragmentManager.popBackStack(); true } else false }
+    view.setOnKeyListener { v, keycode, event ->
+      if (KeyEvent.KEYCODE_BACK == keycode)
+      {
+        fmarkHost.supportFragmentManager.popBackStack()
+        executor.shutdown()
+        true
+      }
+      else false
+    }
 
     view.findViewById<AppCompatImageButton>(R.id.feditor_face) .setOnClickListener { switchDrawing(contents[FACE_CODE]) }
     view.findViewById<AppCompatImageButton>(R.id.feditor_front).setOnClickListener { switchDrawing(contents[FRONT_CODE]) }
@@ -181,7 +186,6 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     handler.sendEmptyMessageDelayed(SAVE_PICTURE, 4_000)
   }
 
-  var saveJob : Job? = null
   private fun startSave()
   {
     val canvasView = view?.findViewById<CanvasView>(R.id.feditor_canvas) ?: return
@@ -190,21 +194,18 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     val picToSave = shownPicture
     val guide = fmarkHost.getDrawable(picToSave.guideId)
     fmarkHost.saveIndicator.showInProgress()
-    val oldSaveJob = saveJob
-    saveJob = GlobalScope.launch {
-      initJob.join()
-      oldSaveJob?.join()
+    executor.execute { runBlocking {
       try
       {
         saveData()
         savePicture(picToSave, drawnBitmap, guide)
-        launch(Dispatchers.Main) { fmarkHost.saveIndicator.showOk() }
+        fmarkHost.runOnUiThread { fmarkHost.saveIndicator.showOk() }
       }
       catch (e : ApiException)
       {
-        launch(Dispatchers.Main) { fmarkHost.saveIndicator.showError() }
+        fmarkHost.runOnUiThread { fmarkHost.saveIndicator.showError() }
       }
-    }
+    }}
   }
 
   private suspend fun saveData()
