@@ -58,7 +58,7 @@ class FMark : AppCompatActivity()
 
   private fun createSaveIndicator(parent : ViewGroup) : SaveIndicator
   {
-    val indicator = layoutInflater.inflate(R.layout.save_indicator, parent as ViewGroup, false) as SaveIndicator
+    val indicator = layoutInflater.inflate(R.layout.save_indicator, parent, false) as SaveIndicator
     parent.addView(indicator)
     return indicator
   }
@@ -84,9 +84,18 @@ class FMark : AppCompatActivity()
   }
 
   fun offlineError(msgId : Int) = offlineError(resources.getString(msgId))
-  fun offlineError(msg : String?)
+  private fun offlineError(msg : String?)
   {
     supportFragmentManager.beginTransaction().replace(R.id.main_fragment, SignInErrorFragment(msg, ::startSignIn)).commit()
+  }
+
+  override fun onBackPressed()
+  {
+    val fragment = shownFragment
+    when (fragment) {
+      is FEditor -> fragment.onBackPressed()
+      else -> super.onBackPressed()
+    }
   }
 
   override fun onPrepareOptionsMenu(menu : Menu?) : Boolean

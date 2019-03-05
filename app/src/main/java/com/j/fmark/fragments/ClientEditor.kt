@@ -86,7 +86,6 @@ class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveRe
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View?
   {
     val view = inflater.inflate(R.layout.fragment_client_editor, container, false)
-    view.setOnKeyListener { v, keycode, event -> if (KeyEvent.KEYCODE_BACK == keycode) { fmarkHost.supportFragmentManager.popBackStack(); true } else false }
     view.findViewById<LinearLayout>(R.id.new_session_button).setOnClickListener {
       GlobalScope.launch {
         val session = createSessionForClient(driveApi, clientFolder.driveId.asDriveFolder(), LocalSecond(System.currentTimeMillis()))

@@ -10,7 +10,6 @@ import android.os.Handler
 import android.os.Message
 import android.support.v4.app.Fragment
 import android.support.v7.widget.AppCompatImageButton
-import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MenuItem
 import android.view.View
@@ -107,19 +106,18 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     }
   }
 
+  fun onBackPressed() {
+    fmarkHost.spinnerVisible = true
+    startSave()
+    executor.execute {
+      executor.shutdown()
+      fmarkHost.runOnUiThread { fmarkHost.supportFragmentManager.popBackStack(); fmarkHost.spinnerVisible = false }
+    }
+  }
+
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View?
   {
     val view = inflater.inflate(R.layout.fragment_feditor, container, false)
-    view.setOnKeyListener { v, keycode, event ->
-      if (KeyEvent.KEYCODE_BACK == keycode)
-      {
-        fmarkHost.supportFragmentManager.popBackStack()
-        executor.shutdown()
-        true
-      }
-      else false
-    }
-
     view.findViewById<AppCompatImageButton>(R.id.feditor_face) .setOnClickListener { switchDrawing(contents[FACE_CODE]) }
     view.findViewById<AppCompatImageButton>(R.id.feditor_front).setOnClickListener { switchDrawing(contents[FRONT_CODE]) }
     view.findViewById<AppCompatImageButton>(R.id.feditor_back) .setOnClickListener { switchDrawing(contents[BACK_CODE]) }
@@ -148,7 +146,13 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
   {
     super.onPause()
     handler.removeMessages(SAVE_PICTURE)
-    startSave()
+    if (!executor.isShutdown) startSave()
+  }
+
+  override fun onStop()
+  {
+    super.onStop()
+    if (!executor.isShutdown) executor.shutdown()
   }
 
   // Return the regular LayoutInflater so that this fragment can be put fullscreen on top of the existing interface.
