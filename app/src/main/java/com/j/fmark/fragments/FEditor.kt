@@ -57,7 +57,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
 {
   val name : String = decodeName(clientFolder)
   private val handler = FEditorHandler(this)
-  private val contents = SessionData.Builder().build()
+  private val contents = SessionData()
   private lateinit var shownPicture : Drawing
   private val brushViews = ArrayList<BrushView>()
   private val executor = Executors.newSingleThreadExecutor()

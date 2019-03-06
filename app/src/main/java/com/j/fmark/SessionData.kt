@@ -9,6 +9,7 @@ import kotlinx.coroutines.experimental.tasks.await
 import java.io.BufferedInputStream
 import java.io.EOFException
 import java.io.FileInputStream
+import java.io.InputStream
 import java.io.ObjectInputStream
 import java.io.StreamCorruptedException
 
@@ -19,6 +20,12 @@ private fun codeToImageName(code : Int) = when (code) {
   FACE_CODE -> FACE_IMAGE_NAME
   FRONT_CODE -> FRONT_IMAGE_NAME
   BACK_CODE -> BACK_IMAGE_NAME
+  else -> throw IllegalArgumentException("Unknown image code ${code}")
+}
+private fun codeToResourceId(code : Int) = when (code) {
+  FACE_CODE -> R.drawable.face
+  FRONT_CODE -> R.drawable.front
+  BACK_CODE -> R.drawable.back
   else -> throw IllegalArgumentException("Unknown image code ${code}")
 }
 
@@ -59,19 +66,26 @@ data class SessionData(val face : Drawing, val front : Drawing, val back : Drawi
   }
 }
 
+fun SessionData() = SessionData.Builder().build()
+
 suspend fun SessionData(driveApi : DriveResourceClient, sessionFolder : DriveFolder) : SessionData
 {
-  val contents = SessionData.Builder()
   val file = driveApi.findFile(sessionFolder, DATA_FILE_NAME) ?: driveApi.createFile(sessionFolder, MetadataChangeSet.Builder().setTitle(DATA_FILE_NAME).build(), null).await()
   val dataContents = driveApi.openFile(file, DriveFile.MODE_READ_WRITE).await()
+  return SessionData(FileInputStream(dataContents.parcelFileDescriptor.fileDescriptor))
+}
+
+fun SessionData(inputStream : InputStream) : SessionData
+{
+  val contents = SessionData.Builder()
   try
   {
-    ObjectInputStream(BufferedInputStream(FileInputStream(dataContents.parcelFileDescriptor.fileDescriptor))).use {
+    ObjectInputStream(BufferedInputStream(inputStream)).use {
       while (true)
       {
         val code = it.readInt()
         val data = it.readObject() as ArrayList<FEditorDataType>
-        contents[code] = Drawing(code, R.drawable.face, codeToImageName(code), data)
+        contents[code] = Drawing(code, codeToResourceId(code), codeToImageName(code), data)
       }
     }
   }

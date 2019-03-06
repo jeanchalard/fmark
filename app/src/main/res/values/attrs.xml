@@ -3,4 +3,7 @@
   <declare-styleable name="BrushWidthView">
     <attr name="widthFactor" format="float" />
   </declare-styleable>
+  <declare-styleable name="CanvasView">
+    <attr name="touchEnabled" format="boolean" />
+  </declare-styleable>
 </resources>

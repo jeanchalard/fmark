@@ -51,6 +51,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     fun addCommand(command : Action) = add(command.value)
   }
   interface ChangeDelegate { fun onDataChanged() }
+  private val touchEnabled : Boolean = context.obtainStyledAttributes(attrs, R.styleable.CanvasView, defStyleAttr, defStyleRes)?.getBoolean(R.styleable.CanvasView_touchEnabled, true) ?: true
   private val data = CommandList()
   private val oldData = CommandList()
   private val defaultColor = context.getColor(R.color.defaultBrushColor)
@@ -112,7 +113,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   var cacheVector = FloatArray(2)
   override fun onTouchEvent(event : MotionEvent?) : Boolean
   {
-    if (null == event) return false
+    if (null == event || !touchEnabled) return false
     cacheVector[0] = event.x; cacheVector[1] = event.y
     viewToImage.mapPoints(cacheVector)
     val radius = clamp(event.touchMajor / 12, 5f, 250f) * brush.width

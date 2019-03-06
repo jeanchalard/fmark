@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
               android:orientation="vertical"
               android:layout_width="match_parent"
               android:layout_height="wrap_content"
@@ -67,11 +68,12 @@
        android:layout_width="match_parent"
        android:layout_height="match_parent"
        android:layout_weight="1">
-        <ImageView
+        <com.j.fmark.CanvasView
          android:id="@+id/client_history_face"
+         app:touchEnabled="false"
          android:layout_width="match_parent"
          android:layout_height="match_parent"
-         android:src="@drawable/face" />
+         android:scaleType="fitCenter" />
         <ProgressBar
          style="?android:attr/progressBarStyle"
          android:id="@+id/client_history_face_loading"
@@ -92,11 +94,12 @@
        android:layout_width="match_parent"
        android:layout_height="match_parent"
        android:layout_weight="1">
-        <ImageView
+        <com.j.fmark.CanvasView
          android:id="@+id/client_history_front"
+         app:touchEnabled="false"
          android:layout_width="match_parent"
          android:layout_height="match_parent"
-         android:src="@drawable/front" />
+         android:scaleType="fitCenter" />
         <ProgressBar
          style="?android:attr/progressBarStyle"
          android:id="@+id/client_history_front_loading"
@@ -117,11 +120,12 @@
        android:layout_width="match_parent"
        android:layout_height="match_parent"
        android:layout_weight="1">
-        <ImageView
+        <com.j.fmark.CanvasView
          android:id="@+id/client_history_back"
+         app:touchEnabled="false"
          android:layout_width="match_parent"
          android:layout_height="match_parent"
-         android:src="@drawable/back" />
+         android:scaleType="fitCenter" />
         <ProgressBar
          style="?android:attr/progressBarStyle"
          android:id="@+id/client_history_back_loading"

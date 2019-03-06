@@ -1,18 +1,14 @@
 package com.j.fmark.fragments
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v7.widget.DividerItemDecoration
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
 import android.util.Log
-import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -26,13 +22,14 @@ import com.google.android.gms.drive.query.Query
 import com.google.android.gms.drive.query.SearchableField
 import com.google.android.gms.drive.query.SortOrder
 import com.google.android.gms.drive.query.SortableField
-import com.j.fmark.BACK_IMAGE_NAME
 import com.j.fmark.COMMENT_FILE_NAME
-import com.j.fmark.FACE_IMAGE_NAME
+import com.j.fmark.CanvasView
+import com.j.fmark.DATA_FILE_NAME
+import com.j.fmark.Drawing
 import com.j.fmark.FMark
-import com.j.fmark.FRONT_IMAGE_NAME
 import com.j.fmark.LocalSecond
 import com.j.fmark.R
+import com.j.fmark.SessionData
 import com.j.fmark.drive.createSessionForClient
 import com.j.fmark.drive.decodeName
 import com.j.fmark.drive.decodeSessionDate
@@ -47,21 +44,18 @@ import kotlinx.coroutines.experimental.tasks.await
 import java.io.InputStream
 import java.util.Locale
 
-val EMPTY_BITMAP : Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-val DEFERRED_EMPTY_BITMAP = CompletableDeferred(EMPTY_BITMAP)
 private val EMPTY_METADATA = object : Metadata() {
   override fun <T : Any?> zza(p0 : MetadataField<T>?) : T = throw NotImplementedError()
   override fun freeze() : Metadata = this
   override fun isDataValid() : Boolean = false
 }
-private val INCOMPLETE_SESSIONDATA = SessionData(CompletableDeferred(), DEFERRED_EMPTY_BITMAP, DEFERRED_EMPTY_BITMAP, DEFERRED_EMPTY_BITMAP)
+private val INCOMPLETE_SESSIONSTUFF = SessionStuff(CompletableDeferred(), CompletableDeferred(SessionData()))
 
 private fun Metadata?.isEmpty() = this == null || this === EMPTY_METADATA
-private fun InputStream?.decodeBitmap() = if (null == this) EMPTY_BITMAP else BitmapFactory.decodeStream(this)
+private fun InputStream?.decodeSessionData() = if (null == this) SessionData() else SessionData(this)
 private fun Deferred<String>?.orElse(s : String) = this ?: CompletableDeferred(s)
-private fun Deferred<Bitmap>?.orEmpty() = this ?: DEFERRED_EMPTY_BITMAP
+private fun Deferred<SessionData>?.orNewData() = this ?: CompletableDeferred(SessionData())
 private fun t() = Thread.currentThread()
-
 
 
 private class Poke
@@ -71,13 +65,9 @@ private class Poke
   fun poke() = listener?.poke()
 }
 
-
-private data class SessionData(val comment : Deferred<String>, val face : Deferred<Bitmap>, val front : Deferred<Bitmap>, val back : Deferred<Bitmap>)
-{
-  val hasImages : Boolean get() = face !== DEFERRED_EMPTY_BITMAP || front !== DEFERRED_EMPTY_BITMAP || back !== DEFERRED_EMPTY_BITMAP
-}
-private data class Session(val folder : Metadata, val poke : Poke, val data : Deferred<SessionData>)
-
+// Todo : find a reasonable name for this, or better : remove it completely (which should be doable by putting the comment into SessionData)
+private data class SessionStuff(val comment : Deferred<String>, val data : Deferred<SessionData>)
+private data class Session(val folder : Metadata, val poke : Poke, val data : Deferred<SessionStuff>)
 
 class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val driveRefreshClient : DriveClient, private val clientFolder : Metadata) : Fragment()
 {
@@ -104,10 +94,10 @@ class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveRe
     poke.poke()
     res
   }
-  private fun loadImage(file : DriveFile, poke : Poke) = GlobalScope.async {
-    val bitmap = loadFile(file).decodeBitmap()
+  private fun loadData(file : DriveFile, poke : Poke) = GlobalScope.async {
+    val data = loadFile(file).decodeSessionData()
     poke.poke()
-    bitmap
+    data
   }
 
   private fun populateClientHistory(view : View)
@@ -128,21 +118,17 @@ class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveRe
         Session(folderMetadata, poke, async(start = CoroutineStart.LAZY) {
           val sessionContents = driveApi.queryChildren(sessionFolder, Query.Builder().addFilter(Filters.eq(SearchableField.TRASHED, false)).build()).await()
           var comment : Deferred<String>? = null
-          var face : Deferred<Bitmap>? = null
-          var front : Deferred<Bitmap>? = null
-          var back : Deferred<Bitmap>? = null
+          var data : Deferred<SessionData>? = null
           sessionContents.forEach { metadata ->
             if (metadata.isFolder) return@forEach
             val file = metadata.driveId.asDriveFile()
             when (metadata.title)
             {
               COMMENT_FILE_NAME -> comment = loadComment(file, poke)
-              FACE_IMAGE_NAME   -> face = loadImage(file, poke)
-              FRONT_IMAGE_NAME  -> front = loadImage(file, poke)
-              BACK_IMAGE_NAME   -> back = loadImage(file, poke)
+              DATA_FILE_NAME -> data = loadData(file, poke)
             }
           }
-          SessionData(comment.orElse(""), face.orEmpty(), front.orEmpty(), back.orEmpty())
+          SessionStuff(comment.orElse(""), data.orNewData())
         })
       }
       if (inProgress.isNotEmpty()) inProgress.first().data.start()
@@ -174,13 +160,12 @@ private class ClientHistoryAdapter(private val parent : ClientEditor, private va
     private val commentTextView : TextView = view.findViewById(R.id.client_history_comment)
     private val commentLoading : ProgressBar = view.findViewById(R.id.client_history_comment_loading)
     private val lastUpdateLabel : TextView = view.findViewById(R.id.client_history_last_update)
-    private val faceImage : ImageView = view.findViewById(R.id.client_history_face)
+    private val faceImage : CanvasView = view.findViewById<CanvasView>(R.id.client_history_face).also { it.setImageResource(R.drawable.face) }
     private var faceImageLoading : ProgressBar = view.findViewById(R.id.client_history_face_loading)
-    private val frontImage : ImageView = view.findViewById(R.id.client_history_front)
+    private val frontImage : CanvasView = view.findViewById<CanvasView>(R.id.client_history_front).also { it.setImageResource(R.drawable.front) }
     private val frontImageLoading : ProgressBar = view.findViewById(R.id.client_history_front_loading)
-    private val backImage : ImageView = view.findViewById(R.id.client_history_back)
+    private val backImage : CanvasView = view.findViewById<CanvasView>(R.id.client_history_back).also { it.setImageResource(R.drawable.back) }
     private val backImageLoading : ProgressBar = view.findViewById(R.id.client_history_back_loading)
-    private val imageHolder : LinearLayout = view.findViewById(R.id.client_history_images)
 
     private var comment : Deferred<String> = CompletableDeferred()
       set(value)
@@ -191,29 +176,24 @@ private class ClientHistoryAdapter(private val parent : ClientEditor, private va
         commentTextView.visibility = (commentTextView.text == "").toVisi()
       }
 
-    private var face : Deferred<Bitmap> = CompletableDeferred()
-      set(value)
-      {
-        val completed = value.isCompleted
-        faceImage.setImageBitmap(if (completed) value.getCompleted() else EMPTY_BITMAP)
-        faceImageLoading.visibility = (!completed).toVisi()
-      }
+    private var face : Deferred<SessionData> = CompletableDeferred()
+      set(value) = setDrawingToCanvasView(value, SessionData::face, faceImage, faceImageLoading)
+    private var front : Deferred<SessionData> = CompletableDeferred()
+      set(value) = setDrawingToCanvasView(value, SessionData::front, frontImage, frontImageLoading)
+    private var back : Deferred<SessionData> = CompletableDeferred()
+      set(value) = setDrawingToCanvasView(value, SessionData::back, backImage, backImageLoading)
 
-    private var front : Deferred<Bitmap> = CompletableDeferred()
-      set(value)
-      {
-        val completed = value.isCompleted
-        frontImage.setImageBitmap(if (completed) value.getCompleted() else EMPTY_BITMAP)
-        frontImageLoading.visibility = (!completed).toVisi()
-      }
-
-    private var back : Deferred<Bitmap> = CompletableDeferred()
-      set(value)
-      {
-        val completed = value.isCompleted
-        backImage.setImageBitmap(if (completed) value.getCompleted() else EMPTY_BITMAP)
-        backImageLoading.visibility = (!completed).toVisi()
-      }
+    private fun setDrawingToCanvasView(sessionData : Deferred<SessionData>, field : SessionData.() -> Drawing, view : CanvasView, progressView : ProgressBar)
+    {
+        val completed = sessionData.isCompleted
+        if (completed)
+          sessionData.getCompleted().field().let {
+            view.setImageResource(it.guideId)
+            view.readData(it.data)
+          }
+        else view.clear()
+        progressView.visibility = (!completed).toVisi()
+    }
 
     var session : Session = Session(EMPTY_METADATA, Poke(), CompletableDeferred())
       set(data)
@@ -225,12 +205,11 @@ private class ClientHistoryAdapter(private val parent : ClientEditor, private va
           dateLabel.text = if (!data.folder.isEmpty()) decodeSessionDate(data.folder).toShortString() else ""
           val lastUpdateDateString = if (!data.folder.isEmpty()) LocalSecond(data.folder.modifiedDate).toString() else ""
           lastUpdateLabel.text = String.format(Locale.getDefault(), lastUpdateLabel.context.getString(R.string.update_time_with_placeholder), lastUpdateDateString)
-          val completedData = if (data.data.isCompleted) data.data.getCompleted() else INCOMPLETE_SESSIONDATA
+          val completedData = if (data.data.isCompleted) data.data.getCompleted() else INCOMPLETE_SESSIONSTUFF
           comment = completedData.comment
-          face = completedData.face
-          front = completedData.front
-          back = completedData.back
-          imageHolder.visibility = (completedData.hasImages).toVisi()
+          face = completedData.data
+          front = completedData.data
+          back = completedData.data
         }
       }
 
