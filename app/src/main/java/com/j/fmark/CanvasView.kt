@@ -12,7 +12,6 @@ import android.graphics.PorterDuffXfermode
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.widget.ImageView
-import com.j.fmark.fragments.FEditorDataType
 
 enum class Action(val value : FEditorDataType)
 {
