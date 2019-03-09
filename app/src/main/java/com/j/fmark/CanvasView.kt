@@ -93,6 +93,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     imageMatrix.invert(viewToImage)
     cacheVector[0] = drawable.intrinsicWidth.toFloat(); cacheVector[1] = drawable.intrinsicHeight.toFloat()
     imageMatrix.mapPoints(cacheVector)
+    replayData(ArrayList(data))
   }
 
   override fun onDraw(canvas : Canvas?)

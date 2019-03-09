@@ -30,14 +30,14 @@
       <EditText
        android:id="@+id/feditor_comment_text"
        android:hint="@string/comment_hint"
-       android:layout_marginTop="8dp"
+       android:layout_margin="8dp"
        android:padding="8dp"
        android:background="@drawable/rectangle"
        android:layout_width="match_parent"
        android:layout_height="match_parent"
        android:textSize="22sp"
        android:gravity="top"
-       android:inputType="text" />
+       android:inputType="textLongMessage|textMultiLine|textAutoCorrect" />
 
     </LinearLayout>
 

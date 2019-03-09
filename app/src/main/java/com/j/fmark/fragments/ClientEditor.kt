@@ -167,8 +167,7 @@ private class ClientHistoryAdapter(private val parent : ClientEditor, private va
             loadingVisibility = View.INVISIBLE
           } else loadingVisibility = View.VISIBLE
           arrayOf(commentLoading, faceImageLoading, frontImageLoading, backImageLoading).forEach { it.visibility = loadingVisibility }
-            commentLoading.visibility = View.INVISIBLE
-            faceImageLoading.visibility = View.INVISIBLE
+          commentLoading.visibility = View.INVISIBLE
         }
       }
 

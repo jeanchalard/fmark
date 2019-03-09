@@ -57,6 +57,12 @@ private fun EditText.addAfterTextChangedListener(f : (String) -> Unit)
     override fun onTextChanged(s : CharSequence?, start : Int, before : Int, count : Int) {}
   })
 }
+private fun View?.hasChild(v : View) : Boolean
+{
+  if (this !is ViewGroup) return false
+  for (i in 0..childCount) getChildAt(i).let { child -> if (v === child || v.hasChild(v)) return true }
+  return false
+}
 
 class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val driveRefreshClient : DriveClient, private val clientFolder : Metadata) : Fragment(), CanvasView.ChangeDelegate
 {
@@ -133,7 +139,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     brushViews.forEach { it.setOnClickListener { v ->
       val bv = v as BrushView
       canvasView.brush = bv.changeBrush(canvasView.brush)
-      brushViews.forEach { it.isActivated = it.isActive(canvasView.brush) }
+      brushViews.forEach { brushView -> brushView.isActivated = brushView.isActive(canvasView.brush) }
     }}
     brushViews.forEach { it.isActivated = it.isActive(canvasView.brush) }
     return view
@@ -160,8 +166,8 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     handler.removeMessages(SAVE_PICTURE_MSG)
     startSave()
     val switcher = view?.findViewById<ViewFlipper>(R.id.feditor_comment_canvas_flipper) ?: return
-    val comment = view?.findViewById<EditText>(R.id.feditor_comment_text)
-    if (switcher.currentView != comment) switcher.showPrevious()
+    val comment = view?.findViewById<EditText>(R.id.feditor_comment_text) ?: return
+    if (!switcher.currentView.hasChild(comment)) switcher.showPrevious()
   }
 
   private fun switchDrawing(drawing : Drawing)
@@ -170,11 +176,10 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     startSave()
     val switcher = view?.findViewById<ViewFlipper>(R.id.feditor_comment_canvas_flipper) ?: return
     val canvasView = view?.findViewById<CanvasView>(R.id.feditor_canvas) ?: return
-    if (switcher.currentView != canvasView) switcher.showNext()
-    val guideId = drawing.guideId
-    canvasView.saveData(shownPicture.data)
+    if (!switcher.currentView.hasChild(canvasView)) switcher.showNext()
+    else canvasView.saveData(shownPicture.data)
     shownPicture = drawing
-    canvasView.setImageResource(guideId)
+    canvasView.setImageResource(drawing.guideId)
     canvasView.readData(drawing.data)
   }
 
