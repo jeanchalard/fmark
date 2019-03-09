@@ -16,7 +16,10 @@ import android.view.LayoutInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.ViewFlipper
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.drive.DriveClient
 import com.google.android.gms.drive.DriveFile
@@ -39,6 +42,7 @@ import com.j.fmark.R
 import com.j.fmark.SessionData
 import com.j.fmark.color
 import com.j.fmark.drive.decodeName
+import com.j.fmark.drive.decodeSessionDate
 import com.j.fmark.drive.findFile
 import kotlinx.coroutines.experimental.runBlocking
 import kotlinx.coroutines.experimental.tasks.await
@@ -103,9 +107,12 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View?
   {
     val view = inflater.inflate(R.layout.fragment_feditor, container, false)
-    view.findViewById<AppCompatImageButton>(R.id.feditor_face) .setOnClickListener { switchDrawing(contents[FACE_CODE]) }
-    view.findViewById<AppCompatImageButton>(R.id.feditor_front).setOnClickListener { switchDrawing(contents[FRONT_CODE]) }
-    view.findViewById<AppCompatImageButton>(R.id.feditor_back) .setOnClickListener { switchDrawing(contents[BACK_CODE]) }
+    view.findViewById<AppCompatImageButton>(R.id.feditor_comment).setOnClickListener { switchToComment() }
+    view.findViewById<AppCompatImageButton>(R.id.feditor_face)   .setOnClickListener { switchDrawing(contents[FACE_CODE]) }
+    view.findViewById<AppCompatImageButton>(R.id.feditor_front)  .setOnClickListener { switchDrawing(contents[FRONT_CODE]) }
+    view.findViewById<AppCompatImageButton>(R.id.feditor_back)   .setOnClickListener { switchDrawing(contents[BACK_CODE]) }
+
+    view.findViewById<TextView>(R.id.feditor_date).text = decodeSessionDate(clientFolder).toShortString()
 
     shownPicture = contents[FACE_CODE]
     val canvasView = view.findViewById<CanvasView>(R.id.feditor_canvas)
@@ -143,13 +150,23 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
   // Return the regular LayoutInflater so that this fragment can be put fullscreen on top of the existing interface.
   override fun onGetLayoutInflater(savedFragmentState : Bundle?) = fmarkHost.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
 
+  private fun switchToComment()
+  {
+    val switcher = view?.findViewById<ViewFlipper>(R.id.feditor_comment_canvas_flipper) ?: return
+    val comment = view?.findViewById<EditText>(R.id.feditor_comment_text)
+    if (switcher.currentView != comment) switcher.showPrevious()
+    handler.removeMessages(SAVE_PICTURE_MSG)
+    startSave()
+  }
+
   private fun switchDrawing(drawing : Drawing)
   {
+    val switcher = view?.findViewById<ViewFlipper>(R.id.feditor_comment_canvas_flipper) ?: return
+    val canvasView = view?.findViewById<CanvasView>(R.id.feditor_canvas) ?: return
+    if (switcher.currentView != canvasView) switcher.showNext()
     handler.removeMessages(SAVE_PICTURE_MSG)
     startSave()
     val guideId = drawing.guideId
-    val view = view ?: return
-    val canvasView = view.findViewById<CanvasView>(R.id.feditor_canvas)
     canvasView.saveData(shownPicture.data)
     shownPicture = drawing
     canvasView.setImageResource(guideId)

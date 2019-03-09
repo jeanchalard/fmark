@@ -9,12 +9,14 @@ import java.util.Locale
 fun color(l : Long) : Int = (l and -1L).toInt()
 fun formatDate(date : Date?) : String = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date ?: Date())
 
+private fun roundTo(v : Long, granularity : Long) = (v % granularity).let { mod -> if (mod * 2 > granularity) v + granularity - mod else v - mod }
+
 // Simple and stupid utility that's not very useful for real stuff but is vastly easier to use than the classes that are
 data class LocalSecond(val year : Int, val month : Int, val day : Int, val hour : Int, val minute : Int, val second : Int)
 {
-  constructor(gc : GregorianCalendar) : this(gc.get(Calendar.YEAR), 1 + gc.get(Calendar.MONTH), gc.get(Calendar.DATE),
+  private constructor(gc : GregorianCalendar) : this(gc.get(Calendar.YEAR), 1 + gc.get(Calendar.MONTH), gc.get(Calendar.DATE),
    gc.get(Calendar.HOUR_OF_DAY), gc.get(Calendar.MINUTE), gc.get(Calendar.SECOND))
-  constructor(t : Long) : this(GregorianCalendar().apply { timeInMillis = t })
+  constructor(t : Long) : this(GregorianCalendar().apply { timeInMillis = roundTo(t, 30 * 60 * 1000) })
   constructor(d : Date) : this(d.time)
   constructor() : this(0, 0, 0, 0, 0, 0)
 
