@@ -49,11 +49,8 @@ private val EMPTY_METADATA = object : Metadata() {
   override fun freeze() : Metadata = this
   override fun isDataValid() : Boolean = false
 }
-private val INCOMPLETE_SESSIONSTUFF = SessionStuff(CompletableDeferred(), CompletableDeferred(SessionData()))
-
 private fun Metadata?.isEmpty() = this == null || this === EMPTY_METADATA
 private fun InputStream?.decodeSessionData() = if (null == this) SessionData() else SessionData(this)
-private fun Deferred<String>?.orElse(s : String) = this ?: CompletableDeferred(s)
 private fun Deferred<SessionData>?.orNewData() = this ?: CompletableDeferred(SessionData())
 private fun t() = Thread.currentThread()
 
@@ -66,7 +63,7 @@ private class Poke
 }
 
 // Todo : find a reasonable name for this, or better : remove it completely (which should be doable by putting the comment into SessionData)
-private data class SessionStuff(val comment : Deferred<String>, val data : Deferred<SessionData>)
+private data class SessionStuff(val data : Deferred<SessionData>)
 private data class Session(val folder : Metadata, val poke : Poke, val data : Deferred<SessionStuff>)
 
 class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val driveRefreshClient : DriveClient, private val clientFolder : Metadata) : Fragment()
@@ -117,18 +114,16 @@ class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveRe
         val poke = Poke()
         Session(folderMetadata, poke, async(start = CoroutineStart.LAZY) {
           val sessionContents = driveApi.queryChildren(sessionFolder, Query.Builder().addFilter(Filters.eq(SearchableField.TRASHED, false)).build()).await()
-          var comment : Deferred<String>? = null
           var data : Deferred<SessionData>? = null
           sessionContents.forEach { metadata ->
             if (metadata.isFolder) return@forEach
             val file = metadata.driveId.asDriveFile()
             when (metadata.title)
             {
-              COMMENT_FILE_NAME -> comment = loadComment(file, poke)
               DATA_FILE_NAME -> data = loadData(file, poke)
             }
           }
-          SessionStuff(comment.orElse(""), data.orNewData())
+          SessionStuff(data.orNewData())
         })
       }
       if (inProgress.isNotEmpty()) inProgress.first().data.start()
@@ -149,7 +144,6 @@ class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveRe
   fun startSessionEditor(sessionFolder : Metadata) = fmarkHost.startSessionEditor(driveApi, driveRefreshClient, sessionFolder)
 }
 
-private fun Boolean.toVisi() = if (this) View.VISIBLE else View.GONE
 private class ClientHistoryAdapter(private val parent : ClientEditor, private var source : List<Session>) : RecyclerView.Adapter<ClientHistoryAdapter.Holder>()
 {
   class Holder(private val adapter : ClientHistoryAdapter, view : View) : RecyclerView.ViewHolder(view), View.OnClickListener, Poke.Pokable
@@ -167,34 +161,6 @@ private class ClientHistoryAdapter(private val parent : ClientEditor, private va
     private val backImage : CanvasView = view.findViewById<CanvasView>(R.id.client_history_back).also { it.setImageResource(R.drawable.back) }
     private val backImageLoading : ProgressBar = view.findViewById(R.id.client_history_back_loading)
 
-    private var comment : Deferred<String> = CompletableDeferred()
-      set(value)
-      {
-        val completed = value.isCompleted
-        commentTextView.text = if (completed) value.getCompleted() else ""
-        commentLoading.visibility = (!completed).toVisi()
-        commentTextView.visibility = (commentTextView.text == "").toVisi()
-      }
-
-    private var face : Deferred<SessionData> = CompletableDeferred()
-      set(value) = setDrawingToCanvasView(value, SessionData::face, faceImage, faceImageLoading)
-    private var front : Deferred<SessionData> = CompletableDeferred()
-      set(value) = setDrawingToCanvasView(value, SessionData::front, frontImage, frontImageLoading)
-    private var back : Deferred<SessionData> = CompletableDeferred()
-      set(value) = setDrawingToCanvasView(value, SessionData::back, backImage, backImageLoading)
-
-    private fun setDrawingToCanvasView(sessionData : Deferred<SessionData>, field : SessionData.() -> Drawing, view : CanvasView, progressView : ProgressBar)
-    {
-        val completed = sessionData.isCompleted
-        if (completed)
-          sessionData.getCompleted().field().let {
-            view.setImageResource(it.guideId)
-            view.readData(it.data)
-          }
-        else view.clear()
-        progressView.visibility = (!completed).toVisi()
-    }
-
     var session : Session = Session(EMPTY_METADATA, Poke(), CompletableDeferred())
       set(data)
       {
@@ -205,11 +171,24 @@ private class ClientHistoryAdapter(private val parent : ClientEditor, private va
           dateLabel.text = if (!data.folder.isEmpty()) decodeSessionDate(data.folder).toShortString() else ""
           val lastUpdateDateString = if (!data.folder.isEmpty()) LocalSecond(data.folder.modifiedDate).toString() else ""
           lastUpdateLabel.text = String.format(Locale.getDefault(), lastUpdateLabel.context.getString(R.string.update_time_with_placeholder), lastUpdateDateString)
-          val completedData = if (data.data.isCompleted) data.data.getCompleted() else INCOMPLETE_SESSIONSTUFF
-          comment = completedData.comment
-          face = completedData.data
-          front = completedData.data
-          back = completedData.data
+          // Todo : lol. Remove this crap.
+          val loadingVisibility : Int
+          if (data.data.isCompleted && data.data.getCompleted().data.isCompleted)
+          {
+            val completedData = data.data.getCompleted().data.getCompleted()
+            commentTextView.text = completedData.comment
+            faceImage.setImageResource(completedData.face.guideId)
+            faceImage.readData(completedData.face.data)
+            frontImage.setImageResource(completedData.front.guideId)
+            frontImage.readData(completedData.front.data)
+            backImage.setImageResource(completedData.back.guideId)
+            backImage.readData(completedData.back.data)
+            commentTextView.visibility = View.VISIBLE
+            loadingVisibility = View.INVISIBLE
+          } else loadingVisibility = View.VISIBLE
+          arrayOf(commentLoading, faceImageLoading, frontImageLoading, backImageLoading).forEach { it.visibility = loadingVisibility }
+            commentLoading.visibility = View.INVISIBLE
+            faceImageLoading.visibility = View.INVISIBLE
         }
       }
 
