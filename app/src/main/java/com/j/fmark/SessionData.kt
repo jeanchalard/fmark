@@ -11,6 +11,8 @@ import java.io.EOFException
 import java.io.FileInputStream
 import java.io.InputStream
 import java.io.ObjectInputStream
+import java.io.ObjectOutputStream
+import java.io.OutputStream
 import java.io.StreamCorruptedException
 
 const val FACE_CODE = 0
@@ -31,9 +33,10 @@ private fun codeToResourceId(code : Int) = when (code) {
 
 typealias FEditorDataType = Double
 data class Drawing(val code : Int, val guideId : Int, val fileName : String, val data : ArrayList<FEditorDataType>)
-data class SessionData(val face : Drawing, val front : Drawing, val back : Drawing) {
+data class SessionData(var comment : String, val face : Drawing, val front : Drawing, val back : Drawing) {
   class Builder
   {
+    var comment : String? = null
     var face : Drawing? = null
     var front : Drawing? = null
     var back : Drawing? = null
@@ -47,6 +50,7 @@ data class SessionData(val face : Drawing, val front : Drawing, val back : Drawi
       }
     }
     fun build() : SessionData = SessionData(
+     comment ?: "",
      face  ?: Drawing(FACE_CODE,  R.drawable.face,  FACE_IMAGE_NAME,  ArrayList()),
      front ?: Drawing(FRONT_CODE, R.drawable.front, FRONT_IMAGE_NAME, ArrayList()),
      back  ?: Drawing(BACK_CODE,  R.drawable.back,  BACK_IMAGE_NAME,  ArrayList()))
@@ -81,6 +85,7 @@ fun SessionData(inputStream : InputStream) : SessionData
   try
   {
     ObjectInputStream(BufferedInputStream(inputStream)).use {
+      contents.comment = it.readObject() as String
       while (true)
       {
         val code = it.readInt()
@@ -92,4 +97,13 @@ fun SessionData(inputStream : InputStream) : SessionData
   catch (e : EOFException) { /* done */ }
   catch (e : StreamCorruptedException) { /* done */ }
   return contents.build()
+}
+
+fun SessionData.save(os : ObjectOutputStream)
+{
+  os.writeObject(comment)
+  forEach {
+    os.writeInt(it.code)
+    os.writeObject(it.data)
+  }
 }

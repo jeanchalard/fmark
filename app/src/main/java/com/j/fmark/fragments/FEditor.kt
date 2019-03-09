@@ -10,8 +10,8 @@ import android.os.Handler
 import android.os.Message
 import android.support.v4.app.Fragment
 import android.support.v7.widget.AppCompatImageButton
-import android.util.ArrayMap
-import android.util.SparseArray
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.MenuItem
 import android.view.View
@@ -27,35 +27,36 @@ import com.google.android.gms.drive.DriveResourceClient
 import com.google.android.gms.drive.Metadata
 import com.google.android.gms.drive.MetadataChangeSet
 import com.j.fmark.BACK_CODE
-import com.j.fmark.BACK_IMAGE_NAME
 import com.j.fmark.BrushView
 import com.j.fmark.CanvasView
 import com.j.fmark.DATA_FILE_NAME
 import com.j.fmark.Drawing
 import com.j.fmark.FACE_CODE
-import com.j.fmark.FACE_IMAGE_NAME
-import com.j.fmark.FEditorDataType
 import com.j.fmark.FMark
 import com.j.fmark.FRONT_CODE
-import com.j.fmark.FRONT_IMAGE_NAME
 import com.j.fmark.R
 import com.j.fmark.SessionData
 import com.j.fmark.color
 import com.j.fmark.drive.decodeName
 import com.j.fmark.drive.decodeSessionDate
 import com.j.fmark.drive.findFile
+import com.j.fmark.save
 import kotlinx.coroutines.experimental.runBlocking
 import kotlinx.coroutines.experimental.tasks.await
-import java.io.BufferedInputStream
-import java.io.EOFException
-import java.io.FileInputStream
-import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
-import java.io.StreamCorruptedException
 import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
 private const val SAVE_PICTURE_MSG = 1
+
+private fun EditText.addAfterTextChangedListener(f : (String) -> Unit)
+{
+  this.addTextChangedListener(object : TextWatcher {
+    override fun afterTextChanged(s : Editable?) { if (s != null) f(s.toString()) }
+    override fun beforeTextChanged(s : CharSequence?, start : Int, count : Int, after : Int) {}
+    override fun onTextChanged(s : CharSequence?, start : Int, before : Int, count : Int) {}
+  })
+}
 
 class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val driveRefreshClient : DriveClient, private val clientFolder : Metadata) : Fragment(), CanvasView.ChangeDelegate
 {
@@ -72,9 +73,12 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     fmarkHost.saveIndicator.hideOk()
     executor.execute { runBlocking {
       val data = SessionData(driveApi, clientFolder.driveId.asDriveFolder())
+      contents.comment = data.comment
       data.forEach { contents[it.code].data.addAll(it.data) }
       fmarkHost.runOnUiThread {
         val view = view ?: return@runOnUiThread
+        val commentView = view.findViewById<EditText>(R.id.feditor_comment_text)
+        commentView.setText(data.comment)
         val canvasView = view.findViewById<CanvasView>(R.id.feditor_canvas)
         canvasView.setOnChangeDelegate(this@FEditor)
         canvasView.readData(shownPicture.data)
@@ -113,6 +117,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     view.findViewById<AppCompatImageButton>(R.id.feditor_back)   .setOnClickListener { switchDrawing(contents[BACK_CODE]) }
 
     view.findViewById<TextView>(R.id.feditor_date).text = decodeSessionDate(clientFolder).toShortString()
+    view.findViewById<EditText>(R.id.feditor_comment_text).addAfterTextChangedListener { text -> contents.comment = text }
 
     shownPicture = contents[FACE_CODE]
     val canvasView = view.findViewById<CanvasView>(R.id.feditor_canvas)
@@ -152,20 +157,20 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
 
   private fun switchToComment()
   {
+    handler.removeMessages(SAVE_PICTURE_MSG)
+    startSave()
     val switcher = view?.findViewById<ViewFlipper>(R.id.feditor_comment_canvas_flipper) ?: return
     val comment = view?.findViewById<EditText>(R.id.feditor_comment_text)
     if (switcher.currentView != comment) switcher.showPrevious()
-    handler.removeMessages(SAVE_PICTURE_MSG)
-    startSave()
   }
 
   private fun switchDrawing(drawing : Drawing)
   {
+    handler.removeMessages(SAVE_PICTURE_MSG)
+    startSave()
     val switcher = view?.findViewById<ViewFlipper>(R.id.feditor_comment_canvas_flipper) ?: return
     val canvasView = view?.findViewById<CanvasView>(R.id.feditor_canvas) ?: return
     if (switcher.currentView != canvasView) switcher.showNext()
-    handler.removeMessages(SAVE_PICTURE_MSG)
-    startSave()
     val guideId = drawing.guideId
     canvasView.saveData(shownPicture.data)
     shownPicture = drawing
@@ -192,19 +197,26 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     handler.sendEmptyMessageDelayed(SAVE_PICTURE_MSG, 4_000)
   }
 
+  private data class BitmapSaveData(val drawnBitmap : Bitmap?, val picToSave : Drawing?, val guide : Drawable?)
   private fun startSave()
   {
-    val canvasView = view?.findViewById<CanvasView>(R.id.feditor_canvas) ?: return
-    val drawnBitmap = canvasView.getBitmap()
-    canvasView.saveData(shownPicture.data)
-    val picToSave = shownPicture
-    val guide = fmarkHost.getDrawable(picToSave.guideId)
+    val currentView = view?.findViewById<ViewFlipper>(R.id.feditor_comment_canvas_flipper)?.currentView ?: return
+    val canvasView = view?.findViewById<CanvasView>(R.id.feditor_canvas)
+    val (drawnBitmap, picToSave, guide) = if (currentView === canvasView)
+    {
+      val drawnBitmap = canvasView.getBitmap()
+      canvasView.saveData(shownPicture.data)
+      val picToSave = shownPicture
+      val guide = fmarkHost.getDrawable(picToSave.guideId)
+      BitmapSaveData(drawnBitmap, picToSave, guide)
+    } else BitmapSaveData(null, null, null)
+
     fmarkHost.saveIndicator.showInProgress()
     executor.execute { runBlocking {
       try
       {
         saveData()
-        savePicture(picToSave, drawnBitmap, guide)
+        if (picToSave != null && drawnBitmap != null && guide != null) savePicture(picToSave, drawnBitmap, guide)
         fmarkHost.runOnUiThread { fmarkHost.saveIndicator.showOk() }
       }
       catch (e : ApiException)
@@ -218,13 +230,10 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
   {
     val dataFile = driveApi.findFile(clientFolder.driveId.asDriveFolder(), DATA_FILE_NAME) ?: return
     val dataContents = driveApi.openFile(dataFile, DriveFile.MODE_WRITE_ONLY).await()
-    val os = ObjectOutputStream(dataContents.outputStream)
-    contents.forEach {
-      os.writeInt(it.code)
-      os.writeObject(it.data)
+    ObjectOutputStream(dataContents.outputStream).use {
+      contents.save(it)
+      it.flush()
     }
-    os.flush()
-    os.close()
     driveApi.commitContents(dataContents, null)
   }
 
