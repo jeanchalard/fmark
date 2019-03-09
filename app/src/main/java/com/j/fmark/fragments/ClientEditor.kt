@@ -51,7 +51,6 @@ private val EMPTY_METADATA = object : Metadata() {
 }
 private fun Metadata?.isEmpty() = this == null || this === EMPTY_METADATA
 private fun InputStream?.decodeSessionData() = if (null == this) SessionData() else SessionData(this)
-private fun Deferred<SessionData>?.orNewData() = this ?: CompletableDeferred(SessionData())
 private fun t() = Thread.currentThread()
 
 
@@ -62,9 +61,7 @@ private class Poke
   fun poke() = listener?.poke()
 }
 
-// Todo : find a reasonable name for this, or better : remove it completely (which should be doable by putting the comment into SessionData)
-private data class SessionStuff(val data : Deferred<SessionData>)
-private data class Session(val folder : Metadata, val poke : Poke, val data : Deferred<SessionStuff>)
+private data class Session(val folder : Metadata, val poke : Poke, val data : Deferred<SessionData>)
 
 class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val driveRefreshClient : DriveClient, private val clientFolder : Metadata) : Fragment()
 {
@@ -85,17 +82,7 @@ class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveRe
     return view
   }
 
-  private suspend fun loadFile(file : DriveFile) = driveApi.openFile(file, DriveFile.MODE_READ_ONLY)?.await()?.inputStream
-  private fun loadComment(file : DriveFile, poke : Poke) = GlobalScope.async {
-    val res = loadFile(file)?.bufferedReader()?.readText() ?: ""
-    poke.poke()
-    res
-  }
-  private fun loadData(file : DriveFile, poke : Poke) = GlobalScope.async {
-    val data = loadFile(file).decodeSessionData()
-    poke.poke()
-    data
-  }
+  private suspend fun loadData(file : DriveFile) : SessionData = driveApi.openFile(file, DriveFile.MODE_READ_ONLY)?.await()?.inputStream.decodeSessionData()
 
   private fun populateClientHistory(view : View)
   {
@@ -114,16 +101,17 @@ class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveRe
         val poke = Poke()
         Session(folderMetadata, poke, async(start = CoroutineStart.LAZY) {
           val sessionContents = driveApi.queryChildren(sessionFolder, Query.Builder().addFilter(Filters.eq(SearchableField.TRASHED, false)).build()).await()
-          var data : Deferred<SessionData>? = null
+          var data = SessionData()
           sessionContents.forEach { metadata ->
             if (metadata.isFolder) return@forEach
             val file = metadata.driveId.asDriveFile()
             when (metadata.title)
             {
-              DATA_FILE_NAME -> data = loadData(file, poke)
+              DATA_FILE_NAME -> data = loadData(file)
             }
           }
-          SessionStuff(data.orNewData())
+          poke.poke()
+          data
         })
       }
       if (inProgress.isNotEmpty()) inProgress.first().data.start()
@@ -171,11 +159,10 @@ private class ClientHistoryAdapter(private val parent : ClientEditor, private va
           dateLabel.text = if (!data.folder.isEmpty()) decodeSessionDate(data.folder).toShortString() else ""
           val lastUpdateDateString = if (!data.folder.isEmpty()) LocalSecond(data.folder.modifiedDate).toString() else ""
           lastUpdateLabel.text = String.format(Locale.getDefault(), lastUpdateLabel.context.getString(R.string.update_time_with_placeholder), lastUpdateDateString)
-          // Todo : lol. Remove this crap.
           val loadingVisibility : Int
-          if (data.data.isCompleted && data.data.getCompleted().data.isCompleted)
+          if (data.data.isCompleted)
           {
-            val completedData = data.data.getCompleted().data.getCompleted()
+            val completedData = data.data.getCompleted()
             commentTextView.text = completedData.comment
             faceImage.setImageResource(completedData.face.guideId)
             faceImage.readData(completedData.face.data)
