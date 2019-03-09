@@ -33,6 +33,7 @@ import com.j.fmark.SessionData
 import com.j.fmark.drive.createSessionForClient
 import com.j.fmark.drive.decodeName
 import com.j.fmark.drive.decodeSessionDate
+import com.j.fmark.drive.findFile
 import kotlinx.coroutines.experimental.CompletableDeferred
 import kotlinx.coroutines.experimental.CoroutineStart
 import kotlinx.coroutines.experimental.Deferred
@@ -82,7 +83,9 @@ class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveRe
     return view
   }
 
-  private suspend fun loadData(file : DriveFile) : SessionData = driveApi.openFile(file, DriveFile.MODE_READ_ONLY)?.await()?.inputStream.decodeSessionData()
+  private suspend fun loadData(file : DriveFile?) : SessionData =
+    if (null != file) driveApi.openFile(file, DriveFile.MODE_READ_ONLY)?.await()?.inputStream.decodeSessionData()
+    else SessionData()
 
   private fun populateClientHistory(view : View)
   {
@@ -100,18 +103,8 @@ class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveRe
         val sessionFolder = folderMetadata.driveId?.asDriveFolder() ?: return@mapNotNull null
         val poke = Poke()
         Session(folderMetadata, poke, async(start = CoroutineStart.LAZY) {
-          val sessionContents = driveApi.queryChildren(sessionFolder, Query.Builder().addFilter(Filters.eq(SearchableField.TRASHED, false)).build()).await()
-          var data = SessionData()
-          sessionContents.forEach { metadata ->
-            if (metadata.isFolder) return@forEach
-            val file = metadata.driveId.asDriveFile()
-            when (metadata.title)
-            {
-              DATA_FILE_NAME -> data = loadData(file)
-            }
-          }
-          poke.poke()
-          data
+          val sessionContents = driveApi.findFile(sessionFolder, DATA_FILE_NAME)
+          loadData(sessionContents).also { poke.poke() }
         })
       }
       if (inProgress.isNotEmpty()) inProgress.first().data.start()
