@@ -1,139 +1,114 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
               xmlns:app="http://schemas.android.com/apk/res-auto"
-              android:orientation="vertical"
               android:layout_width="match_parent"
-              android:layout_height="wrap_content"
-              android:background="?attr/selectableItemBackground">
+              android:layout_height="wrap_content">
 
-  <TextView
-   android:id="@+id/client_history_date"
-   android:paddingStart="48dp"
-   android:paddingEnd="48dp"
-   android:layout_width="match_parent"
-   android:layout_height="wrap_content"
-   android:layout_marginBottom="8dp"
-   android:background="@drawable/gradient_grey"
-   android:textStyle="bold"
-   android:textColor="@android:color/black"
-   android:textSize="22sp"/>
+  <LinearLayout android:orientation="vertical"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackground">
 
-  <FrameLayout
-   android:layout_width="match_parent"
-   android:layout_height="0dp"
-   android:layout_weight="1"
-   android:layout_marginBottom="8dp">
+    <TextView
+     android:id="@+id/client_history_date"
+     android:paddingStart="48dp"
+     android:paddingEnd="48dp"
+     android:layout_width="match_parent"
+     android:layout_height="wrap_content"
+     android:layout_marginBottom="8dp"
+     android:background="@drawable/gradient_grey"
+     android:textStyle="bold"
+     android:textColor="@android:color/black"
+     android:textSize="22sp"/>
+
     <TextView
      android:id="@+id/client_history_comment"
      android:layout_width="match_parent"
-     android:layout_height="match_parent"/>
-    <ProgressBar
-     style="?android:attr/progressBarStyle"
-     android:id="@+id/client_history_comment_loading"
-     android:layout_width="wrap_content"
      android:layout_height="wrap_content"
-     android:layout_gravity="center_vertical|center_horizontal" />
-  </FrameLayout>
+     android:textSize="16sp"
+     android:maxLines="100"
+     android:background="@drawable/rectangle"
+     android:padding="8dp"
+     android:layout_margin="8dp" />
 
-  <TextView
-   android:id="@+id/client_history_last_update"
-   android:paddingStart="48dp"
-   android:paddingEnd="48dp"
-   android:layout_width="match_parent"
-   android:layout_height="wrap_content"
-   android:layout_marginBottom="8dp"
-   android:gravity="end"
-   android:textColor="@android:color/darker_gray"
-   android:textSize="14sp" />
-
-  <LinearLayout
-   android:orientation="vertical"
-   android:layout_width="match_parent"
-   android:layout_height="wrap_content"
-   android:layout_marginBottom="16dp">
-
-    <View
+    <TextView
+     android:id="@+id/client_history_last_update"
+     android:paddingStart="48dp"
+     android:paddingEnd="48dp"
      android:layout_width="match_parent"
-     android:layout_height="1px"
-     android:layout_gravity="center"
-     android:background="@color/lightGrey"/>
+     android:layout_height="wrap_content"
+     android:layout_marginBottom="8dp"
+     android:gravity="end"
+     android:textColor="@android:color/darker_gray"
+     android:textSize="16sp" />
 
     <LinearLayout
-     android:id="@+id/client_history_images"
-     android:orientation="horizontal"
+     android:orientation="vertical"
      android:layout_width="match_parent"
-     android:layout_height="108dp">
+     android:layout_height="wrap_content"
+     android:layout_marginBottom="16dp">
 
-      <FrameLayout
+      <View
        android:layout_width="match_parent"
-       android:layout_height="match_parent"
-       android:layout_weight="1">
+       android:layout_height="1px"
+       android:layout_gravity="center"
+       android:background="@color/lightGrey"/>
+
+      <LinearLayout
+       android:id="@+id/client_history_images"
+       android:orientation="horizontal"
+       android:layout_width="match_parent"
+       android:layout_height="108dp">
+
         <com.j.fmark.CanvasView
          android:id="@+id/client_history_face"
          app:touchEnabled="false"
          android:layout_width="match_parent"
          android:layout_height="match_parent"
+         android:layout_weight="1"
          android:scaleType="fitCenter" />
-        <ProgressBar
-         style="?android:attr/progressBarStyle"
-         android:id="@+id/client_history_face_loading"
-         android:layout_width="wrap_content"
-         android:layout_height="wrap_content"
-         android:layout_gravity="center_vertical|center_horizontal" />
-      </FrameLayout>
 
-      <View
-       android:layout_width="1px"
-       android:layout_height="match_parent"
-       android:layout_marginLeft="8dp"
-       android:layout_marginRight="8dp"
-       android:layout_gravity="center"
-       android:background="@color/lightGrey"/>
+        <View
+         android:layout_width="1px"
+         android:layout_height="match_parent"
+         android:layout_marginLeft="8dp"
+         android:layout_marginRight="8dp"
+         android:layout_gravity="center"
+         android:background="@color/lightGrey"/>
 
-      <FrameLayout
-       android:layout_width="match_parent"
-       android:layout_height="match_parent"
-       android:layout_weight="1">
         <com.j.fmark.CanvasView
          android:id="@+id/client_history_front"
          app:touchEnabled="false"
          android:layout_width="match_parent"
          android:layout_height="match_parent"
+         android:layout_weight="1"
          android:scaleType="fitCenter" />
-        <ProgressBar
-         style="?android:attr/progressBarStyle"
-         android:id="@+id/client_history_front_loading"
-         android:layout_width="wrap_content"
-         android:layout_height="wrap_content"
-         android:layout_gravity="center_vertical|center_horizontal" />
-      </FrameLayout>
 
-      <View
-       android:layout_width="1px"
-       android:layout_height="match_parent"
-       android:layout_marginLeft="8dp"
-       android:layout_marginRight="8dp"
-       android:layout_gravity="center"
-       android:background="@color/lightGrey"/>
+        <View
+         android:layout_width="1px"
+         android:layout_height="match_parent"
+         android:layout_marginLeft="8dp"
+         android:layout_marginRight="8dp"
+         android:layout_gravity="center"
+         android:background="@color/lightGrey"/>
 
-      <FrameLayout
-       android:layout_width="match_parent"
-       android:layout_height="match_parent"
-       android:layout_weight="1">
         <com.j.fmark.CanvasView
          android:id="@+id/client_history_back"
          app:touchEnabled="false"
          android:layout_width="match_parent"
          android:layout_height="match_parent"
+         android:layout_weight="1"
          android:scaleType="fitCenter" />
-        <ProgressBar
-         style="?android:attr/progressBarStyle"
-         android:id="@+id/client_history_back_loading"
-         android:layout_width="wrap_content"
-         android:layout_height="wrap_content"
-         android:layout_gravity="center_vertical|center_horizontal" />
-      </FrameLayout>
 
+      </LinearLayout>
     </LinearLayout>
   </LinearLayout>
-</LinearLayout>
+
+  <ProgressBar
+   style="?android:attr/progressBarStyle"
+   android:id="@+id/client_history_loading"
+   android:layout_width="wrap_content"
+   android:layout_height="wrap_content"
+   android:layout_gravity="center_vertical|center_horizontal" />
+
+</FrameLayout>

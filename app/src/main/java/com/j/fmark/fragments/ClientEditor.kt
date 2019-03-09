@@ -132,15 +132,12 @@ private class ClientHistoryAdapter(private val parent : ClientEditor, private va
     init { view.setOnClickListener(this) }
 
     private val dateLabel : TextView = view.findViewById(R.id.client_history_date)
+    private val loadingView : ProgressBar = view.findViewById(R.id.client_history_loading)
     private val commentTextView : TextView = view.findViewById(R.id.client_history_comment)
-    private val commentLoading : ProgressBar = view.findViewById(R.id.client_history_comment_loading)
     private val lastUpdateLabel : TextView = view.findViewById(R.id.client_history_last_update)
     private val faceImage : CanvasView = view.findViewById<CanvasView>(R.id.client_history_face).also { it.setImageResource(R.drawable.face) }
-    private var faceImageLoading : ProgressBar = view.findViewById(R.id.client_history_face_loading)
     private val frontImage : CanvasView = view.findViewById<CanvasView>(R.id.client_history_front).also { it.setImageResource(R.drawable.front) }
-    private val frontImageLoading : ProgressBar = view.findViewById(R.id.client_history_front_loading)
     private val backImage : CanvasView = view.findViewById<CanvasView>(R.id.client_history_back).also { it.setImageResource(R.drawable.back) }
-    private val backImageLoading : ProgressBar = view.findViewById(R.id.client_history_back_loading)
 
     var session : Session = Session(EMPTY_METADATA, Poke(), CompletableDeferred())
       set(data)
@@ -152,7 +149,6 @@ private class ClientHistoryAdapter(private val parent : ClientEditor, private va
           dateLabel.text = if (!data.folder.isEmpty()) decodeSessionDate(data.folder).toShortString() else ""
           val lastUpdateDateString = if (!data.folder.isEmpty()) LocalSecond(data.folder.modifiedDate).toString() else ""
           lastUpdateLabel.text = String.format(Locale.getDefault(), lastUpdateLabel.context.getString(R.string.update_time_with_placeholder), lastUpdateDateString)
-          val loadingVisibility : Int
           if (data.data.isCompleted)
           {
             val completedData = data.data.getCompleted()
@@ -164,10 +160,8 @@ private class ClientHistoryAdapter(private val parent : ClientEditor, private va
             backImage.setImageResource(completedData.back.guideId)
             backImage.readData(completedData.back.data)
             commentTextView.visibility = View.VISIBLE
-            loadingVisibility = View.INVISIBLE
-          } else loadingVisibility = View.VISIBLE
-          arrayOf(commentLoading, faceImageLoading, frontImageLoading, backImageLoading).forEach { it.visibility = loadingVisibility }
-          commentLoading.visibility = View.INVISIBLE
+            loadingView.visibility = View.INVISIBLE
+          } else loadingView.visibility = View.VISIBLE
         }
       }
 
