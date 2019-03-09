@@ -48,6 +48,7 @@ class ClientList(private val fmarkHost : FMark, private val driveClient : DriveR
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View
   {
     val view = inflater.inflate(R.layout.fragment_client_list, container, false)
+    view.clipToOutline = true // This should be set in XML but a bug in the resource parser makes it impossible
     searchField = view.findViewById(R.id.client_name_search)
     searchField.addTextChangedListener(this)
     view.findViewById<FloatingActionButton>(R.id.client_add).setOnClickListener {

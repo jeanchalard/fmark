@@ -1,5 +1,6 @@
 package com.j.fmark.fragments
 
+import android.content.Context
 import android.os.Bundle
 import android.support.v4.app.DialogFragment
 import android.support.v7.app.AlertDialog
@@ -63,7 +64,7 @@ class ClientDetails(private val fmarkHost : FMark, private val resourceClient : 
         val message = String.format(Locale.getDefault(), fmarkHost.getString(R.string.client_already_exists), existingFolders.count)
         AlertDialog.Builder(fmarkHost)
          .setMessage(message)
-         .setPositiveButton(R.string.ok) { _, _ -> GlobalScope.launch(Dispatchers.Main) { validateDetails(fmarkFolder, name, reading) } }
+         .setPositiveButton(android.R.string.ok) { _, _ -> GlobalScope.launch(Dispatchers.Main) { validateDetails(fmarkFolder, name, reading) } }
          .setNegativeButton(R.string.cancel) { dialog, _ -> dialog.dismiss() }
          .show()
       }
@@ -85,6 +86,6 @@ class ClientDetails(private val fmarkHost : FMark, private val resourceClient : 
     super.onDetach()
     // This is atrocious. Why do I need to say "post" for this to work when a button is pressed (as opposed to dismissing by clicking outside the dialog ?)
     // I've spent too much valuable time on this. This solution sucks but it works.
-    fmarkHost.window.decorView.post { fmarkHost.getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(fmarkHost.window.decorView.windowToken, 0) }
+    fmarkHost.window.decorView.post { (fmarkHost.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(fmarkHost.window.decorView.windowToken, 0) }
   }
 }

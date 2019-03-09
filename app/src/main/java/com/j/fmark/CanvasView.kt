@@ -13,6 +13,9 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.widget.ImageView
 
+// Context#getColor is only supported from API 23 onward
+const val DEFAULT_BRUSH_COLOR = 0xFFE53935.toInt()
+
 enum class Action(val value : FEditorDataType)
 {
   NONE(0.0), DOWN(1.0), MOVE(2.0), UP(3.0)
@@ -54,7 +57,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   private val touchEnabled : Boolean = context.obtainStyledAttributes(attrs, R.styleable.CanvasView, defStyleAttr, defStyleRes)?.getBoolean(R.styleable.CanvasView_touchEnabled, true) ?: true
   private val data = CommandList()
   private val oldData = CommandList()
-  private val defaultColor = context.getColor(R.color.defaultBrushColor)
+  private val defaultColor = DEFAULT_BRUSH_COLOR
   private val defaultWidth = 1.0f
   private val startCommandIndices = ArrayList<Int>()
   private val eraserRadius = context.resources.getDimension(R.dimen.eraserRadius)

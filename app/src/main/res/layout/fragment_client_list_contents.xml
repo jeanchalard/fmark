@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge
+ xmlns:android="http://schemas.android.com/apk/res/android"
+ xmlns:app="http://schemas.android.com/apk/res-auto"
+ xmlns:tools="http://schemas.android.com/tools"
+ tools:context=".FMark">
+
+  <ImageView
+   android:layout_width="match_parent"
+   android:layout_height="200dp"
+   android:gravity="center"
+   android:background="@color/colorPrimaryDark"
+   android:textColor="@android:color/white"
+   android:textSize="48sp"
+   android:scaleType="centerCrop"
+   android:src="@drawable/cover"
+   />
+
+  <EditText
+   android:id="@+id/client_name_search"
+   android:focusedByDefault="false"
+   android:layout_width="match_parent"
+   android:layout_height="wrap_content"
+   android:padding="16dp"
+   android:hint="@string/search_hint"
+   android:textColorHint="@color/lightGrey"
+   android:textSize="24sp"
+   android:textColor="@android:color/white"
+   android:drawableEnd="@drawable/ic_baseline_search_24px"
+   android:background="@color/textBackgroundDark"
+   />
+
+  <FrameLayout
+   android:layout_width="match_parent"
+   android:layout_height="0dp"
+   android:layout_weight="1">
+    <android.support.v7.widget.RecyclerView
+     android:id="@+id/client_list"
+     android:focusedByDefault="true"
+     app:layoutManager="android.support.v7.widget.LinearLayoutManager"
+     android:layout_width="match_parent"
+     android:layout_height="match_parent" />
+
+    <android.support.design.widget.FloatingActionButton
+     android:id="@+id/client_add"
+     android:layout_width="wrap_content"
+     android:layout_height="wrap_content"
+     android:layout_gravity="bottom|end"
+     android:layout_margin="8dp"
+     android:focusable="true"
+     android:clickable="true"
+     app:srcCompat="@drawable/fab"/>
+  </FrameLayout>
+</merge>

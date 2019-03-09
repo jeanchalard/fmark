@@ -29,7 +29,7 @@ import java.util.Locale
 
 class FMark : AppCompatActivity()
 {
-  private val shownFragment : Fragment?
+  private val lastFragment : Fragment?
     get() = supportFragmentManager.fragments.lastOrNull()
   private lateinit var loadingSpinner : View
   var spinnerVisible : Boolean
@@ -45,7 +45,7 @@ class FMark : AppCompatActivity()
     saveIndicator = createSaveIndicator(findViewById<FrameLayout>(R.id.action_bar_container))
     supportFragmentManager.addOnBackStackChangedListener {
       val actionBar = supportActionBar ?: return@addOnBackStackChangedListener
-      val fragment = shownFragment
+      val fragment = lastFragment
       when (fragment) {
         is ClientList -> actionBar.setTitle(R.string.titlebar_main)
         is ClientDetails -> actionBar.setTitle(R.string.titlebar_client_details)
@@ -91,7 +91,7 @@ class FMark : AppCompatActivity()
 
   override fun onBackPressed()
   {
-    val fragment = shownFragment
+    val fragment = lastFragment
     when (fragment) {
       is FEditor -> fragment.onBackPressed()
       else -> super.onBackPressed()
@@ -101,7 +101,7 @@ class FMark : AppCompatActivity()
   override fun onPrepareOptionsMenu(menu : Menu?) : Boolean
   {
     val menu = menu ?: return super.onPrepareOptionsMenu(menu)
-    val isHome = when (shownFragment) {
+    val isHome = when (lastFragment) {
       is ClientList, is ClientDetails -> true
       is FEditor -> false
       else -> true
@@ -121,7 +121,7 @@ class FMark : AppCompatActivity()
 
   override fun onOptionsItemSelected(item : MenuItem?) : Boolean
   {
-    val fragment = shownFragment
+    val fragment = lastFragment
     when (fragment) {
       is FEditor -> return fragment.onOptionsItemSelected(item)
       is ClientList -> fragment.refresh()
