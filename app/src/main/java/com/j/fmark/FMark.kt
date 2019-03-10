@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v7.app.AppCompatActivity
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -18,7 +19,7 @@ import com.j.fmark.drive.FDrive
 import com.j.fmark.drive.SignInException
 import com.j.fmark.drive.renameFolder
 import com.j.fmark.fragments.ClientDetails
-import com.j.fmark.fragments.ClientEditor
+import com.j.fmark.fragments.ClientHistory
 import com.j.fmark.fragments.ClientList
 import com.j.fmark.fragments.FEditor
 import com.j.fmark.fragments.SignInErrorFragment
@@ -31,25 +32,32 @@ class FMark : AppCompatActivity()
 {
   private val lastFragment : Fragment?
     get() = supportFragmentManager.fragments.lastOrNull()
-  private lateinit var loadingSpinner : View
-  var spinnerVisible : Boolean
-    get() = loadingSpinner.visibility == View.VISIBLE
-    set(v) { loadingSpinner.visibility = if (v) View.VISIBLE else View.GONE }
+  private lateinit var topSpinner : View
+  private lateinit var insertSpinner : View
+  var topSpinnerVisible : Boolean
+    get() = topSpinner.visibility == View.VISIBLE
+    set(v) { topSpinner.visibility = if (v) View.VISIBLE else View.GONE }
+  var insertSpinnerVisible : Boolean
+    get() = insertSpinner.visibility == View.VISIBLE
+    set(v) { insertSpinner.visibility = if (v) View.VISIBLE else View.GONE }
   lateinit var saveIndicator : SaveIndicator
 
   override fun onCreate(icicle : Bundle?)
   {
     super.onCreate(null)
     setContentView(R.layout.activity_fmark)
-    loadingSpinner = findViewById<View>(R.id.main_loading)
+    findViewById<View>(R.id.list_fragment).clipToOutline = true // This should be set in XML but a bug in the resource parser makes it impossible
+    insertSpinner = findViewById(R.id.insert_loading)
+    topSpinner = findViewById(R.id.top_loading) ?: insertSpinner
     saveIndicator = createSaveIndicator(findViewById<FrameLayout>(R.id.action_bar_container))
     supportFragmentManager.addOnBackStackChangedListener {
       val actionBar = supportActionBar ?: return@addOnBackStackChangedListener
       val fragment = lastFragment
+      Log.e("frag", "${fragment?.javaClass}")
       when (fragment) {
-        is ClientList -> actionBar.setTitle(R.string.titlebar_main)
+        is ClientList    -> actionBar.setTitle(R.string.titlebar_main)
         is ClientDetails -> actionBar.setTitle(R.string.titlebar_client_details)
-        is ClientEditor -> actionBar.title = String.format(Locale.getDefault(), getString(R.string.titlebar_editor), fragment.name)
+        is ClientHistory -> { fragment.onResume(); actionBar.title = String.format(Locale.getDefault(), getString(R.string.titlebar_editor), fragment.name) }
       }
       invalidateOptionsMenu()
     }
@@ -65,7 +73,7 @@ class FMark : AppCompatActivity()
 
   private fun startSignIn()
   {
-    spinnerVisible = true
+    insertSpinnerVisible = true
     GlobalScope.launch(Dispatchers.Main) {
       try
       {
@@ -74,8 +82,8 @@ class FMark : AppCompatActivity()
         {
           val driveResourceClient = Drive.getDriveResourceClient(this@FMark, account)
           val refreshClient = Drive.getDriveClient(this@FMark, account)
-          spinnerVisible = false
-          supportFragmentManager.beginTransaction().replace(R.id.main_fragment, ClientList(this@FMark, driveResourceClient, refreshClient)).commit()
+          insertSpinnerVisible = false
+          supportFragmentManager.beginTransaction().replace(R.id.list_fragment, ClientList(this@FMark, driveResourceClient, refreshClient)).commit()
         } // Otherwise, wait for sign in activity → onActivityResult
       } catch (e : SignInException) {
         offlineError(e.message)
@@ -86,7 +94,7 @@ class FMark : AppCompatActivity()
   fun offlineError(msgId : Int) = offlineError(resources.getString(msgId))
   private fun offlineError(msg : String?)
   {
-    supportFragmentManager.beginTransaction().replace(R.id.main_fragment, SignInErrorFragment(msg, ::startSignIn)).commit()
+    supportFragmentManager.beginTransaction().replace(R.id.list_fragment, SignInErrorFragment(msg, ::startSignIn)).commit()
   }
 
   override fun onBackPressed()
@@ -142,15 +150,15 @@ class FMark : AppCompatActivity()
     val account = signInResult.signInAccount
     if (!signInResult.isSuccess || null == account)
     {
-      findViewById<View>(R.id.main_loading).visibility = View.GONE
+      findViewById<View>(R.id.insert_loading).visibility = View.GONE
       offlineError(R.string.sign_in_fail_eventual)
     }
     else
     {
       val resourceClient = Drive.getDriveResourceClient(this@FMark, account)
       val refreshClient = Drive.getDriveClient(this@FMark, account)
-      findViewById<View>(R.id.main_loading).visibility = View.GONE
-      supportFragmentManager.beginTransaction().replace(R.id.main_fragment, ClientList(this@FMark, resourceClient, refreshClient)).commit()
+      findViewById<View>(R.id.insert_loading).visibility = View.GONE
+      supportFragmentManager.beginTransaction().replace(R.id.list_fragment, ClientList(this@FMark, resourceClient, refreshClient)).commit()
     }
   }
 
@@ -163,10 +171,16 @@ class FMark : AppCompatActivity()
   }
 
   fun startClientEditor(resourceClient : DriveResourceClient, refreshClient : DriveClient, sessionFolder : Metadata) =
-   supportFragmentManager.beginTransaction().addToBackStack("client").replace(R.id.main_fragment, ClientEditor(this, resourceClient, refreshClient, sessionFolder), "client").commit()
+   supportFragmentManager.beginTransaction().addToBackStack("client").replace(R.id.list_fragment, ClientHistory(this, resourceClient, refreshClient, sessionFolder), "client").commit()
 
-  fun startSessionEditor(resourceClient : DriveResourceClient, refreshClient : DriveClient, sessionFolder : Metadata) =
-   supportFragmentManager.beginTransaction().addToBackStack("editor").replace(R.id.main_fragment, FEditor(this, resourceClient, refreshClient, sessionFolder), "editor").commit()
+  fun startSessionEditor(resourceClient : DriveResourceClient, refreshClient : DriveClient, sessionFolder : Metadata)
+  {
+    val fEditor = FEditor(this, resourceClient, refreshClient, sessionFolder)
+    supportFragmentManager.beginTransaction().apply {
+      addToBackStack("editor")
+      replace(R.id.top_fragment, fEditor, "editor")
+    }.commit()
+  }
 
   suspend fun renameClient(driveResourceClient : DriveResourceClient, clientFolder : Metadata, name : String, reading : String)
   {

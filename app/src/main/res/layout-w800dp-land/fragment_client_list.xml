@@ -2,11 +2,10 @@
 <LinearLayout
  xmlns:android="http://schemas.android.com/apk/res/android"
  xmlns:tools="http://schemas.android.com/tools"
+ android:id="@+id/client_list_container"
  android:orientation="vertical"
  android:layout_width="match_parent"
  android:layout_height="match_parent"
- android:background="@drawable/rounded_square"
- android:elevation="5dp"
  tools:context=".FMark">
   <include layout="@layout/fragment_client_list_contents"/>
 </LinearLayout>

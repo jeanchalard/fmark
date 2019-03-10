@@ -63,6 +63,7 @@
         <com.j.fmark.CanvasView
          android:id="@+id/client_history_face"
          app:touchEnabled="false"
+         android:layout_marginTop="8dp"
          android:layout_width="match_parent"
          android:layout_height="match_parent"
          android:layout_weight="1"
@@ -79,6 +80,7 @@
         <com.j.fmark.CanvasView
          android:id="@+id/client_history_front"
          app:touchEnabled="false"
+         android:layout_marginTop="8dp"
          android:layout_width="match_parent"
          android:layout_height="match_parent"
          android:layout_weight="1"
@@ -95,6 +97,7 @@
         <com.j.fmark.CanvasView
          android:id="@+id/client_history_back"
          app:touchEnabled="false"
+         android:layout_marginTop="8dp"
          android:layout_width="match_parent"
          android:layout_height="match_parent"
          android:layout_weight="1"

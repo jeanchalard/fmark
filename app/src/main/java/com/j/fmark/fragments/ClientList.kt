@@ -48,7 +48,6 @@ class ClientList(private val fmarkHost : FMark, private val driveClient : DriveR
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View
   {
     val view = inflater.inflate(R.layout.fragment_client_list, container, false)
-    view.clipToOutline = true // This should be set in XML but a bug in the resource parser makes it impossible
     searchField = view.findViewById(R.id.client_name_search)
     searchField.addTextChangedListener(this)
     view.findViewById<FloatingActionButton>(R.id.client_add).setOnClickListener {
@@ -60,13 +59,13 @@ class ClientList(private val fmarkHost : FMark, private val driveClient : DriveR
   override fun onResume()
   {
     super.onResume()
-    fmarkHost.spinnerVisible = true
+    fmarkHost.insertSpinnerVisible = true
     populateClientList(0L)
   }
 
   fun refresh()
   {
-    fmarkHost.spinnerVisible = true
+    fmarkHost.insertSpinnerVisible = true
     refreshRequested = true
     populateClientList(0L)
   }
@@ -100,7 +99,7 @@ class ClientList(private val fmarkHost : FMark, private val driveClient : DriveR
         // Can't reach Google servers
         fmarkHost.offlineError(R.string.fail_data_fetch)
       }
-      fmarkHost.spinnerVisible = false
+      fmarkHost.insertSpinnerVisible = false
     }
   }
 
@@ -127,6 +126,5 @@ class ClientList(private val fmarkHost : FMark, private val driveClient : DriveR
 
   fun showClientDetails(clientFolder : Metadata) = fmarkHost.showClientDetails(driveClient, refreshClient, clientFolder)
   fun startClientEditor(clientFolder : Metadata) = fmarkHost.startClientEditor(driveClient, refreshClient, clientFolder)
-  fun startSessionEditor(sessionFolder : Metadata) = fmarkHost.startSessionEditor(driveClient, refreshClient, sessionFolder)
   fun notifyRenamed(clientFolder : Metadata) = (view?.findViewById<RecyclerView>(R.id.client_list)?.adapter as ClientAdapter?)?.notifyRenamed(clientFolder)
 }

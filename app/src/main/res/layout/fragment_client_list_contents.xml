@@ -5,17 +5,6 @@
  xmlns:tools="http://schemas.android.com/tools"
  tools:context=".FMark">
 
-  <ImageView
-   android:layout_width="match_parent"
-   android:layout_height="200dp"
-   android:gravity="center"
-   android:background="@color/colorPrimaryDark"
-   android:textColor="@android:color/white"
-   android:textSize="48sp"
-   android:scaleType="centerCrop"
-   android:src="@drawable/cover"
-   />
-
   <EditText
    android:id="@+id/client_name_search"
    android:focusedByDefault="false"

@@ -22,10 +22,8 @@ import com.google.android.gms.drive.query.Query
 import com.google.android.gms.drive.query.SearchableField
 import com.google.android.gms.drive.query.SortOrder
 import com.google.android.gms.drive.query.SortableField
-import com.j.fmark.COMMENT_FILE_NAME
 import com.j.fmark.CanvasView
 import com.j.fmark.DATA_FILE_NAME
-import com.j.fmark.Drawing
 import com.j.fmark.FMark
 import com.j.fmark.LocalSecond
 import com.j.fmark.R
@@ -64,13 +62,13 @@ private class Poke
 
 private data class Session(val folder : Metadata, val poke : Poke, val data : Deferred<SessionData>)
 
-class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val driveRefreshClient : DriveClient, private val clientFolder : Metadata) : Fragment()
+class ClientHistory(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val driveRefreshClient : DriveClient, private val clientFolder : Metadata) : Fragment()
 {
   val name = decodeName(clientFolder)
 
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View?
   {
-    val view = inflater.inflate(R.layout.fragment_client_editor, container, false)
+    val view = inflater.inflate(R.layout.fragment_client_history, container, false)
     view.findViewById<LinearLayout>(R.id.new_session_button).setOnClickListener {
       GlobalScope.launch {
         val session = createSessionForClient(driveApi, clientFolder.driveId.asDriveFolder(), LocalSecond(System.currentTimeMillis()))
@@ -83,13 +81,20 @@ class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveRe
     return view
   }
 
+  override fun onResume()
+  {
+    super.onResume()
+    Log.e("wat", "> ${view}")
+    view?.let { populateClientHistory(it) }
+  }
+
   private suspend fun loadData(file : DriveFile?) : SessionData =
     if (null != file) driveApi.openFile(file, DriveFile.MODE_READ_ONLY)?.await()?.inputStream.decodeSessionData()
     else SessionData()
 
   private fun populateClientHistory(view : View)
   {
-    fmarkHost.spinnerVisible = true
+    fmarkHost.insertSpinnerVisible = true
     GlobalScope.launch {
       Log.e("Launch ${t()}", "Start loading client history from ${clientFolder.title}")
       val clientFolder = clientFolder.driveId.asDriveFolder()
@@ -114,10 +119,10 @@ class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveRe
         if (null == list.adapter)
         {
           list.addItemDecoration(DividerItemDecoration(context, (list.layoutManager as LinearLayoutManager).orientation))
-          list.adapter = ClientHistoryAdapter(this@ClientEditor, inProgress)
+          list.adapter = ClientHistoryAdapter(this@ClientHistory, inProgress)
         }
         else (list.adapter as ClientHistoryAdapter).setSource(inProgress)
-        fmarkHost.spinnerVisible = false
+        fmarkHost.insertSpinnerVisible = false
       }
     }
   }
@@ -125,7 +130,7 @@ class ClientEditor(private val fmarkHost : FMark, private val driveApi : DriveRe
   fun startSessionEditor(sessionFolder : Metadata) = fmarkHost.startSessionEditor(driveApi, driveRefreshClient, sessionFolder)
 }
 
-private class ClientHistoryAdapter(private val parent : ClientEditor, private var source : List<Session>) : RecyclerView.Adapter<ClientHistoryAdapter.Holder>()
+private class ClientHistoryAdapter(private val parent : ClientHistory, private var source : List<Session>) : RecyclerView.Adapter<ClientHistoryAdapter.Holder>()
 {
   class Holder(private val adapter : ClientHistoryAdapter, view : View) : RecyclerView.ViewHolder(view), View.OnClickListener, Poke.Pokable
   {
@@ -182,6 +187,7 @@ private class ClientHistoryAdapter(private val parent : ClientEditor, private va
   fun setSource(source : List<Session>)
   {
     this.source = source
+    notifyDataSetChanged()
   }
 
   fun startClientEditor(sessionFolder : Metadata) = parent.startSessionEditor(sessionFolder)

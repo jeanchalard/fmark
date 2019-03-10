@@ -1,38 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-             android:background="@color/textBackgroundLight"
              android:layout_width="match_parent"
              android:layout_height="match_parent">
-
-  <LinearLayout
-   android:orientation="horizontal"
+  <ImageView
    android:layout_width="match_parent"
-   android:layout_height="match_parent">
-    <FrameLayout
-     android:id="@+id/left_fragment"
-     android:layout_weight="1"
-     android:layout_width="0dp"
-     android:layout_height="match_parent" />
-    <FrameLayout
-     android:id="@+id/right_fragment"
-     android:layout_weight="2"
-     android:layout_width="0dp"
-     android:layout_height="match_parent" />
-  </LinearLayout>
-
+   android:layout_height="match_parent"
+   android:gravity="center"
+   android:background="@color/colorPrimaryDark"
+   android:textColor="@android:color/white"
+   android:textSize="48sp"
+   android:scaleType="centerCrop"
+   android:src="@drawable/cover" />
   <FrameLayout
-   android:id="@+id/main_fragment"
+   android:id="@+id/list_fragment"
+   android:alpha="0.8"
    android:layout_margin="32dp"
    android:layout_width="600dp"
    android:layout_height="match_parent"
-   android:layout_gravity="center" />
-
+   android:layout_gravity="right"
+   android:background="@drawable/rounded_square"
+   android:elevation="5dp">
+    <FrameLayout
+     android:id="@+id/insert_loading"
+     android:clickable="true"
+     android:background="#9F000000"
+     android:layout_width="match_parent"
+     android:layout_height="match_parent">
+      <ProgressBar
+       style="?android:attr/progressBarStyle"
+       android:layout_width="wrap_content"
+       android:layout_height="wrap_content"
+       android:layout_gravity="center_vertical|center_horizontal" />
+    </FrameLayout>
+  </FrameLayout>
   <FrameLayout
-   android:id="@+id/main_loading"
+   android:id="@+id/top_fragment"
+   android:layout_width="match_parent"
+   android:layout_height="match_parent"
+   android:elevation="10dp" />
+  <FrameLayout
+   android:id="@+id/top_loading"
+   android:visibility="gone"
    android:clickable="true"
    android:background="#9F000000"
    android:layout_width="match_parent"
-   android:layout_height="match_parent">
+   android:layout_height="match_parent"
+   android:elevation="15dp">
     <ProgressBar
      style="?android:attr/progressBarStyle"
      android:layout_width="wrap_content"
