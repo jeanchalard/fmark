@@ -105,7 +105,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     super.onDraw(canvas)
     canvas.drawBitmap(pic, 0f, 0f, bitmapPaint)
     canvas.drawPath(path, paint)
-    if (eraserX > 0f) canvas.drawCircle(eraserX, eraserY, eraserRadius, eraserFeedbackPaint)
+    if (eraserX > 0f) canvas.drawCircle(eraserX, eraserY, imageMatrix.mapRadius(eraserRadius), eraserFeedbackPaint)
   }
 
   fun getBitmap() : Bitmap = pic.copy(pic.config, false)
@@ -196,20 +196,20 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     val isEraser = Brush.isEraser(erase)
     cacheVector[0] = x.toFloat(); cacheVector[1] = y.toFloat()
     imageMatrix.mapPoints(cacheVector)
-    val radius = imageMatrix.mapRadius(pressure.toFloat())
     val screenX : Float; val screenY : Float
     if (isEraser)
     {
       screenX = cacheVector[0]; screenY = cacheVector[1]
       eraserX = screenX; eraserY = screenY
-      paint.strokeWidth = eraserRadius * 2
+      paint.strokeWidth = imageMatrix.mapRadius(eraserRadius) * 2
       path.lineTo(screenX, screenY)
     }
     else
     {
+      val radius = imageMatrix.mapRadius(pressure.toFloat())
       screenX = ((lastX + cacheVector[0]) / 2)
       screenY = ((lastY + cacheVector[1]) / 2)
-      paint.strokeWidth = (paint.strokeWidth * 9 + radius) / 10
+      paint.strokeWidth = (paint.strokeWidth * 8 + radius * 2) / 10
     }
     path.quadTo(lastX, lastY, screenX, screenY)
     canvas.drawPath(path, paint)
