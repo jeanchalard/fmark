@@ -11,7 +11,7 @@ import com.google.android.gms.drive.query.Filters
 import com.google.android.gms.drive.query.Query
 import com.google.android.gms.drive.query.SearchableField
 import com.j.fmark.R
-import kotlinx.coroutines.experimental.tasks.await
+import kotlinx.coroutines.tasks.await
 import java.util.concurrent.ExecutionException
 
 object FDrive
@@ -44,7 +44,7 @@ object FDrive
     return getFolder(client, context.getString(R.string.fmark_root_directory))
   }
 
-  suspend fun getFolder(client : DriveResourceClient, name : String) : DriveFolder
+  private suspend fun getFolder(client : DriveResourceClient, name : String) : DriveFolder
   {
     var currentFolder = client.rootFolder.await()
     name.split(Regex("/")).forEach {
@@ -53,13 +53,11 @@ object FDrive
        .addFilter(Filters.`in`(SearchableField.PARENTS, currentFolder.driveId))
        .addFilter(Filters.eq(SearchableField.TRASHED, false))
        .build()).await()
-      if (0 == buffer.count) currentFolder = client.createFolder(currentFolder, newFolderChangeset(it)).await()
-      else if (1 != buffer.count) throw FolderNotUniqueException(name)
-      else
+      currentFolder = when
       {
-        val b = buffer[0]
-        if (!b.isFolder) throw NotAFolderException(b.title)
-        currentFolder = b.driveId.asDriveFolder()
+        1 != buffer.count -> throw FolderNotUniqueException(name)
+        0 == buffer.count -> client.createFolder(currentFolder, newFolderChangeset(it)).await()
+        else              -> buffer[0].let { metadata -> if (!metadata.isFolder) throw NotAFolderException(metadata.title) else metadata.driveId.asDriveFolder() }
       }
     }
     return currentFolder

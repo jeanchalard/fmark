@@ -1,5 +1,6 @@
 package com.j.fmark.fragments
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Bundle
 import android.support.v4.app.DialogFragment
@@ -23,12 +24,9 @@ import com.j.fmark.drive.decodeName
 import com.j.fmark.drive.decodeReading
 import com.j.fmark.drive.getFoldersForClientName
 import com.j.fmark.formatDate
-import kotlinx.coroutines.experimental.Dispatchers
-import kotlinx.coroutines.experimental.GlobalScope
-import kotlinx.coroutines.experimental.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 class ClientDetails(private val fmarkHost : FMark, private val resourceClient : DriveResourceClient, private val refreshClient : DriveClient, private val clientFolder : Metadata?) : DialogFragment()
 {
@@ -56,12 +54,13 @@ class ClientDetails(private val fmarkHost : FMark, private val resourceClient : 
     if (null == name || null == reading) throw NullPointerException("Neither name or reading can be null when validating the dialog")
     GlobalScope.launch(Dispatchers.Main) {
       val fmarkFolder = getFMarkFolder(resourceClient, fmarkHost)
-      val existingFolders = getFoldersForClientName(resourceClient, fmarkFolder, name, reading)
+      val existingFolders = getFoldersForClientName(resourceClient, fmarkFolder, name)
       if (existingFolders.count == 0)
         validateDetails(fmarkFolder, name, reading)
       else
       {
-        val message = String.format(Locale.getDefault(), fmarkHost.getString(R.string.client_already_exists), existingFolders.count)
+        val count = existingFolders.count
+        val message = resources.getQuantityString(R.plurals.client_already_exists, count, count)
         AlertDialog.Builder(fmarkHost)
          .setMessage(message)
          .setPositiveButton(android.R.string.ok) { _, _ -> GlobalScope.launch(Dispatchers.Main) { validateDetails(fmarkFolder, name, reading) } }

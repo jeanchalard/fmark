@@ -5,14 +5,13 @@ import com.google.android.gms.drive.DriveFolder
 import com.google.android.gms.drive.DriveResourceClient
 import com.google.android.gms.drive.MetadataChangeSet
 import com.j.fmark.drive.findFile
-import kotlinx.coroutines.experimental.tasks.await
+import kotlinx.coroutines.tasks.await
 import java.io.BufferedInputStream
 import java.io.EOFException
 import java.io.FileInputStream
 import java.io.InputStream
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
-import java.io.OutputStream
 import java.io.StreamCorruptedException
 
 const val FACE_CODE = 0
@@ -37,9 +36,9 @@ data class SessionData(var comment : String, val face : Drawing, val front : Dra
   class Builder
   {
     var comment : String? = null
-    var face : Drawing? = null
-    var front : Drawing? = null
-    var back : Drawing? = null
+    private var face : Drawing? = null
+    private var front : Drawing? = null
+    private var back : Drawing? = null
     operator fun set(code : Int, value : Drawing)
     {
       when (code)
@@ -89,6 +88,7 @@ fun SessionData(inputStream : InputStream) : SessionData
       while (true)
       {
         val code = it.readInt()
+        @Suppress("UNCHECKED_CAST") // Contained type can't be checked at runtime because of erasure, no free lunch
         val data = it.readObject() as ArrayList<FEditorDataType>
         contents[code] = Drawing(code, codeToResourceId(code), codeToImageName(code), data)
       }

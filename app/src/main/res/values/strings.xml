@@ -15,7 +15,10 @@
   <string name="cancel">Cancel</string>
 
   <!-- TODO: Remove or change this placeholder text -->
-  <string name="client_already_exists">%d client(s) with this name already exist(s). Proceed ?</string>
+  <plurals name="client_already_exists">
+    <item quantity="one">One client with this name already exists. Proceed ?</item>
+    <item quantity="other">%d clients with this name already exist. Proceed ?</item>
+  </plurals>
   <string name="titlebar_editor">%s</string>
   <string name="titlebar_client_details">Client details</string>
   <string name="titlebar_main">FMark</string>
@@ -29,5 +32,13 @@
   <string name="fail_data_fetch">Can\'t fetch data. Please check your data connection.</string>
   <string name="new_session">New session</string>
   <string name="update_time_with_placeholder">Last updated on %s</string>
-  <string name="comment_hint">Write comment...</string>
+  <string name="comment_hint">Write comment…</string>
+  <string name="accessibility_description_cover_image">Background image</string>
+  <string name="accessibility_description_comment_button">Switch to comment button</string>
+  <string name="accessibility_description_face_button">Switch to face drawing</string>
+  <string name="accessibility_description_front_button">Switch to front drawing</string>
+  <string name="accessibility_description_back_button">Switch to back drawing</string>
+  <string name="accessibility_description_save_inprogress">Save in progress</string>
+  <string name="accessibility_description_save_done">Saved</string>
+  <string name="accessibility_description_save_error">Save error</string>
 </resources>

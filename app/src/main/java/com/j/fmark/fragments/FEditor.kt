@@ -21,7 +21,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.ViewFlipper
 import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.drive.DriveClient
 import com.google.android.gms.drive.DriveFile
 import com.google.android.gms.drive.DriveResourceClient
 import com.google.android.gms.drive.Metadata
@@ -42,8 +41,8 @@ import com.j.fmark.drive.decodeName
 import com.j.fmark.drive.decodeSessionDate
 import com.j.fmark.drive.findFile
 import com.j.fmark.save
-import kotlinx.coroutines.experimental.runBlocking
-import kotlinx.coroutines.experimental.tasks.await
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.tasks.await
 import java.io.ObjectOutputStream
 import java.io.OutputStreamWriter
 import java.util.concurrent.Executors
@@ -69,7 +68,7 @@ private fun View?.hasChild(v : View) : Boolean
 
 data class SaveBitmapData(val drawing : Drawing, val bitmap : Bitmap, val guide : Drawable)
 
-class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val driveRefreshClient : DriveClient, private val clientFolder : Metadata) : Fragment(), CanvasView.ChangeDelegate
+class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val clientFolder : Metadata) : Fragment(), CanvasView.ChangeDelegate
 {
   val name : String = decodeName(clientFolder)
   private val handler = FEditorHandler(this)
@@ -203,7 +202,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     return true
   }
 
-  fun onCommentChanged()
+  private fun onCommentChanged()
   {
     fmarkHost.saveIndicator.hideOk()
     handler.sendEmptyMessageDelayed(SAVE_COMMENT_MSG, 4_000)
@@ -223,8 +222,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
       canvasView.saveData(shownPicture.data)
       startSave(contents.comment, SaveBitmapData(shownPicture, canvasView.getBitmap(), fmarkHost.getDrawable(shownPicture.guideId)))
     }
-    else
-      if (switcher.currentView.hasChild(canvasView)) startSaveBitmap() else startSaveComment()
+    else if (switcher.currentView.hasChild(canvasView)) startSaveBitmap() else startSaveComment()
   }
 
   private fun startSaveComment() = startSave(contents.comment, null)

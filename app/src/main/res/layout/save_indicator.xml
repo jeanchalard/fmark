@@ -8,19 +8,22 @@
    android:layout_width="wrap_content"
    android:layout_height="wrap_content"
    android:layout_gravity="center"
-   android:visibility="invisible" />
+   android:visibility="invisible"
+   android:contentDescription="@string/accessibility_description_save_inprogress" />
   <ImageView
    android:id="@+id/save_error"
    android:src="@drawable/save_error"
    android:layout_width="wrap_content"
    android:layout_height="wrap_content"
    android:layout_gravity="center"
-   android:visibility="invisible" />
+   android:visibility="invisible"
+   android:contentDescription="@string/accessibility_description_save_error" />
   <ImageView
    android:id="@+id/save_ok"
    android:src="@drawable/save_ok"
    android:layout_width="wrap_content"
    android:layout_height="wrap_content"
    android:layout_gravity="center"
-   android:visibility="invisible" />
+   android:visibility="invisible"
+   android:contentDescription="@string/accessibility_description_save_done" />
 </com.j.fmark.SaveIndicator>

@@ -23,9 +23,9 @@ import com.j.fmark.fragments.ClientHistory
 import com.j.fmark.fragments.ClientList
 import com.j.fmark.fragments.FEditor
 import com.j.fmark.fragments.SignInErrorFragment
-import kotlinx.coroutines.experimental.Dispatchers
-import kotlinx.coroutines.experimental.GlobalScope
-import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 class FMark : AppCompatActivity()
@@ -108,7 +108,7 @@ class FMark : AppCompatActivity()
 
   override fun onPrepareOptionsMenu(menu : Menu?) : Boolean
   {
-    val menu = menu ?: return super.onPrepareOptionsMenu(menu)
+    if (null == menu) return super.onPrepareOptionsMenu(menu)
     val isHome = when (lastFragment) {
       is ClientList, is ClientDetails -> true
       is FEditor -> false
@@ -175,7 +175,7 @@ class FMark : AppCompatActivity()
 
   fun startSessionEditor(resourceClient : DriveResourceClient, refreshClient : DriveClient, sessionFolder : Metadata)
   {
-    val fEditor = FEditor(this, resourceClient, refreshClient, sessionFolder)
+    val fEditor = FEditor(this, resourceClient, sessionFolder)
     supportFragmentManager.beginTransaction().apply {
       addToBackStack("editor")
       replace(R.id.top_fragment, fEditor, "editor")

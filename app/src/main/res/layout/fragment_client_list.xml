@@ -17,7 +17,8 @@
    android:textSize="48sp"
    android:scaleType="centerCrop"
    android:src="@drawable/cover"
+   android:contentDescription="@string/accessibility_description_cover_image" />
 
-   />
   <include layout="@layout/fragment_client_list_contents"/>
+
 </LinearLayout>

@@ -1,5 +1,6 @@
 package com.j.fmark
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -89,7 +90,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     canvas = Canvas(pic)
   }
 
-  var viewToImage = Matrix()
+  private var viewToImage = Matrix()
   override fun onLayout(changed : Boolean, left : Int, top : Int, right : Int, bottom : Int)
   {
     super.onLayout(changed, left, top, right, bottom)
@@ -114,7 +115,8 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
 
   private fun clamp(i : Float, min : Float, max : Float) = if (i < min) min else if (max < i) max else i
 
-  var cacheVector = FloatArray(2)
+  private var cacheVector = FloatArray(2)
+  @SuppressLint("ClickableViewAccessibility") // This view is not clickable.
   override fun onTouchEvent(event : MotionEvent?) : Boolean
   {
     if (null == event || !touchEnabled) return false

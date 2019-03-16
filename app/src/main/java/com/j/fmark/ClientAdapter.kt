@@ -16,7 +16,7 @@ class ClientAdapter(private var source : MetadataBuffer, private val clientList 
 {
   private val updated : SparseArray<Metadata> = SparseArray() // To cache out-of-band updates, so that there is no need to re-fetch everything for known updates.
 
-  class Holder(private val adapter : ClientAdapter, private val view : View) : RecyclerView.ViewHolder(view), View.OnClickListener, View.OnLongClickListener
+  class Holder(private val adapter : ClientAdapter, view : View) : RecyclerView.ViewHolder(view), View.OnClickListener, View.OnLongClickListener
   {
     var source : Metadata? = null
     val name : TextView = view.findViewById(R.id.client_name)

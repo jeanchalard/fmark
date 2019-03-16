@@ -171,7 +171,8 @@
    android:scaleType="fitCenter"
    app:layout_constraintBottom_toBottomOf="parent"
    app:layout_constraintStart_toStartOf="parent"
-   app:layout_constraintEnd_toStartOf="@id/feditor_hsep0" />
+   app:layout_constraintEnd_toStartOf="@id/feditor_hsep0"
+   android:contentDescription="@string/accessibility_description_comment_button" />
 
   <View
    android:id="@+id/feditor_hsep0"
@@ -191,7 +192,8 @@
    android:scaleType="fitCenter"
    app:layout_constraintBottom_toBottomOf="parent"
    app:layout_constraintStart_toStartOf="@id/feditor_hsep0"
-   app:layout_constraintEnd_toStartOf="@id/feditor_hsep1" />
+   app:layout_constraintEnd_toStartOf="@id/feditor_hsep1"
+   android:contentDescription="@string/accessibility_description_face_button" />
 
   <View
    android:id="@+id/feditor_hsep1"
@@ -211,7 +213,8 @@
    android:scaleType="fitCenter"
    app:layout_constraintBottom_toBottomOf="parent"
    app:layout_constraintEnd_toStartOf="@id/feditor_hsep2"
-   app:layout_constraintStart_toEndOf="@id/feditor_hsep1"/>
+   app:layout_constraintStart_toEndOf="@id/feditor_hsep1"
+   android:contentDescription="@string/accessibility_description_front_button" />
 
   <View
    android:id="@+id/feditor_hsep2"
@@ -231,6 +234,7 @@
    android:scaleType="fitCenter"
    app:layout_constraintBottom_toBottomOf="parent"
    app:layout_constraintStart_toEndOf="@id/feditor_hsep2"
-   app:layout_constraintEnd_toEndOf="parent" />
+   app:layout_constraintEnd_toEndOf="parent"
+   android:contentDescription="@string/accessibility_description_back_button" />
 
 </android.support.constraint.ConstraintLayout>

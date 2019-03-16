@@ -18,7 +18,6 @@ data class LocalSecond(val year : Int, val month : Int, val day : Int, val hour 
    gc.get(Calendar.HOUR_OF_DAY), gc.get(Calendar.MINUTE), gc.get(Calendar.SECOND))
   constructor(t : Long) : this(GregorianCalendar().apply { timeInMillis = roundTo(t, 30 * 60 * 1000) })
   constructor(d : Date) : this(d.time)
-  constructor() : this(0, 0, 0, 0, 0, 0)
 
   override fun toString() = String.format("%04d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, second)
   fun toShortString() = String.format("%04d-%02d-%02d %02d:%02d", year, month, day, hour, minute)
