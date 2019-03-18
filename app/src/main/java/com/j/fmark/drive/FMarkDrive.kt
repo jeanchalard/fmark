@@ -9,6 +9,7 @@ import com.google.android.gms.drive.MetadataChangeSet
 import com.google.android.gms.drive.query.Filters
 import com.google.android.gms.drive.query.Query
 import com.google.android.gms.drive.query.SearchableField
+import com.google.api.services.drive.model.File
 import com.j.fmark.LocalSecond
 import com.j.fmark.parseLocalSecond
 import kotlinx.coroutines.tasks.await
@@ -65,6 +66,13 @@ suspend fun DriveResourceClient.findFile(clientFolder : DriveFolder, fileName : 
 fun encodeClientFolderName(name : String, reading : String) = "${name} -- ${reading}"
 fun encodeSessionFolderName(date : LocalSecond) = date.toString()
 fun encodeIndexableText(name : String, reading : String) = "${name} ${reading}"
-fun decodeName(folder : Metadata) : String = folder.title.let { if (it.indexOf("--") != -1) it.split(" -- ")[0] else it }
-fun decodeReading(folder : Metadata) : String = folder.title.let { if (it.indexOf("--") != -1) it.split(" -- ")[1] else it }
-fun decodeSessionDate(folder : Metadata) = parseLocalSecond(folder.title)
+
+private fun decodeName(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[0] else folderName
+fun decodeName(folder : Metadata) = decodeName(folder.title)
+fun decodeName(folder : File) = decodeName(folder.name)
+private fun decodeReading(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[1] else folderName
+fun decodeReading(folder : Metadata) = decodeReading(folder.title)
+fun decodeReading(folder : File) = decodeReading(folder.name)
+private fun decodeSessionDate(folderName : String) = parseLocalSecond(folderName)
+fun decodeSessionDate(folder : Metadata) = decodeSessionDate(folder.title)
+fun decodeSessionDate(folder : File) = decodeSessionDate(folder.name)

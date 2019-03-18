@@ -16,7 +16,9 @@ import com.google.android.gms.drive.query.SearchableField
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
 import com.j.fmark.R
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.util.concurrent.ExecutionException
 
 const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
@@ -45,14 +47,16 @@ object FDrive
     return null
   }
 
-  suspend fun getFMarkFolder(drive : Drive, context : Context) : Any = getFolder(drive, context.getString(R.string.fmark_root_directory))
+  suspend fun getFMarkFolder(drive : Drive, context : Context) : File = withContext(Dispatchers.Default) { getFolder(drive, context.getString(R.string.fmark_root_directory)) }
   suspend fun getFMarkFolder(client : DriveResourceClient, context : Context) : DriveFolder = getFolder(client, context.getString(R.string.fmark_root_directory))
 
   private suspend fun getFolder(drive : Drive, name : String) : File
   {
     var folder = File().setId("root")
     name.split(Regex("/")).forEach { component ->
-      val filelist = drive.files().list().setQ("name=${component} and parents in ${folder.id}").execute()?.files
+      val filelist = drive.files().list()
+       .setQ("name = '${component}' and '${folder.id}' in parents and trashed = false and mimeType = '${FOLDER_MIME_TYPE}'")
+       .execute()?.files
       folder = when
       {
         null == filelist || filelist.size == 0 -> createFolder(drive, folder, component)
@@ -89,4 +93,20 @@ object FDrive
   }
 
   private fun newFolderChangeset(name : String) : MetadataChangeSet = MetadataChangeSet.Builder().setTitle(name).setMimeType(DriveFolder.MIME_TYPE).build()
+}
+
+public suspend fun Drive.Files.List.executeFully() : List<File>
+{
+  val list = this
+  return withContext(Dispatchers.Default) {
+    val result = ArrayList<File>()
+    var pageToken : String? = null
+    do {
+      list.pageToken = pageToken
+      val page = list.execute()
+      result.addAll(page.files)
+      pageToken = page.nextPageToken
+    } while (null != pageToken)
+    result
+  }
 }
