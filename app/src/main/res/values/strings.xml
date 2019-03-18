@@ -1,6 +1,7 @@
 <resources>
   <string name="gapi_client_id" translatable="false">519981656006-rvtri3v9rb8i20n0hiqnqvm8jmg3o3av.apps.googleusercontent.com</string>
   <string name="fmark_root_directory" translatable="false">Clients</string>
+  <string name="gservices_app_name" translatable="false">FMark</string>
 
   <string name="app_name">Clients</string>
   <string name="title">Title</string>
