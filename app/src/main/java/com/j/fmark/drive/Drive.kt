@@ -6,21 +6,27 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.drive.*
+import com.google.android.gms.drive.DriveFolder
+import com.google.android.gms.drive.DriveResourceClient
+import com.google.android.gms.drive.MetadataBuffer
+import com.google.android.gms.drive.MetadataChangeSet
 import com.google.android.gms.drive.query.Filters
 import com.google.android.gms.drive.query.Query
 import com.google.android.gms.drive.query.SearchableField
+import com.google.api.services.drive.Drive
+import com.google.api.services.drive.model.File
 import com.j.fmark.R
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.ExecutionException
 
+const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
+
 object FDrive
 {
-
   suspend fun getAccount(c : Activity, resultCode : Int) : GoogleSignInAccount?
   {
     val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-     .requestScopes(Drive.SCOPE_FILE)
+     .requestScopes(com.google.android.gms.drive.Drive.SCOPE_FILE)
      .build()
     val client = GoogleSignIn.getClient(c, options)
     val signInTask = client.silentSignIn()
@@ -39,9 +45,28 @@ object FDrive
     return null
   }
 
-  suspend fun getFMarkFolder(client : DriveResourceClient, context : Context) : DriveFolder
+  suspend fun getFMarkFolder(drive : Drive, context : Context) : Any = getFolder(drive, context.getString(R.string.fmark_root_directory))
+  suspend fun getFMarkFolder(client : DriveResourceClient, context : Context) : DriveFolder = getFolder(client, context.getString(R.string.fmark_root_directory))
+
+  private suspend fun getFolder(drive : Drive, name : String) : File
   {
-    return getFolder(client, context.getString(R.string.fmark_root_directory))
+    var folder = File().setId("root")
+    name.split(Regex("/")).forEach { component ->
+      val filelist = drive.files().list().setQ("name=${component} and parents in ${folder.id}").execute()?.files
+      folder = when
+      {
+        null == filelist || filelist.size == 0 -> createFolder(drive, folder, component)
+        filelist.size == 1                     -> filelist[0]
+        else                                   -> throw FolderNotUniqueException(name)
+      }
+    }
+    return folder
+  }
+  private suspend fun createFolder(drive : Drive, parentFolder : File, name : String) : File
+  {
+    val newFile = File().setName(name).setMimeType(FOLDER_MIME_TYPE).setParents(listOf(parentFolder.id))
+    drive.files().create(newFile).setFields("id, parents").execute()
+    return newFile
   }
 
   private suspend fun getFolder(client : DriveResourceClient, name : String) : DriveFolder
