@@ -22,6 +22,26 @@ android {
         // Disable idiotic check for idiotic API
         disable "ValidFragment"
     }
+
+    // As far as I can tell this is a bug in Google libraries. Add a few of them and you get
+    // build errors saying there are multiple of some of these files, and there is exactly
+    // zero doc on how to fix it. Multiple dev random sources mention the following without
+    // explaining why it's happening or why this is the right fix. IIUC this is because
+    // multiple of their libs contain such a file, and the build system simply copies them
+    // checking that there aren't many identical destinations. These obviously should not
+    // be copied from a lib to the dependent package. They should make it so that those files
+    // are not copied to the destination package, or renamed while doing so, and it's the
+    // library that should dictate this, so it's a bug on their side.
+    packagingOptions {
+        exclude 'META-INF/DEPENDENCIES'
+        exclude 'META-INF/LICENSE'
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/license.txt'
+        exclude 'META-INF/NOTICE'
+        exclude 'META-INF/NOTICE.txt'
+        exclude 'META-INF/notice.txt'
+        exclude 'META-INF/ASL2.0'
+    }
 }
 
 dependencies {
@@ -37,6 +57,9 @@ dependencies {
     implementation "com.google.android.gms:play-services-drive:$gms_version"
     implementation 'com.android.support.constraint:constraint-layout:1.1.3'
     implementation 'com.android.support:support-v4:27.1.1'
+    implementation 'com.google.api-client:google-api-client-android:1.28.0'
+    implementation 'com.google.apis:google-api-services-drive:v3-rev20181213-1.28.0'
+    implementation 'com.google.http-client:google-http-client-gson:1.28.0'
     testImplementation "junit:junit:4.12"
     androidTestImplementation "com.android.support.test:runner:1.0.2"
     androidTestImplementation "com.android.support.test.espresso:espresso-core:3.0.2"
