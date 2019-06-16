@@ -1,13 +1,19 @@
 package com.j.fmark
 
+import android.util.Log
+import com.google.api.client.util.DateTime
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.GregorianCalendar
 import java.util.Locale
 
+fun log(msg : String) = Log.e("FMark", msg)
+
 fun color(l : Long) : Int = (l and -1L).toInt()
 fun formatDate(date : Date?) : String = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date ?: Date())
+fun formatDate(date : DateTime) : String = LocalSecond(date).toDateString()
+fun formatDate(date : Long) : String = LocalSecond(date).toDateString()
 
 private fun roundTo(v : Long, granularity : Long) = (v % granularity).let { mod -> if (mod * 2 > granularity) v + granularity - mod else v - mod }
 
@@ -18,9 +24,11 @@ data class LocalSecond(val year : Int, val month : Int, val day : Int, val hour 
    gc.get(Calendar.HOUR_OF_DAY), gc.get(Calendar.MINUTE), gc.get(Calendar.SECOND))
   constructor(t : Long) : this(GregorianCalendar().apply { timeInMillis = roundTo(t, 30 * 60 * 1000) })
   constructor(d : Date) : this(d.time)
+  constructor(d : DateTime) : this(d.value)
 
   override fun toString() = String.format("%04d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, second)
   fun toShortString() = String.format("%04d-%02d-%02d %02d:%02d", year, month, day, hour, minute)
+  fun toDateString() = String.format("%04d-%02d-%02d", year, month, day)
 }
 
 class IllegalDateException(s : String) : Exception(s)

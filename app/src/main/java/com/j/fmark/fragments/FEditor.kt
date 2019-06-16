@@ -21,15 +21,9 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.ViewFlipper
 import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.drive.DriveFile
-import com.google.android.gms.drive.DriveResourceClient
-import com.google.android.gms.drive.Metadata
-import com.google.android.gms.drive.MetadataChangeSet
 import com.j.fmark.BACK_CODE
 import com.j.fmark.BrushView
-import com.j.fmark.COMMENT_FILE_NAME
 import com.j.fmark.CanvasView
-import com.j.fmark.DATA_FILE_NAME
 import com.j.fmark.Drawing
 import com.j.fmark.FACE_CODE
 import com.j.fmark.FMark
@@ -37,14 +31,8 @@ import com.j.fmark.FRONT_CODE
 import com.j.fmark.R
 import com.j.fmark.SessionData
 import com.j.fmark.color
-import com.j.fmark.drive.decodeName
-import com.j.fmark.drive.decodeSessionDate
-import com.j.fmark.drive.findFile
-import com.j.fmark.save
+import com.j.fmark.fdrive.SessionFolder
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.tasks.await
-import java.io.ObjectOutputStream
-import java.io.OutputStreamWriter
 import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
@@ -68,9 +56,9 @@ private fun View?.hasChild(v : View) : Boolean
 
 data class SaveBitmapData(val drawing : Drawing, val bitmap : Bitmap, val guide : Drawable)
 
-class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val clientFolder : Metadata) : Fragment(), CanvasView.ChangeDelegate
+class FEditor(private val fmarkHost : FMark, private val session : SessionFolder) : Fragment(), CanvasView.ChangeDelegate
 {
-  val name : String = decodeName(clientFolder)
+  // val name : String = session.name // TODO : is this really write-only ?
   private val handler = FEditorHandler(this)
   private val contents = SessionData()
   private lateinit var shownPicture : Drawing
@@ -83,7 +71,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     fmarkHost.topSpinnerVisible = true
     fmarkHost.saveIndicator.hideOk()
     executor.execute { runBlocking {
-      val data = SessionData(driveApi, clientFolder.driveId.asDriveFolder())
+      val data = session.openData()
       contents.comment = data.comment
       data.forEach { contents[it.code].data.addAll(it.data) }
       fmarkHost.runOnUiThread {
@@ -128,7 +116,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     view.findViewById<AppCompatImageButton>(R.id.feditor_front)   .setOnClickListener { switchDrawing(contents[FRONT_CODE]) }
     view.findViewById<AppCompatImageButton>(R.id.feditor_back)    .setOnClickListener { switchDrawing(contents[BACK_CODE]) }
 
-    view.findViewById<TextView>(R.id.feditor_date).text = decodeSessionDate(clientFolder).toShortString()
+    view.findViewById<TextView>(R.id.feditor_date).text = session.date.toShortString()
     view.findViewById<EditText>(R.id.feditor_comment_text).addAfterTextChangedListener { text -> contents.comment = text; onCommentChanged() }
 
     shownPicture = contents[FACE_CODE]
@@ -240,8 +228,8 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     executor.execute { runBlocking {
       try
       {
-        saveData()
-        if (null != comment) saveComment(comment)
+        session.saveData(contents)
+        if (null != comment) session.saveComment(comment)
         if (null != saveBitmapData) savePicture(saveBitmapData.drawing, saveBitmapData.bitmap, saveBitmapData.guide)
         fmarkHost.runOnUiThread { fmarkHost.saveIndicator.showOk() }
       }
@@ -252,32 +240,8 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     }}
   }
 
-  private suspend fun saveData()
-  {
-    val dataFile = driveApi.findFile(clientFolder.driveId.asDriveFolder(), DATA_FILE_NAME) ?: return
-    val dataContents = driveApi.openFile(dataFile, DriveFile.MODE_WRITE_ONLY).await()
-    contents.save(ObjectOutputStream(dataContents.outputStream))
-    driveApi.commitContents(dataContents, null)
-  }
-
-  private suspend fun saveComment(comment : String)
-  {
-    val file = driveApi.findFile(clientFolder.driveId.asDriveFolder(), COMMENT_FILE_NAME)
-    val contents = (if (file != null) driveApi.openFile(file, DriveFile.MODE_WRITE_ONLY) else driveApi.createContents()).await()
-    OutputStreamWriter(contents.outputStream).use { it.write(comment) }
-    val cs = MetadataChangeSet.Builder().setTitle(COMMENT_FILE_NAME).build()
-    if (file != null)
-      driveApi.commitContents(contents, cs).await()
-    else
-      driveApi.createFile(clientFolder.driveId.asDriveFolder(), cs, contents).await()
-  }
-
   private suspend fun savePicture(picToSave : Drawing, drawnBitmap : Bitmap, guide : Drawable)
   {
-    // Get the file on Drive
-    val file = driveApi.findFile(clientFolder.driveId.asDriveFolder(), picToSave.fileName)
-    val contents = (if (file != null) driveApi.openFile(file, DriveFile.MODE_WRITE_ONLY) else driveApi.createContents()).await()
-
     // Create a new bitmap to compose and floodfill it with white.
     val composedBitmap = Bitmap.createBitmap(drawnBitmap.width, drawnBitmap.height, drawnBitmap.config)
     val canvas = Canvas(composedBitmap)
@@ -303,14 +267,7 @@ class FEditor(private val fmarkHost : FMark, private val driveApi : DriveResourc
     // Blit the drawing.
     canvas.drawBitmap(drawnBitmap, 0f, 0f, Paint())
 
-    // Compress the image and save it to Drive.
-    composedBitmap.compress(Bitmap.CompressFormat.PNG, 85, contents.outputStream)
-    val cs = MetadataChangeSet.Builder()
-     .setTitle(picToSave.fileName)
-     .build()
-    if (file != null)
-      driveApi.commitContents(contents, cs).await()
-    else
-      driveApi.createFile(clientFolder.driveId.asDriveFolder(), cs, contents).await()
+    // Save it.
+    session.saveImage(composedBitmap, picToSave.fileName)
   }
 }

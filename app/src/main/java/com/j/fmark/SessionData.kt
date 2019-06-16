@@ -1,14 +1,7 @@
 package com.j.fmark
 
-import com.google.android.gms.drive.DriveFile
-import com.google.android.gms.drive.DriveFolder
-import com.google.android.gms.drive.DriveResourceClient
-import com.google.android.gms.drive.MetadataChangeSet
-import com.j.fmark.drive.findFile
-import kotlinx.coroutines.tasks.await
 import java.io.BufferedInputStream
 import java.io.EOFException
-import java.io.FileInputStream
 import java.io.InputStream
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
@@ -18,16 +11,16 @@ const val FACE_CODE = 0
 const val FRONT_CODE = 1
 const val BACK_CODE = 2
 private fun codeToImageName(code : Int) = when (code) {
-  FACE_CODE -> FACE_IMAGE_NAME
+  FACE_CODE  -> FACE_IMAGE_NAME
   FRONT_CODE -> FRONT_IMAGE_NAME
-  BACK_CODE -> BACK_IMAGE_NAME
-  else -> throw IllegalArgumentException("Unknown image code ${code}")
+  BACK_CODE  -> BACK_IMAGE_NAME
+  else                   -> throw IllegalArgumentException("Unknown image code ${code}")
 }
 private fun codeToResourceId(code : Int) = when (code) {
-  FACE_CODE -> R.drawable.face
+  FACE_CODE  -> R.drawable.face
   FRONT_CODE -> R.drawable.front
-  BACK_CODE -> R.drawable.back
-  else -> throw IllegalArgumentException("Unknown image code ${code}")
+  BACK_CODE  -> R.drawable.back
+  else                   -> throw IllegalArgumentException("Unknown image code ${code}")
 }
 
 typealias FEditorDataType = Double
@@ -50,16 +43,16 @@ data class SessionData(var comment : String, val face : Drawing, val front : Dra
     }
     fun build() : SessionData = SessionData(
      comment ?: "",
-     face  ?: Drawing(FACE_CODE,  R.drawable.face,  FACE_IMAGE_NAME,  ArrayList()),
+     face ?: Drawing(FACE_CODE, R.drawable.face, FACE_IMAGE_NAME, ArrayList()),
      front ?: Drawing(FRONT_CODE, R.drawable.front, FRONT_IMAGE_NAME, ArrayList()),
-     back  ?: Drawing(BACK_CODE,  R.drawable.back,  BACK_IMAGE_NAME,  ArrayList()))
+     back ?: Drawing(BACK_CODE, R.drawable.back, BACK_IMAGE_NAME, ArrayList()))
   }
   operator fun get(code : Int) = when (code)
   {
     FACE_CODE  -> face
     FRONT_CODE -> front
     BACK_CODE  -> back
-    else -> throw IllegalArgumentException("Unknown image code ${code}")
+    else                   -> throw IllegalArgumentException("Unknown image code ${code}")
   }
   fun forEach(f : (Drawing) -> Unit)
   {
@@ -70,14 +63,6 @@ data class SessionData(var comment : String, val face : Drawing, val front : Dra
 }
 
 fun SessionData() = SessionData.Builder().build()
-
-suspend fun SessionData(driveApi : DriveResourceClient, sessionFolder : DriveFolder) : SessionData
-{
-  val file = driveApi.findFile(sessionFolder, DATA_FILE_NAME) ?: driveApi.createFile(sessionFolder, MetadataChangeSet.Builder().setTitle(DATA_FILE_NAME).build(), null).await()
-  val dataContents = driveApi.openFile(file, DriveFile.MODE_READ_WRITE).await()
-  return SessionData(FileInputStream(dataContents.parcelFileDescriptor.fileDescriptor))
-}
-
 fun SessionData(inputStream : InputStream) : SessionData
 {
   val contents = SessionData.Builder()

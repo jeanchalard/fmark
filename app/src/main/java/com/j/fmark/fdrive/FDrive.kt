@@ -1,4 +1,4 @@
-package com.j.fmark.drive
+package com.j.fmark.fdrive
 
 import android.app.Activity
 import android.content.Context
@@ -15,13 +15,15 @@ import com.google.android.gms.drive.query.Query
 import com.google.android.gms.drive.query.SearchableField
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
+import com.j.fmark.LocalSecond
 import com.j.fmark.R
+import com.j.fmark.drive.encodeClientFolderName
+import com.j.fmark.drive.encodeIndexableText
+import com.j.fmark.drive.encodeSessionFolderName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ExecutionException
-
-const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
 
 object FDrive
 {
@@ -47,15 +49,25 @@ object FDrive
     return null
   }
 
-  suspend fun getFMarkFolder(drive : Drive, context : Context) : File = withContext(Dispatchers.Default) { getFolder(drive, context.getString(R.string.fmark_root_directory)) }
-  suspend fun getFMarkFolder(client : DriveResourceClient, context : Context) : DriveFolder = getFolder(client, context.getString(R.string.fmark_root_directory))
+  suspend fun getFMarkFolder(drive : Drive, context : Context) : File = withContext(Dispatchers.Default) {
+    FDrive.getFolder(drive, context.getString(R.string.fmark_root_directory))
+  }
 
+  suspend fun getFolders(drive : Drive, parentFolder : File, name : String? = null, exactMatch : Boolean = true) : List<File> {
+    val constraints = mutableListOf("trashed = false", "mimeType = '$FOLDER_MIME_TYPE'", "'${parentFolder.id}' in parents")
+    if (null != name) constraints.add("name ${if (exactMatch) "is" else "contains"} '${name}'")
+    return drive.files().list().apply {
+      q = constraints.joinToString(" and ")
+      orderBy = "name"
+      spaces = "drive"
+    }.executeFully()
+  }
   private suspend fun getFolder(drive : Drive, name : String) : File
   {
     var folder = File().setId("root")
     name.split(Regex("/")).forEach { component ->
       val filelist = drive.files().list()
-       .setQ("name = '${component}' and '${folder.id}' in parents and trashed = false and mimeType = '${FOLDER_MIME_TYPE}'")
+       .setQ("name = '${component}' and '${folder.id}' in parents and trashed = false and mimeType = '$FOLDER_MIME_TYPE'")
        .execute()?.files
       folder = when
       {
@@ -73,11 +85,15 @@ object FDrive
     return newFile
   }
 
-  private suspend fun getFolder(client : DriveResourceClient, name : String) : DriveFolder
+
+  // Legacy API stuff
+  private fun newFolderChangeset(name : String) : MetadataChangeSet = MetadataChangeSet.Builder().setTitle(name).setMimeType(DriveFolder.MIME_TYPE).build()
+
+  suspend fun getFolder(resourceClient : DriveResourceClient, name : String) : DriveFolder
   {
-    var currentFolder = client.rootFolder.await()
+    var currentFolder = resourceClient.rootFolder.await()
     name.split(Regex("/")).forEach {
-      val buffer : MetadataBuffer = client.query(Query.Builder()
+      val buffer : MetadataBuffer = resourceClient.query(Query.Builder()
        .addFilter(Filters.eq(SearchableField.TITLE, it))
        .addFilter(Filters.`in`(SearchableField.PARENTS, currentFolder.driveId))
        .addFilter(Filters.eq(SearchableField.TRASHED, false))
@@ -85,28 +101,23 @@ object FDrive
       currentFolder = when
       {
         1 != buffer.count -> throw FolderNotUniqueException(name)
-        0 == buffer.count -> client.createFolder(currentFolder, newFolderChangeset(it)).await()
+        0 == buffer.count -> resourceClient.createFolder(currentFolder, newFolderChangeset(it)).await()
         else              -> buffer[0].let { metadata -> if (!metadata.isFolder) throw NotAFolderException(metadata.title) else metadata.driveId.asDriveFolder() }
       }
     }
     return currentFolder
   }
 
-  private fun newFolderChangeset(name : String) : MetadataChangeSet = MetadataChangeSet.Builder().setTitle(name).setMimeType(DriveFolder.MIME_TYPE).build()
-}
+  fun metadataForClient(name : String, reading : String) : MetadataChangeSet = MetadataChangeSet.Builder()
+   .setTitle(encodeClientFolderName(name, reading))
+   .setDescription(reading)
+   .setIndexableText(encodeIndexableText(name, reading))
+   .setMimeType(DriveFolder.MIME_TYPE)
+   .build()
 
-public suspend fun Drive.Files.List.executeFully() : List<File>
-{
-  val list = this
-  return withContext(Dispatchers.Default) {
-    val result = ArrayList<File>()
-    var pageToken : String? = null
-    do {
-      list.pageToken = pageToken
-      val page = list.execute()
-      result.addAll(page.files)
-      pageToken = page.nextPageToken
-    } while (null != pageToken)
-    result
-  }
+  fun metadataForSession(date : LocalSecond) : MetadataChangeSet = MetadataChangeSet.Builder()
+   .setTitle(encodeSessionFolderName(date))
+   .setDescription(date.toString())
+   .setMimeType(DriveFolder.MIME_TYPE)
+   .build()
 }

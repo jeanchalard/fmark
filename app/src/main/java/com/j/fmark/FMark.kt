@@ -4,29 +4,30 @@ import android.content.Intent
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v7.app.AppCompatActivity
-import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import com.google.android.gms.auth.api.Auth
-import com.google.android.gms.drive.Drive
-import com.google.android.gms.drive.DriveClient
-import com.google.android.gms.drive.DriveResourceClient
-import com.google.android.gms.drive.Metadata
-import com.j.fmark.drive.FDrive
-import com.j.fmark.drive.SignInException
-import com.j.fmark.drive.renameFolder
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.j.fmark.fdrive.ClientFolder
+import com.j.fmark.fdrive.FDrive
+import com.j.fmark.fdrive.FMarkRoot
+import com.j.fmark.fdrive.LegacyFMarkRoot
+import com.j.fmark.fdrive.SessionFolder
+import com.j.fmark.fdrive.SignInException
 import com.j.fmark.fragments.ClientDetails
 import com.j.fmark.fragments.ClientHistory
-import com.j.fmark.fragments.ClientList
+import com.j.fmark.fragments.ClientListFragment
 import com.j.fmark.fragments.FEditor
 import com.j.fmark.fragments.SignInErrorFragment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import java.util.Locale
+
+const val USE_REST = false
 
 class FMark : AppCompatActivity()
 {
@@ -53,11 +54,11 @@ class FMark : AppCompatActivity()
     supportFragmentManager.addOnBackStackChangedListener {
       val actionBar = supportActionBar ?: return@addOnBackStackChangedListener
       val fragment = lastFragment
-      Log.e("frag", "${fragment?.javaClass}")
+      if (DBGLOG) log("Fragment : ${fragment?.javaClass}")
       when (fragment) {
-        is ClientList    -> actionBar.setTitle(R.string.titlebar_main)
-        is ClientDetails -> actionBar.setTitle(R.string.titlebar_client_details)
-        is ClientHistory -> { fragment.onResume(); actionBar.title = String.format(Locale.getDefault(), getString(R.string.titlebar_editor), fragment.name) }
+        is ClientListFragment -> actionBar.setTitle(R.string.titlebar_main)
+        is ClientDetails      -> actionBar.setTitle(R.string.titlebar_client_details)
+        is ClientHistory      -> { fragment.onResume(); actionBar.title = String.format(Locale.getDefault(), getString(R.string.titlebar_editor), fragment.name) }
       }
       invalidateOptionsMenu()
     }
@@ -73,22 +74,28 @@ class FMark : AppCompatActivity()
 
   private fun startSignIn()
   {
+    if (DBGLOG) log("Starting sign in...")
     insertSpinnerVisible = true
     GlobalScope.launch(Dispatchers.Main) {
       try
       {
+        if (DBGLOG) log("Getting account...")
         val account = FDrive.getAccount(this@FMark, GOOGLE_SIGN_IN_CODE)
-        if (null != account)
-        {
-          val driveResourceClient = Drive.getDriveResourceClient(this@FMark, account)
-          val refreshClient = Drive.getDriveClient(this@FMark, account)
-          insertSpinnerVisible = false
-          supportFragmentManager.beginTransaction().replace(R.id.list_fragment, ClientList(this@FMark, driveResourceClient, refreshClient)).commit()
-        } // Otherwise, wait for sign in activity → onActivityResult
+        if (DBGLOG) log("Account : ${account}")
+        if (null != account) startClientList(account)
+        // else, wait for sign in activity → onActivityResult
       } catch (e : SignInException) {
         offlineError(e.message)
       }
     }
+  }
+
+  private suspend fun startClientList(account : GoogleSignInAccount)
+  {
+    val root = LegacyFMarkRoot(this, account) //if (USE_REST) RESTFMarkRoot(this, account) else LegacyFMarkRoot(this, account)
+    if (DBGLOG) log("Root dir obtained ${root}")
+    insertSpinnerVisible = false
+    supportFragmentManager.beginTransaction().replace(R.id.list_fragment, ClientListFragment(this@FMark, root)).commit()
   }
 
   fun offlineError(msgId : Int) = offlineError(resources.getString(msgId))
@@ -99,8 +106,7 @@ class FMark : AppCompatActivity()
 
   override fun onBackPressed()
   {
-    val fragment = lastFragment
-    when (fragment) {
+    when (val fragment = lastFragment) {
       is FEditor -> fragment.onBackPressed()
       else -> super.onBackPressed()
     }
@@ -110,9 +116,9 @@ class FMark : AppCompatActivity()
   {
     if (null == menu) return super.onPrepareOptionsMenu(menu)
     val isHome = when (lastFragment) {
-      is ClientList, is ClientDetails -> true
-      is FEditor -> false
-      else -> true
+      is ClientListFragment, is ClientDetails -> true
+      is FEditor                              -> false
+      else                                    -> true
     }
     menu.findItem(R.id.action_button_refresh).isVisible = isHome
     menu.findItem(R.id.action_button_clear).isVisible = !isHome
@@ -131,8 +137,8 @@ class FMark : AppCompatActivity()
   {
     val fragment = lastFragment
     when (fragment) {
-      is FEditor -> return fragment.onOptionsItemSelected(item)
-      is ClientList -> fragment.refresh()
+      is FEditor            -> return fragment.onOptionsItemSelected(item)
+      is ClientListFragment -> fragment.refresh()
     }
     return super.onOptionsItemSelected(item)
   }
@@ -154,39 +160,38 @@ class FMark : AppCompatActivity()
       offlineError(R.string.sign_in_fail_eventual)
     }
     else
-    {
-      val resourceClient = Drive.getDriveResourceClient(this@FMark, account)
-      val refreshClient = Drive.getDriveClient(this@FMark, account)
-      findViewById<View>(R.id.insert_loading).visibility = View.GONE
-      supportFragmentManager.beginTransaction().replace(R.id.list_fragment, ClientList(this@FMark, resourceClient, refreshClient)).commit()
-    }
+      GlobalScope.launch(Dispatchers.Main) { startClientList(account) }
   }
 
-  fun showClientDetails(resourceClient : DriveResourceClient, refreshClient : DriveClient, client : Metadata?)
+  fun showClientDetails(clientFolder : ClientFolder?, root : FMarkRoot)
   {
-    val f = ClientDetails(this, resourceClient, refreshClient, client)
+    val f = ClientDetails(this, clientFolder, root)
     val transaction = supportFragmentManager.beginTransaction()
      .addToBackStack(null)
     f.show(transaction, "details")
   }
 
-  fun startClientEditor(resourceClient : DriveResourceClient, refreshClient : DriveClient, sessionFolder : Metadata) =
-   supportFragmentManager.beginTransaction().addToBackStack("client").replace(R.id.list_fragment, ClientHistory(this, resourceClient, refreshClient, sessionFolder), "client").commit()
+  fun startClientEditor(clientFolder : ClientFolder) =
+   supportFragmentManager.beginTransaction()
+    .addToBackStack("client")
+    .replace(R.id.list_fragment, ClientHistory(this, clientFolder), "client")
+    .commit()
 
-  fun startSessionEditor(resourceClient : DriveResourceClient, refreshClient : DriveClient, sessionFolder : Metadata)
+  fun startSessionEditor(sessionFolder : SessionFolder)
   {
-    val fEditor = FEditor(this, resourceClient, sessionFolder)
+    val fEditor = FEditor(this, sessionFolder)
     supportFragmentManager.beginTransaction().apply {
       addToBackStack("editor")
       replace(R.id.top_fragment, fEditor, "editor")
     }.commit()
   }
 
-  suspend fun renameClient(driveResourceClient : DriveResourceClient, clientFolder : Metadata, name : String, reading : String)
+  // TODO : remove this function and have listeners on the ClientFolder object
+  suspend fun renameClient(clientFolder : ClientFolder, name : String, reading : String)
   {
-    val renamedFolder = renameFolder(driveResourceClient, clientFolder.driveId.asDriveFolder(), name, reading) ?: return
+    clientFolder.rename(name, reading)
     supportFragmentManager.fragments.forEach {
-      if (it is ClientList) it.notifyRenamed(renamedFolder)
+      if (it is ClientListFragment) it.notifyRenamed(clientFolder)
     }
   }
 }

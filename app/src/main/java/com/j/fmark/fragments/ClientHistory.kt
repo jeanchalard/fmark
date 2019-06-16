@@ -1,37 +1,26 @@
 package com.j.fmark.fragments
 
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.support.v4.app.Fragment
 import android.support.v7.widget.DividerItemDecoration
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
-import com.google.android.gms.drive.DriveClient
-import com.google.android.gms.drive.DriveFile
-import com.google.android.gms.drive.DriveResourceClient
-import com.google.android.gms.drive.Metadata
-import com.google.android.gms.drive.metadata.MetadataField
-import com.google.android.gms.drive.query.Filters
-import com.google.android.gms.drive.query.Query
-import com.google.android.gms.drive.query.SearchableField
-import com.google.android.gms.drive.query.SortOrder
-import com.google.android.gms.drive.query.SortableField
 import com.j.fmark.CanvasView
-import com.j.fmark.DATA_FILE_NAME
+import com.j.fmark.DBGLOG
 import com.j.fmark.FMark
 import com.j.fmark.LocalSecond
 import com.j.fmark.R
 import com.j.fmark.SessionData
-import com.j.fmark.drive.createSessionForClient
-import com.j.fmark.drive.decodeName
-import com.j.fmark.drive.decodeSessionDate
-import com.j.fmark.drive.findFile
+import com.j.fmark.fdrive.ClientFolder
+import com.j.fmark.fdrive.SessionFolder
+import com.j.fmark.log
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -39,41 +28,30 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import java.io.InputStream
 import java.util.Locale
 
-private val EMPTY_METADATA = object : Metadata() {
-  override fun <T : Any?> zza(p0 : MetadataField<T>?) : T = throw NotImplementedError()
-  override fun freeze() : Metadata = this
-  override fun isDataValid() : Boolean = false
-}
-private fun Metadata?.isEmpty() = this == null || this === EMPTY_METADATA
-private fun InputStream?.decodeSessionData() = if (null == this) SessionData() else SessionData(this)
-private fun t() = Thread.currentThread()
-
-
-private class Poke
-{
-  interface Pokable { fun poke() }
-  @Volatile var listener : Pokable? = null
-  fun poke() = listener?.poke()
+private data class LoadSession(val session : SessionFolder, val data : Deferred<SessionData>)
+val EMPTY_SESSION = object : SessionFolder {
+  override val date : LocalSecond get() = LocalSecond(System.currentTimeMillis())
+  override val lastUpdateDate : LocalSecond get() = LocalSecond(System.currentTimeMillis())
+  override suspend fun openData() : SessionData = SessionData()
+  override suspend fun saveData(data : SessionData) {}
+  override suspend fun saveComment(comment : String) {}
+  override suspend fun saveImage(image : Bitmap, filename : String) {}
 }
 
-private data class Session(val folder : Metadata, val poke : Poke, val data : Deferred<SessionData>)
-
-class ClientHistory(private val fmarkHost : FMark, private val driveApi : DriveResourceClient, private val driveRefreshClient : DriveClient, private val clientFolder : Metadata) : Fragment()
+class ClientHistory(private val fmarkHost : FMark, private val clientFolder : ClientFolder) : Fragment()
 {
-  val name = decodeName(clientFolder)
+  val name get() = clientFolder.name
 
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View?
   {
     val view = inflater.inflate(R.layout.fragment_client_history, container, false)
     view.findViewById<LinearLayout>(R.id.new_session_button).setOnClickListener {
       GlobalScope.launch {
-        val session = createSessionForClient(driveApi, clientFolder.driveId.asDriveFolder(), LocalSecond(System.currentTimeMillis()))
+        val session = clientFolder.newSession()
         GlobalScope.launch(Dispatchers.Main) {
-          fmarkHost.startSessionEditor(driveApi, driveRefreshClient, session)
+          fmarkHost.startSessionEditor(session)
         }
       }
     }
@@ -84,34 +62,15 @@ class ClientHistory(private val fmarkHost : FMark, private val driveApi : DriveR
   override fun onResume()
   {
     super.onResume()
-    Log.e("wat", "> ${view}")
     view?.let { populateClientHistory(it) }
   }
-
-  private suspend fun loadData(file : DriveFile?) : SessionData =
-    if (null != file) driveApi.openFile(file, DriveFile.MODE_READ_ONLY)?.await()?.inputStream.decodeSessionData()
-    else SessionData()
 
   private fun populateClientHistory(view : View)
   {
     fmarkHost.insertSpinnerVisible = true
     GlobalScope.launch {
-      Log.e("Launch ${t()}", "Start loading client history from ${clientFolder.title}")
-      val clientFolder = clientFolder.driveId.asDriveFolder()
-      val query = Query.Builder().apply {
-        addFilter(Filters.eq(SearchableField.TRASHED, false))
-        setSortOrder(SortOrder.Builder().addSortDescending(SortableField.TITLE).build())
-      }.build()
-      val result = driveApi.queryChildren(clientFolder, query).await()
-      val inProgress = result.mapNotNull { folderMetadata ->
-        if (null == folderMetadata || !folderMetadata.isFolder) return@mapNotNull null
-        val sessionFolder = folderMetadata.driveId?.asDriveFolder() ?: return@mapNotNull null
-        val poke = Poke()
-        Session(folderMetadata, poke, async(start = CoroutineStart.LAZY) {
-          val sessionContents = driveApi.findFile(sessionFolder, DATA_FILE_NAME)
-          loadData(sessionContents).also { poke.poke() }
-        })
-      }
+      val sessions = clientFolder.getSessions()
+      val inProgress = sessions.map { session -> LoadSession(session, async(start = CoroutineStart.LAZY) { session.openData() }) }
       if (inProgress.isNotEmpty()) inProgress.first().data.start()
 
       GlobalScope.launch(Dispatchers.Main) {
@@ -127,12 +86,12 @@ class ClientHistory(private val fmarkHost : FMark, private val driveApi : DriveR
     }
   }
 
-  fun startSessionEditor(sessionFolder : Metadata) = fmarkHost.startSessionEditor(driveApi, driveRefreshClient, sessionFolder)
+  fun startSessionEditor(sessionFolder : SessionFolder) = fmarkHost.startSessionEditor(sessionFolder)
 }
 
-private class ClientHistoryAdapter(private val parent : ClientHistory, private var source : List<Session>) : RecyclerView.Adapter<ClientHistoryAdapter.Holder>()
+private class ClientHistoryAdapter(private val parent : ClientHistory, private var source : List<LoadSession>) : RecyclerView.Adapter<ClientHistoryAdapter.Holder>()
 {
-  class Holder(private val adapter : ClientHistoryAdapter, view : View) : RecyclerView.ViewHolder(view), View.OnClickListener, Poke.Pokable
+  class Holder(private val adapter : ClientHistoryAdapter, view : View) : RecyclerView.ViewHolder(view), View.OnClickListener
   {
     init { view.setOnClickListener(this) }
 
@@ -144,37 +103,38 @@ private class ClientHistoryAdapter(private val parent : ClientHistory, private v
     private val frontImage : CanvasView = view.findViewById<CanvasView>(R.id.client_history_front).also { it.setImageResource(R.drawable.front) }
     private val backImage : CanvasView = view.findViewById<CanvasView>(R.id.client_history_back).also { it.setImageResource(R.drawable.back) }
 
-    var session : Session = Session(EMPTY_METADATA, Poke(), CompletableDeferred())
-      set(data)
+    var session : LoadSession = LoadSession(EMPTY_SESSION, CompletableDeferred())
+      set(session)
       {
-        field = data
-        data.poke.listener = this
-        if (!data.data.isActive) data.data.start()
-        GlobalScope.launch(Dispatchers.Main) {
-          dateLabel.text = if (!data.folder.isEmpty()) decodeSessionDate(data.folder).toShortString() else ""
-          val lastUpdateDateString = if (!data.folder.isEmpty()) LocalSecond(data.folder.modifiedDate).toString() else ""
-          lastUpdateLabel.text = String.format(Locale.getDefault(), lastUpdateLabel.context.getString(R.string.update_time_with_placeholder), lastUpdateDateString)
-          if (data.data.isCompleted)
-          {
-            val completedData = data.data.getCompleted()
-            commentTextView.text = completedData.comment
-            faceImage.setImageResource(completedData.face.guideId)
-            faceImage.readData(completedData.face.data)
-            frontImage.setImageResource(completedData.front.guideId)
-            frontImage.readData(completedData.front.data)
-            backImage.setImageResource(completedData.back.guideId)
-            backImage.readData(completedData.back.data)
-            commentTextView.visibility = View.VISIBLE
-            loadingView.visibility = View.INVISIBLE
-          } else loadingView.visibility = View.VISIBLE
-        }
+        field = session
+        if (DBGLOG) log("Setting session ${session.session.date} in ${this}")
+        session.data.invokeOnCompletion { populate(session) }
+        if (!session.data.isActive) session.data.start().also { log("Start loading ${session.session.date} now") }
       }
 
-    override fun poke() {
-      if (session.poke.listener === this) session = session
+    private fun populate(session : LoadSession)
+    {
+      if (DBGLOG) log("Populating with ${session.session.date} ${session.data}")
+      GlobalScope.launch(Dispatchers.Main) {
+        dateLabel.text = if (session.session !== EMPTY_SESSION) session.session.date.toShortString() else ""
+        val lastUpdateDateString = if (session.session !== EMPTY_SESSION) session.session.lastUpdateDate.toShortString() else ""
+        lastUpdateLabel.text = String.format(Locale.getDefault(), lastUpdateLabel.context.getString(R.string.update_time_with_placeholder), lastUpdateDateString)
+        if (session.data.isCompleted)
+        {
+          val completedData = session.data.getCompleted()
+          commentTextView.text = completedData.comment
+          faceImage.setImageResource(completedData.face.guideId)
+          faceImage.readData(completedData.face.data)
+          frontImage.setImageResource(completedData.front.guideId)
+          frontImage.readData(completedData.front.data)
+          backImage.setImageResource(completedData.back.guideId)
+          backImage.readData(completedData.back.data)
+          commentTextView.visibility = View.VISIBLE
+          loadingView.visibility = View.INVISIBLE
+        } else loadingView.visibility = View.VISIBLE
+      }
     }
-
-    override fun onClick(v : View?) { adapter.startClientEditor(session.folder) }
+    override fun onClick(v : View?) { adapter.startClientEditor(session.session) }
   }
 
   override fun getItemCount() : Int = source.size
@@ -184,11 +144,11 @@ private class ClientHistoryAdapter(private val parent : ClientHistory, private v
     holder.session = source[position]
   }
 
-  fun setSource(source : List<Session>)
+  fun setSource(source : List<LoadSession>)
   {
     this.source = source
     notifyDataSetChanged()
   }
 
-  fun startClientEditor(sessionFolder : Metadata) = parent.startSessionEditor(sessionFolder)
+  fun startClientEditor(sessionFolder : SessionFolder) = parent.startSessionEditor(sessionFolder)
 }

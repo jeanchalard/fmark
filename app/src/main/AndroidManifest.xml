@@ -13,7 +13,7 @@
    android:theme="@style/AppTheme"
    tools:ignore="GoogleAppIndexingWarning">
     <activity
-     android:name=".FMark2"
+     android:name=".FMark"
      android:windowSoftInputMode="stateHidden|adjustPan">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
