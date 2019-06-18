@@ -17,9 +17,6 @@ import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
 import com.j.fmark.LocalSecond
 import com.j.fmark.R
-import com.j.fmark.drive.encodeClientFolderName
-import com.j.fmark.drive.encodeIndexableText
-import com.j.fmark.drive.encodeSessionFolderName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -27,6 +24,13 @@ import java.util.concurrent.ExecutionException
 
 object FDrive
 {
+  fun encodeClientFolderName(name : String, reading : String) = "${name} -- ${reading}"
+  fun encodeSessionFolderName(date : LocalSecond) = date.toString()
+  fun encodeIndexableText(name : String, reading : String) = "${name} ${reading}"
+
+  fun decodeName(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[0] else folderName
+  fun decodeReading(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[1] else folderName
+
   suspend fun getAccount(c : Activity, resultCode : Int) : GoogleSignInAccount?
   {
     val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)

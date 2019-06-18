@@ -11,6 +11,7 @@ import com.google.android.gms.drive.query.SearchableField
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
 import com.j.fmark.LocalSecond
+import com.j.fmark.fdrive.FDrive.encodeClientFolderName
 import com.j.fmark.fdrive.FDrive.metadataForClient
 import com.j.fmark.fdrive.FDrive.metadataForSession
 import com.j.fmark.parseLocalSecond
@@ -31,10 +32,3 @@ suspend fun DriveResourceClient.findFile(clientFolder : DriveFolder, fileName : 
   val result = queryChildren(clientFolder, query).await()
   return if (result.count > 0) result[0].driveId.asDriveFile() else null
 }
-
-fun encodeClientFolderName(name : String, reading : String) = "${name} -- ${reading}"
-fun encodeSessionFolderName(date : LocalSecond) = date.toString()
-fun encodeIndexableText(name : String, reading : String) = "${name} ${reading}"
-
-fun decodeName(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[0] else folderName
-fun decodeReading(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[1] else folderName

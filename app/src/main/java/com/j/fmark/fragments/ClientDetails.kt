@@ -67,13 +67,13 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
     }
   }
 
-  private suspend fun validateDetails(fmarkFolder : ClientFolder?, name : String, reading : String)
+  private suspend fun validateDetails(folder : ClientFolder?, name : String, reading : String)
   {
     fmarkHost.supportFragmentManager.popBackStack()
-    if (null == clientFolder)
+    if (null == folder)
       fmarkHost.startSessionEditor(root.createClient(name, reading).newSession()) // It's a new client.
     else
-      fmarkHost.renameClient(clientFolder, name, reading)
+      fmarkHost.renameClient(folder, name, reading)
   }
 
   override fun onDetach()

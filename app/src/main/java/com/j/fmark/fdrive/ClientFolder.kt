@@ -9,8 +9,8 @@ import com.google.android.gms.drive.query.SearchableField
 import com.google.android.gms.drive.query.SortOrder
 import com.google.android.gms.drive.query.SortableField
 import com.j.fmark.LocalSecond
-import com.j.fmark.drive.decodeName
-import com.j.fmark.drive.decodeReading
+import com.j.fmark.fdrive.FDrive.decodeName
+import com.j.fmark.fdrive.FDrive.decodeReading
 import kotlinx.coroutines.tasks.await
 
 interface ClientFolder
