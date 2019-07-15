@@ -19,6 +19,7 @@ import com.j.fmark.formatDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ClientDetails(private val fmarkHost : FMark, private val clientFolder : ClientFolder?, private val root : FMarkRoot) : DialogFragment()
 {
@@ -50,19 +51,21 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
     val name = view?.findViewById<EditText>(R.id.client_details_name)?.text?.toString()
     val reading = view?.findViewById<EditText>(R.id.client_details_reading)?.text?.toString()
     if (null == name || null == reading) throw NullPointerException("Neither name or reading can be null when validating the dialog")
-    GlobalScope.launch(Dispatchers.Main) {
-      val existingClientsWithThisName = root.clientList(name)
-      if (existingClientsWithThisName.count == 0)
-        validateDetails(clientFolder, name, reading)
-      else
-      {
-        val count = existingClientsWithThisName.count
-        val message = resources.getQuantityString(R.plurals.client_already_exists, count, count)
-        AlertDialog.Builder(fmarkHost)
-         .setMessage(message)
-         .setPositiveButton(android.R.string.ok) { _, _ -> GlobalScope.launch(Dispatchers.Main) { validateDetails(clientFolder, name, reading) } }
-         .setNegativeButton(R.string.cancel) { dialog, _ -> dialog.dismiss() }
-         .show()
+    GlobalScope.launch {
+      root.clientList(name).count.let { count ->
+        if (count == 0)
+          validateDetails(clientFolder, name, reading)
+        else
+        {
+          val message = resources.getQuantityString(R.plurals.client_already_exists, count, count)
+          withContext(Dispatchers.Main) {
+            AlertDialog.Builder(fmarkHost)
+             .setMessage(message)
+             .setPositiveButton(android.R.string.ok) { _, _ -> GlobalScope.launch(Dispatchers.Main) { validateDetails(clientFolder, name, reading) } }
+             .setNegativeButton(R.string.cancel) { dialog, _ -> dialog.dismiss() }
+             .show()
+          }
+        }
       }
     }
   }
@@ -71,7 +74,7 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
   {
     fmarkHost.supportFragmentManager.popBackStack()
     if (null == folder)
-      fmarkHost.startSessionEditor(root.createClient(name, reading).newSession()) // It's a new client.
+      withContext(Dispatchers.Main) { fmarkHost.startSessionEditor(root.createClient(name, reading).newSession()) } // It's a new client.
     else
       fmarkHost.renameClient(folder, name, reading)
   }

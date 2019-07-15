@@ -1,11 +1,14 @@
 package com.j.fmark
 
+import android.util.Log
 import java.io.BufferedInputStream
 import java.io.EOFException
 import java.io.InputStream
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
+import java.io.OutputStream
 import java.io.StreamCorruptedException
+import java.lang.Exception
 
 const val FACE_CODE = 0
 const val FRONT_CODE = 1
@@ -68,11 +71,19 @@ fun SessionData(inputStream : InputStream) : SessionData
   val contents = SessionData.Builder()
   try
   {
+//    val a = ByteArray(1024 * 200)
+//    val read = inputStream.read(a)
+//    log("data ${read} : ${a.joinTo(StringBuffer())}")
+//    val read2 = inputStream.read(a)
+//    log("data2 ${read2} : ${a.joinTo(StringBuffer())}")
     ObjectInputStream(BufferedInputStream(inputStream)).use {
-      contents.comment = it.readObject() as String
+      log(">>> 1")
+      try { contents.comment = it.readObject() as String } catch (e : Exception) { log("Oui mais non ${e}") }
+      log(">>> 2 ${contents.comment}")
       while (true)
       {
         val code = it.readInt()
+        log("Got ${code}")
         @Suppress("UNCHECKED_CAST") // Contained type can't be checked at runtime because of erasure, no free lunch
         val data = it.readObject() as ArrayList<FEditorDataType>
         contents[code] = Drawing(code, codeToResourceId(code), codeToImageName(code), data)
@@ -80,15 +91,19 @@ fun SessionData(inputStream : InputStream) : SessionData
     }
   }
   catch (e : EOFException) { /* done */ }
-  catch (e : StreamCorruptedException) { /* done */ }
+  catch (e : StreamCorruptedException) {
+    Log.e("corrupted ?", "hm", e)
+  }
   return contents.build()
 }
 
-fun SessionData.save(os : ObjectOutputStream)
+fun SessionData.save(outputStream : OutputStream)
 {
-  os.writeObject(comment)
-  forEach {
-    os.writeInt(it.code)
-    os.writeObject(it.data)
+  ObjectOutputStream(outputStream).use { os ->
+    os.writeObject(comment)
+    forEach {
+      os.writeInt(it.code)
+      os.writeObject(it.data)
+    }
   }
 }

@@ -2,6 +2,7 @@ package com.j.fmark.fragments
 
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.support.annotation.MainThread
 import android.support.v4.app.Fragment
 import android.support.v7.widget.DividerItemDecoration
 import android.support.v7.widget.LinearLayoutManager
@@ -21,14 +22,18 @@ import com.j.fmark.SessionData
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.SessionFolder
 import com.j.fmark.log
+import com.j.fmark.logStackTrace
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicReference
 
 private data class LoadSession(val session : SessionFolder, val data : Deferred<SessionData>)
 val EMPTY_SESSION = object : SessionFolder {
@@ -37,12 +42,15 @@ val EMPTY_SESSION = object : SessionFolder {
   override suspend fun openData() : SessionData = SessionData()
   override suspend fun saveData(data : SessionData) {}
   override suspend fun saveComment(comment : String) {}
-  override suspend fun saveImage(image : Bitmap, filename : String) {}
+  override suspend fun saveImage(image : Bitmap, fileName : String) {}
 }
 
 class ClientHistory(private val fmarkHost : FMark, private val clientFolder : ClientFolder) : Fragment()
 {
   val name get() = clientFolder.name
+
+  // Main thread only
+  private var currentJob : Job? = null
 
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View?
   {
@@ -50,7 +58,7 @@ class ClientHistory(private val fmarkHost : FMark, private val clientFolder : Cl
     view.findViewById<LinearLayout>(R.id.new_session_button).setOnClickListener {
       GlobalScope.launch {
         val session = clientFolder.newSession()
-        GlobalScope.launch(Dispatchers.Main) {
+        launch(Dispatchers.Main) {
           fmarkHost.startSessionEditor(session)
         }
       }
@@ -67,21 +75,29 @@ class ClientHistory(private val fmarkHost : FMark, private val clientFolder : Cl
 
   private fun populateClientHistory(view : View)
   {
-    fmarkHost.insertSpinnerVisible = true
-    GlobalScope.launch {
-      val sessions = clientFolder.getSessions()
-      val inProgress = sessions.map { session -> LoadSession(session, async(start = CoroutineStart.LAZY) { session.openData() }) }
-      if (inProgress.isNotEmpty()) inProgress.first().data.start()
-
-      GlobalScope.launch(Dispatchers.Main) {
-        val list = view.findViewById<RecyclerView>(R.id.client_history)
-        if (null == list.adapter)
-        {
-          list.addItemDecoration(DividerItemDecoration(context, (list.layoutManager as LinearLayoutManager).orientation))
-          list.adapter = ClientHistoryAdapter(this@ClientHistory, inProgress)
+    GlobalScope.launch(Dispatchers.Main) {
+      // This works though currentJob is not locked because this always runs on the
+      // main thread courtesy of Dispatchers.Main. If it was not the case the
+      // insertSpinnerVisible = true instruction would crash, too.
+      if (null == currentJob)
+      {
+        fmarkHost.insertSpinnerVisible = true
+        currentJob = launch {
+          val sessions = clientFolder.getSessions()
+          val inProgress = sessions.map { session -> LoadSession(session, async(start = CoroutineStart.LAZY) { session.openData() }) }
+          if (inProgress.isNotEmpty()) inProgress.first().data.start()
+          withContext(Dispatchers.Main) {
+            val list = view.findViewById<RecyclerView>(R.id.client_history)
+            if (null == list.adapter)
+            {
+              list.addItemDecoration(DividerItemDecoration(context, (list.layoutManager as LinearLayoutManager).orientation))
+              list.adapter = ClientHistoryAdapter(this@ClientHistory, inProgress)
+            }
+            else (list.adapter as ClientHistoryAdapter).setSource(inProgress)
+            fmarkHost.insertSpinnerVisible = false
+            currentJob = null
+          }
         }
-        else (list.adapter as ClientHistoryAdapter).setSource(inProgress)
-        fmarkHost.insertSpinnerVisible = false
       }
     }
   }
@@ -114,25 +130,23 @@ private class ClientHistoryAdapter(private val parent : ClientHistory, private v
 
     private fun populate(session : LoadSession)
     {
-      if (DBGLOG) log("Populating with ${session.session.date} ${session.data}")
-      GlobalScope.launch(Dispatchers.Main) {
-        dateLabel.text = if (session.session !== EMPTY_SESSION) session.session.date.toShortString() else ""
-        val lastUpdateDateString = if (session.session !== EMPTY_SESSION) session.session.lastUpdateDate.toShortString() else ""
-        lastUpdateLabel.text = String.format(Locale.getDefault(), lastUpdateLabel.context.getString(R.string.update_time_with_placeholder), lastUpdateDateString)
-        if (session.data.isCompleted)
-        {
-          val completedData = session.data.getCompleted()
-          commentTextView.text = completedData.comment
-          faceImage.setImageResource(completedData.face.guideId)
-          faceImage.readData(completedData.face.data)
-          frontImage.setImageResource(completedData.front.guideId)
-          frontImage.readData(completedData.front.data)
-          backImage.setImageResource(completedData.back.guideId)
-          backImage.readData(completedData.back.data)
-          commentTextView.visibility = View.VISIBLE
-          loadingView.visibility = View.INVISIBLE
-        } else loadingView.visibility = View.VISIBLE
-      }
+      if (DBGLOG) log("Populating with ${session.session.date} ${if (session.data.isCompleted) session.data.getCompleted().comment else session.data}")
+      dateLabel.text = if (session.session !== EMPTY_SESSION) session.session.date.toShortString() else ""
+      val lastUpdateDateString = if (session.session !== EMPTY_SESSION) session.session.lastUpdateDate.toShortString() else ""
+      lastUpdateLabel.text = String.format(Locale.getDefault(), lastUpdateLabel.context.getString(R.string.update_time_with_placeholder), lastUpdateDateString)
+      if (session.data.isCompleted)
+      {
+        val completedData = session.data.getCompleted()
+        commentTextView.text = completedData.comment
+        faceImage.setImageResource(completedData.face.guideId)
+        faceImage.readData(completedData.face.data)
+        frontImage.setImageResource(completedData.front.guideId)
+        frontImage.readData(completedData.front.data)
+        backImage.setImageResource(completedData.back.guideId)
+        backImage.readData(completedData.back.data)
+        commentTextView.visibility = View.VISIBLE
+        loadingView.visibility = View.INVISIBLE
+      } else loadingView.visibility = View.VISIBLE
     }
     override fun onClick(v : View?) { adapter.startClientEditor(session.session) }
   }

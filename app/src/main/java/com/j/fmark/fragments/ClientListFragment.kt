@@ -14,12 +14,10 @@ import android.view.ViewGroup
 import android.widget.EditText
 import com.google.android.gms.common.api.ApiException
 import com.j.fmark.ClientAdapter
-import com.j.fmark.DBGLOG
 import com.j.fmark.FMark
 import com.j.fmark.R
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.FMarkRoot
-import com.j.fmark.log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -76,22 +74,16 @@ class ClientListFragment(private val fmarkHost : FMark, private val root : FMark
   // If refresh is requested, this function will request a sync to make sure the data is fresh.
   private fun populateClientList(delayMs : Long)
   {
-    if (DBGLOG) log("Starting populating client list...")
     val searchString = searchField?.text?.toString() ?: return
-    if (DBGLOG) log("With search string \"${searchString}\" and delay ${delayMs}")
     startSearch {
-      if (DBGLOG) log("1")
       if (delayMs > 0) delay(delayMs)
-      if (DBGLOG) log("2")
       try
       {
-        if (DBGLOG) log("3")
         if (refreshRequested)
         {
           root.clearCache()
           refreshRequested = false
         }
-        if (DBGLOG) log("4")
         readClients(if (searchString.isEmpty() or searchString.isBlank()) null else searchString)
       }
       catch (e : ApiException) // TODO : is this still useful ?
@@ -105,26 +97,19 @@ class ClientListFragment(private val fmarkHost : FMark, private val root : FMark
 
   private suspend fun readClients(searchString : String?)
   {
-    if (DBGLOG) log("5")
     val context = context ?: return
     val view = view ?: return
 
-    if (DBGLOG) log("Fetching client list...")
     val clientList = root.clientList(searchString, exactMatch = false)
-    if (DBGLOG) log("List fetched. ${clientList.count}")
 
     val list = view.findViewById<RecyclerView>(R.id.client_list)
     if (null == list.adapter)
     {
-      if (DBGLOG) log("Creating adapter")
       list.addItemDecoration(DividerItemDecoration(context, (list.layoutManager as LinearLayoutManager).orientation))
       list.adapter = ClientAdapter(clientList, this)
     }
     else
-    {
-      if (DBGLOG) log("Setting source on adapter")
       (list.adapter as ClientAdapter).setSource(clientList)
-    }
   }
 
   fun showClientDetails(clientFolder : ClientFolder) = fmarkHost.showClientDetails(clientFolder, root)

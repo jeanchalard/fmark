@@ -48,5 +48,5 @@ class ClientAdapter(private var source : ClientFolderList, private val clientLis
     holder.reading.text = source.reading
   }
 
-  fun notifyRenamed(clientFolder : ClientFolder) = notifyItemChanged(source.findIndex(clientFolder))
+  fun notifyRenamed(clientFolder : ClientFolder) = notifyItemChanged(source.indexOfFirst(clientFolder))
 }

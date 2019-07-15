@@ -15,6 +15,7 @@ import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.FDrive
 import com.j.fmark.fdrive.FMarkRoot
 import com.j.fmark.fdrive.LegacyFMarkRoot
+import com.j.fmark.fdrive.RESTFMarkRoot
 import com.j.fmark.fdrive.SessionFolder
 import com.j.fmark.fdrive.SignInException
 import com.j.fmark.fragments.ClientDetails
@@ -25,9 +26,10 @@ import com.j.fmark.fragments.SignInErrorFragment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
-const val USE_REST = false
+const val USE_REST = true
 
 class FMark : AppCompatActivity()
 {
@@ -54,7 +56,6 @@ class FMark : AppCompatActivity()
     supportFragmentManager.addOnBackStackChangedListener {
       val actionBar = supportActionBar ?: return@addOnBackStackChangedListener
       val fragment = lastFragment
-      if (DBGLOG) log("Fragment : ${fragment?.javaClass}")
       when (fragment) {
         is ClientListFragment -> actionBar.setTitle(R.string.titlebar_main)
         is ClientDetails      -> actionBar.setTitle(R.string.titlebar_client_details)
@@ -92,8 +93,7 @@ class FMark : AppCompatActivity()
 
   private suspend fun startClientList(account : GoogleSignInAccount)
   {
-    val root = LegacyFMarkRoot(this, account) //if (USE_REST) RESTFMarkRoot(this, account) else LegacyFMarkRoot(this, account)
-    if (DBGLOG) log("Root dir obtained ${root}")
+    val root = if (USE_REST) RESTFMarkRoot(this, account) else LegacyFMarkRoot(this, account)
     insertSpinnerVisible = false
     supportFragmentManager.beginTransaction().replace(R.id.list_fragment, ClientListFragment(this@FMark, root)).commit()
   }
@@ -190,8 +190,10 @@ class FMark : AppCompatActivity()
   suspend fun renameClient(clientFolder : ClientFolder, name : String, reading : String)
   {
     clientFolder.rename(name, reading)
-    supportFragmentManager.fragments.forEach {
-      if (it is ClientListFragment) it.notifyRenamed(clientFolder)
+    withContext(Dispatchers.Main) {
+      supportFragmentManager.fragments.forEach {
+        if (it is ClientListFragment) it.notifyRenamed(clientFolder)
+      }
     }
   }
 }
