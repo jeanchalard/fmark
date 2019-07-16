@@ -2,8 +2,8 @@ package com.j.fmark.fragments
 
 import android.content.Context
 import android.os.Bundle
-import android.support.v4.app.DialogFragment
-import android.support.v7.app.AlertDialog
+import androidx.fragment.app.DialogFragment
+import androidx.appcompat.app.AlertDialog
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -41,7 +41,7 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
       view.findViewById<TextView>(R.id.client_details_creation_date_value)?.text = formatDate(now)
       view.findViewById<TextView>(R.id.client_details_last_update_date_value)?.text = formatDate(now)
     }
-    dialog.window.setBackgroundDrawableResource(R.drawable.rounded_square)
+    dialog?.window?.setBackgroundDrawableResource(R.drawable.rounded_square)
     return view
   }
 

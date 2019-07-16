@@ -2,17 +2,16 @@ package com.j.fmark.fragments
 
 import android.graphics.Bitmap
 import android.os.Bundle
-import android.support.annotation.MainThread
-import android.support.v4.app.Fragment
-import android.support.v7.widget.DividerItemDecoration
-import android.support.v7.widget.LinearLayoutManager
-import android.support.v7.widget.RecyclerView
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.DividerItemDecoration
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.j.fmark.CanvasView
 import com.j.fmark.DBGLOG
 import com.j.fmark.FMark
@@ -22,7 +21,6 @@ import com.j.fmark.SessionData
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.SessionFolder
 import com.j.fmark.log
-import com.j.fmark.logStackTrace
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -33,7 +31,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
-import java.util.concurrent.atomic.AtomicReference
 
 private data class LoadSession(val session : SessionFolder, val data : Deferred<SessionData>)
 val EMPTY_SESSION = object : SessionFolder {
@@ -130,7 +127,7 @@ private class ClientHistoryAdapter(private val parent : ClientHistory, private v
 
     private fun populate(session : LoadSession)
     {
-      if (DBGLOG) log("Populating with ${session.session.date} ${if (session.data.isCompleted) session.data.getCompleted().comment else session.data}")
+      if (DBGLOG) log("Populating with ${session.session.date} ${if (session.data.isCompleted) session.data.getCompleted().comment else session.data.toString()}")
       dateLabel.text = if (session.session !== EMPTY_SESSION) session.session.date.toShortString() else ""
       val lastUpdateDateString = if (session.session !== EMPTY_SESSION) session.session.lastUpdateDate.toShortString() else ""
       lastUpdateLabel.text = String.format(Locale.getDefault(), lastUpdateLabel.context.getString(R.string.update_time_with_placeholder), lastUpdateDateString)

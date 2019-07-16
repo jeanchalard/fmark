@@ -1,10 +1,10 @@
 package com.j.fmark
 
-import android.support.v7.widget.RecyclerView
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.recyclerview.widget.RecyclerView
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.ClientFolderList
 import com.j.fmark.fragments.ClientListFragment
