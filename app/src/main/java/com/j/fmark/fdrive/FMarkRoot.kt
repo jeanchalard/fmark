@@ -22,18 +22,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
-interface FMarkRoot
-{
+interface FMarkRoot {
   suspend fun clearCache()
   suspend fun clientList(searchString : String? = null, exactMatch : Boolean = true) : ClientFolderList
   suspend fun createClient(name : String, reading : String) : ClientFolder
 }
 
 suspend fun RESTFMarkRoot(context : Context, account : GoogleSignInAccount) : RESTFMarkRoot = RESTFMarkRoot.make(context, account)
-class RESTFMarkRoot(private val drive : Drive, private val rootFolder : File) : FMarkRoot
-{
-  companion object
-  {
+class RESTFMarkRoot(private val drive : Drive, private val rootFolder : File) : FMarkRoot {
+  companion object {
     suspend fun make(context : Context, account : GoogleSignInAccount) : RESTFMarkRoot {
       val credential = GoogleAccountCredential.usingOAuth2(context, arrayListOf(DriveScopes.DRIVE_FILE))
       credential.selectedAccount = account.account
@@ -59,10 +56,8 @@ class RESTFMarkRoot(private val drive : Drive, private val rootFolder : File) : 
 }
 
 suspend fun LegacyFMarkRoot(context : Context, account : GoogleSignInAccount) : LegacyFMarkRoot = LegacyFMarkRoot.make(context, account)
-class LegacyFMarkRoot private constructor(private val driveClient : DriveClient, private val resourceClient : DriveResourceClient, private val rootFolder : DriveFolder) : FMarkRoot
-{
-  companion object
-  {
+class LegacyFMarkRoot private constructor(private val driveClient : DriveClient, private val resourceClient : DriveResourceClient, private val rootFolder : DriveFolder) : FMarkRoot {
+  companion object {
     suspend fun make(context : Context, account : GoogleSignInAccount) : LegacyFMarkRoot {
       val resourceClient = com.google.android.gms.drive.Drive.getDriveResourceClient(context, account)
       val driveClient = com.google.android.gms.drive.Drive.getDriveClient(context, account)
@@ -75,8 +70,7 @@ class LegacyFMarkRoot private constructor(private val driveClient : DriveClient,
     driveClient.requestSync()?.await()
   }
 
-  override suspend fun clientList(searchString : String?, exactMatch : Boolean) : ClientFolderList
-  {
+  override suspend fun clientList(searchString : String?, exactMatch : Boolean) : ClientFolderList {
     val query = Query.Builder().apply {
       if (null != searchString)
         addFilter(if (exactMatch) Filters.eq(SearchableField.TITLE, searchString) else Filters.contains(SearchableField.TITLE, searchString))
@@ -86,8 +80,7 @@ class LegacyFMarkRoot private constructor(private val driveClient : DriveClient,
     return LegacyClientFolderList(resourceClient.queryChildren(rootFolder, query).await(), resourceClient)
   }
 
-  override suspend fun createClient(name : String, reading : String) : ClientFolder
-  {
+  override suspend fun createClient(name : String, reading : String) : ClientFolder {
     val folder = resourceClient.createFolder(rootFolder, FDrive.metadataForClient(name, reading)).await()
     return LegacyClientFolder(resourceClient.getMetadata(folder).await(), resourceClient)
   }

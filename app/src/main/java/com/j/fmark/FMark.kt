@@ -2,13 +2,13 @@ package com.j.fmark
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.fragment.app.Fragment
-import androidx.appcompat.app.AppCompatActivity
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.Fragment
 import com.google.android.gms.auth.api.Auth
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.j.fmark.fdrive.ClientFolder
@@ -31,8 +31,7 @@ import java.util.Locale
 
 const val USE_REST = true
 
-class FMark : AppCompatActivity()
-{
+class FMark : AppCompatActivity() {
   private val lastFragment : Fragment?
     get() = supportFragmentManager.fragments.lastOrNull()
   private lateinit var topSpinner : View
@@ -45,8 +44,7 @@ class FMark : AppCompatActivity()
     set(v) { insertSpinner.visibility = if (v) View.VISIBLE else View.GONE }
   lateinit var saveIndicator : SaveIndicator
 
-  override fun onCreate(icicle : Bundle?)
-  {
+  override fun onCreate(icicle : Bundle?) {
     super.onCreate(null)
     setContentView(R.layout.activity_fmark)
     findViewById<View>(R.id.list_fragment).clipToOutline = true // This should be set in XML but a bug in the resource parser makes it impossible
@@ -55,8 +53,7 @@ class FMark : AppCompatActivity()
     saveIndicator = createSaveIndicator(findViewById<FrameLayout>(R.id.action_bar_container))
     supportFragmentManager.addOnBackStackChangedListener {
       val actionBar = supportActionBar ?: return@addOnBackStackChangedListener
-      val fragment = lastFragment
-      when (fragment) {
+      when (val fragment = lastFragment) {
         is ClientListFragment -> actionBar.setTitle(R.string.titlebar_main)
         is ClientDetails      -> actionBar.setTitle(R.string.titlebar_client_details)
         is ClientHistory      -> { fragment.onResume(); actionBar.title = String.format(Locale.getDefault(), getString(R.string.titlebar_editor), fragment.name) }
@@ -66,20 +63,17 @@ class FMark : AppCompatActivity()
     startSignIn()
   }
 
-  private fun createSaveIndicator(parent : ViewGroup) : SaveIndicator
-  {
+  private fun createSaveIndicator(parent : ViewGroup) : SaveIndicator {
     val indicator = layoutInflater.inflate(R.layout.save_indicator, parent, false) as SaveIndicator
     parent.addView(indicator)
     return indicator
   }
 
-  private fun startSignIn()
-  {
+  private fun startSignIn() {
     if (DBGLOG) log("Starting sign in...")
     insertSpinnerVisible = true
     GlobalScope.launch(Dispatchers.Main) {
-      try
-      {
+      try {
         if (DBGLOG) log("Getting account...")
         val account = FDrive.getAccount(this@FMark, GOOGLE_SIGN_IN_CODE)
         if (DBGLOG) log("Account : ${account}")
@@ -91,29 +85,25 @@ class FMark : AppCompatActivity()
     }
   }
 
-  private suspend fun startClientList(account : GoogleSignInAccount)
-  {
+  private suspend fun startClientList(account : GoogleSignInAccount) {
     val root = if (USE_REST) RESTFMarkRoot(this, account) else LegacyFMarkRoot(this, account)
     insertSpinnerVisible = false
     supportFragmentManager.beginTransaction().replace(R.id.list_fragment, ClientListFragment(this@FMark, root)).commit()
   }
 
   fun offlineError(msgId : Int) = offlineError(resources.getString(msgId))
-  private fun offlineError(msg : String?)
-  {
+  private fun offlineError(msg : String?) {
     supportFragmentManager.beginTransaction().replace(R.id.list_fragment, SignInErrorFragment(msg, ::startSignIn)).commit()
   }
 
-  override fun onBackPressed()
-  {
+  override fun onBackPressed() {
     when (val fragment = lastFragment) {
       is FEditor -> fragment.onBackPressed()
-      else -> super.onBackPressed()
+      else       -> super.onBackPressed()
     }
   }
 
-  override fun onPrepareOptionsMenu(menu : Menu?) : Boolean
-  {
+  override fun onPrepareOptionsMenu(menu : Menu?) : Boolean {
     if (null == menu) return super.onPrepareOptionsMenu(menu)
     val isHome = when (lastFragment) {
       is ClientListFragment, is ClientDetails -> true
@@ -127,14 +117,12 @@ class FMark : AppCompatActivity()
     return super.onPrepareOptionsMenu(menu)
   }
 
-  override fun onCreateOptionsMenu(menu : Menu) : Boolean
-  {
+  override fun onCreateOptionsMenu(menu : Menu) : Boolean {
     menuInflater.inflate(R.menu.menu_feditor, menu)
     return super.onCreateOptionsMenu(menu)
   }
 
-  override fun onOptionsItemSelected(item : MenuItem?) : Boolean
-  {
+  override fun onOptionsItemSelected(item : MenuItem?) : Boolean {
     val fragment = lastFragment
     when (fragment) {
       is FEditor            -> return fragment.onOptionsItemSelected(item)
@@ -143,28 +131,23 @@ class FMark : AppCompatActivity()
     return super.onOptionsItemSelected(item)
   }
 
-  override fun onActivityResult(requestCode : Int, resultCode : Int, data : Intent?)
-  {
+  override fun onActivityResult(requestCode : Int, resultCode : Int, data : Intent?) {
     super.onActivityResult(requestCode, resultCode, data)
     if (GOOGLE_SIGN_IN_CODE != requestCode) return // How did the control get here ?
     onSignIn(data)
   }
 
-  private fun onSignIn(data : Intent?)
-  {
+  private fun onSignIn(data : Intent?) {
     val signInResult = Auth.GoogleSignInApi.getSignInResultFromIntent(data)
     val account = signInResult.signInAccount
-    if (!signInResult.isSuccess || null == account)
-    {
+    if (!signInResult.isSuccess || null == account) {
       findViewById<View>(R.id.insert_loading).visibility = View.GONE
       offlineError(R.string.sign_in_fail_eventual)
-    }
-    else
+    } else
       GlobalScope.launch(Dispatchers.Main) { startClientList(account) }
   }
 
-  fun showClientDetails(clientFolder : ClientFolder?, root : FMarkRoot)
-  {
+  fun showClientDetails(clientFolder : ClientFolder?, root : FMarkRoot) {
     val f = ClientDetails(this, clientFolder, root)
     val transaction = supportFragmentManager.beginTransaction()
      .addToBackStack(null)
@@ -177,8 +160,7 @@ class FMark : AppCompatActivity()
     .replace(R.id.list_fragment, ClientHistory(this, clientFolder), "client")
     .commit()
 
-  fun startSessionEditor(sessionFolder : SessionFolder)
-  {
+  fun startSessionEditor(sessionFolder : SessionFolder) {
     val fEditor = FEditor(this, sessionFolder)
     supportFragmentManager.beginTransaction().apply {
       addToBackStack("editor")
@@ -187,8 +169,7 @@ class FMark : AppCompatActivity()
   }
 
   // TODO : remove this function and have listeners on the ClientFolder object
-  suspend fun renameClient(clientFolder : ClientFolder, name : String, reading : String)
-  {
+  suspend fun renameClient(clientFolder : ClientFolder, name : String, reading : String) {
     clientFolder.rename(name, reading)
     withContext(Dispatchers.Main) {
       supportFragmentManager.fragments.forEach {

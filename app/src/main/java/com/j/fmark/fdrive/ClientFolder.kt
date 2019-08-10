@@ -21,8 +21,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
-interface ClientFolder
-{
+interface ClientFolder {
   val driveId : String
   val name : String
   val reading : String
@@ -33,15 +32,13 @@ interface ClientFolder
   suspend fun getSessions() : SessionFolderList
 }
 
-interface ClientFolderList
-{
+interface ClientFolderList {
   val count : Int
   operator fun get(i : Int) : ClientFolder
   fun indexOfFirst(folder : ClientFolder) : Int
 }
 
-class RESTClientFolder(private val drive : Drive, private val clientFolder : File) : ClientFolder
-{
+class RESTClientFolder(private val drive : Drive, private val clientFolder : File) : ClientFolder {
   override val driveId : String = clientFolder.id
   override val name = decodeName(clientFolder.name)
   override val reading = decodeReading(clientFolder.name)
@@ -61,8 +58,7 @@ class RESTClientFolder(private val drive : Drive, private val clientFolder : Fil
   }
 }
 
-class RESTClientFolderList(private val drive : Drive, private val folders : List<File>) : ClientFolderList
-{
+class RESTClientFolderList(private val drive : Drive, private val folders : List<File>) : ClientFolderList {
   override val count = folders.size
   override fun get(i : Int) = RESTClientFolder(drive, folders[i])
   override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.id == folder.driveId }
@@ -78,14 +74,12 @@ class LegacyClientFolder(private val metadata : Metadata, private val resourceCl
   override suspend fun rename(name : String, reading : String) =
    LegacyClientFolder(resourceClient.updateMetadata(metadata.driveId.asDriveFolder(), FDrive.metadataForClient(name, reading)).await(), resourceClient)
 
-  override suspend fun newSession() : SessionFolder
-  {
+  override suspend fun newSession() : SessionFolder {
     val folder = resourceClient.createFolder(metadata.driveId.asDriveFolder(), FDrive.metadataForSession(LocalSecond(System.currentTimeMillis()))).await()
     return LegacySessionFolder(resourceClient.getMetadata(folder).await(), resourceClient)
   }
 
-  override suspend fun getSessions() : SessionFolderList
-  {
+  override suspend fun getSessions() : SessionFolderList {
     val clientFolder = metadata.driveId.asDriveFolder()
     val query = Query.Builder().apply {
       addFilter(Filters.eq(SearchableField.TRASHED, false))
@@ -96,12 +90,10 @@ class LegacyClientFolder(private val metadata : Metadata, private val resourceCl
   }
 }
 
-class LegacyClientFolderList(private val buffer : MetadataBuffer, private val resourceClient : DriveResourceClient) : ClientFolderList
-{
+class LegacyClientFolderList(private val buffer : MetadataBuffer, private val resourceClient : DriveResourceClient) : ClientFolderList {
   override val count = buffer.count
   override fun get(i : Int) : ClientFolder = LegacyClientFolder(buffer[i], resourceClient)
-  override fun indexOfFirst(folder : ClientFolder) : Int
-  {
+  override fun indexOfFirst(folder : ClientFolder) : Int {
     buffer.forEachIndexed { index, it -> if (folder.driveId == it.driveId.encodeToString()) return index }
     return -1
   }

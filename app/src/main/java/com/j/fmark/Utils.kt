@@ -22,8 +22,7 @@ fun formatDate(date : Long) : String = LocalSecond(date).toDateString()
 private fun roundTo(v : Long, granularity : Long) = (v % granularity).let { mod -> if (mod * 2 > granularity) v + granularity - mod else v - mod }
 
 // Simple and stupid utility that's not very useful for real stuff but is vastly easier to use than the classes that are
-data class LocalSecond(val year : Int, val month : Int, val day : Int, val hour : Int, val minute : Int, val second : Int)
-{
+data class LocalSecond(val year : Int, val month : Int, val day : Int, val hour : Int, val minute : Int, val second : Int) {
   private constructor(gc : GregorianCalendar) : this(gc.get(Calendar.YEAR), 1 + gc.get(Calendar.MONTH), gc.get(Calendar.DATE),
    gc.get(Calendar.HOUR_OF_DAY), gc.get(Calendar.MINUTE), gc.get(Calendar.SECOND))
   constructor(t : Long) : this(GregorianCalendar().apply { timeInMillis = roundTo(t, 30 * 60 * 1000) })
@@ -36,8 +35,7 @@ data class LocalSecond(val year : Int, val month : Int, val day : Int, val hour 
 }
 
 class IllegalDateException(s : String) : Exception(s)
-fun parseLocalSecond(s : String) : LocalSecond
-{
+fun parseLocalSecond(s : String) : LocalSecond {
   val r = Regex("(\\d\\d\\d\\d)-(\\d\\d)-(\\d\\d) (\\d\\d):(\\d\\d):(\\d\\d)").matchEntire(s)?.groupValues ?: throw IllegalDateException(s)
   return LocalSecond(r[1].toInt(), r[2].toInt(), r[3].toInt(), r[4].toInt(), r[5].toInt(), r[6].toInt())
 }

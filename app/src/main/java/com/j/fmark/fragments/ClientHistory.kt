@@ -33,6 +33,7 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 private data class LoadSession(val session : SessionFolder, val data : Deferred<SessionData>)
+
 val EMPTY_SESSION = object : SessionFolder {
   override val date : LocalSecond get() = LocalSecond(System.currentTimeMillis())
   override val lastUpdateDate : LocalSecond get() = LocalSecond(System.currentTimeMillis())
@@ -42,15 +43,13 @@ val EMPTY_SESSION = object : SessionFolder {
   override suspend fun saveImage(image : Bitmap, fileName : String) {}
 }
 
-class ClientHistory(private val fmarkHost : FMark, private val clientFolder : ClientFolder) : Fragment()
-{
+class ClientHistory(private val fmarkHost : FMark, private val clientFolder : ClientFolder) : Fragment() {
   val name get() = clientFolder.name
 
   // Main thread only
   private var currentJob : Job? = null
 
-  override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View?
-  {
+  override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View? {
     val view = inflater.inflate(R.layout.fragment_client_history, container, false)
     view.findViewById<LinearLayout>(R.id.new_session_button).setOnClickListener {
       GlobalScope.launch {
@@ -64,20 +63,17 @@ class ClientHistory(private val fmarkHost : FMark, private val clientFolder : Cl
     return view
   }
 
-  override fun onResume()
-  {
+  override fun onResume() {
     super.onResume()
     view?.let { populateClientHistory(it) }
   }
 
-  private fun populateClientHistory(view : View)
-  {
+  private fun populateClientHistory(view : View) {
     GlobalScope.launch(Dispatchers.Main) {
       // This works though currentJob is not locked because this always runs on the
       // main thread courtesy of Dispatchers.Main. If it was not the case the
       // insertSpinnerVisible = true instruction would crash, too.
-      if (null == currentJob)
-      {
+      if (null == currentJob) {
         fmarkHost.insertSpinnerVisible = true
         currentJob = launch {
           val sessions = clientFolder.getSessions()
@@ -85,12 +81,10 @@ class ClientHistory(private val fmarkHost : FMark, private val clientFolder : Cl
           if (inProgress.isNotEmpty()) inProgress.first().data.start()
           withContext(Dispatchers.Main) {
             val list = view.findViewById<RecyclerView>(R.id.client_history)
-            if (null == list.adapter)
-            {
+            if (null == list.adapter) {
               list.addItemDecoration(DividerItemDecoration(context, (list.layoutManager as LinearLayoutManager).orientation))
               list.adapter = ClientHistoryAdapter(this@ClientHistory, inProgress)
-            }
-            else (list.adapter as ClientHistoryAdapter).setSource(inProgress)
+            } else (list.adapter as ClientHistoryAdapter).setSource(inProgress)
             fmarkHost.insertSpinnerVisible = false
             currentJob = null
           }
@@ -102,10 +96,8 @@ class ClientHistory(private val fmarkHost : FMark, private val clientFolder : Cl
   fun startSessionEditor(sessionFolder : SessionFolder) = fmarkHost.startSessionEditor(sessionFolder)
 }
 
-private class ClientHistoryAdapter(private val parent : ClientHistory, private var source : List<LoadSession>) : RecyclerView.Adapter<ClientHistoryAdapter.Holder>()
-{
-  class Holder(private val adapter : ClientHistoryAdapter, view : View) : RecyclerView.ViewHolder(view), View.OnClickListener
-  {
+private class ClientHistoryAdapter(private val parent : ClientHistory, private var source : List<LoadSession>) : RecyclerView.Adapter<ClientHistoryAdapter.Holder>() {
+  class Holder(private val adapter : ClientHistoryAdapter, view : View) : RecyclerView.ViewHolder(view), View.OnClickListener {
     init { view.setOnClickListener(this) }
 
     private val dateLabel : TextView = view.findViewById(R.id.client_history_date)
@@ -117,22 +109,19 @@ private class ClientHistoryAdapter(private val parent : ClientHistory, private v
     private val backImage : CanvasView = view.findViewById<CanvasView>(R.id.client_history_back).also { it.setImageResource(R.drawable.back) }
 
     var session : LoadSession = LoadSession(EMPTY_SESSION, CompletableDeferred())
-      set(session)
-      {
+      set(session) {
         field = session
         if (DBGLOG) log("Setting session ${session.session.date} in ${this}")
         session.data.invokeOnCompletion { populate(session) }
         if (!session.data.isActive) session.data.start().also { log("Start loading ${session.session.date} now") }
       }
 
-    private fun populate(session : LoadSession)
-    {
+    private fun populate(session : LoadSession) {
       if (DBGLOG) log("Populating with ${session.session.date} ${if (session.data.isCompleted) session.data.getCompleted().comment else session.data.toString()}")
       dateLabel.text = if (session.session !== EMPTY_SESSION) session.session.date.toShortString() else ""
       val lastUpdateDateString = if (session.session !== EMPTY_SESSION) session.session.lastUpdateDate.toShortString() else ""
       lastUpdateLabel.text = String.format(Locale.getDefault(), lastUpdateLabel.context.getString(R.string.update_time_with_placeholder), lastUpdateDateString)
-      if (session.data.isCompleted)
-      {
+      if (session.data.isCompleted) {
         val completedData = session.data.getCompleted()
         commentTextView.text = completedData.comment
         faceImage.setImageResource(completedData.face.guideId)
@@ -145,18 +134,19 @@ private class ClientHistoryAdapter(private val parent : ClientHistory, private v
         loadingView.visibility = View.INVISIBLE
       } else loadingView.visibility = View.VISIBLE
     }
-    override fun onClick(v : View?) { adapter.startClientEditor(session.session) }
+
+    override fun onClick(v : View?) {
+      adapter.startClientEditor(session.session)
+    }
   }
 
   override fun getItemCount() : Int = source.size
   override fun onCreateViewHolder(parent : ViewGroup, viewType : Int) : Holder = Holder(this, LayoutInflater.from(parent.context).inflate(R.layout.client_history_view, parent, false))
-  override fun onBindViewHolder(holder : Holder, position : Int)
-  {
+  override fun onBindViewHolder(holder : Holder, position : Int) {
     holder.session = source[position]
   }
 
-  fun setSource(source : List<LoadSession>)
-  {
+  fun setSource(source : List<LoadSession>) {
     this.source = source
     notifyDataSetChanged()
   }

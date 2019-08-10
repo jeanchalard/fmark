@@ -26,8 +26,8 @@ import java.util.concurrent.ExecutionException
 
 const val NECESSARY_FIELDS = "id,name,parents,createdTime,modifiedTime"
 const val NECESSARY_FIELDS_EXPRESSION = "files(${NECESSARY_FIELDS})"
-object FDrive
-{
+
+object FDrive {
   fun encodeClientFolderName(name : String, reading : String) = "${name} -- ${reading}"
   fun encodeSessionFolderName(date : LocalSecond) = date.toString()
   fun encodeIndexableText(name : String, reading : String) = "${name} ${reading}"
@@ -35,22 +35,17 @@ object FDrive
   fun decodeName(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[0] else folderName
   fun decodeReading(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[1] else folderName
 
-  suspend fun getAccount(c : Activity, resultCode : Int) : GoogleSignInAccount?
-  {
+  suspend fun getAccount(c : Activity, resultCode : Int) : GoogleSignInAccount? {
     val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
      .requestScopes(com.google.android.gms.drive.Drive.SCOPE_FILE)
      .build()
     val client = GoogleSignIn.getClient(c, options)
     val signInTask = client.silentSignIn()
-    try
-    {
+    try {
       if (signInTask.isSuccessful) return signInTask.result ?: throw SignInException(c.getString(R.string.sign_in_fail_instant))
       return signInTask.await() ?: throw SignInException(c.getString(R.string.sign_in_fail_eventual))
-    }
-    catch (e : Exception)
-    {
-      when (e)
-      {
+    } catch (e : Exception) {
+      when (e) {
         is ExecutionException, is ApiException -> c.startActivityForResult(client.signInIntent, resultCode)
       }
     }
@@ -58,7 +53,7 @@ object FDrive
   }
 
   suspend fun getFMarkFolder(drive : Drive, context : Context) : File = withContext(Dispatchers.Default) {
-    FDrive.getFolder(drive, context.getString(R.string.fmark_root_directory))
+    getFolder(drive, context.getString(R.string.fmark_root_directory))
   }
 
   suspend fun getFolders(drive : Drive, parentFolder : File, name : String? = null, exactMatch : Boolean = true) : List<File> {
@@ -72,8 +67,7 @@ object FDrive
     }.executeFully()
   }
 
-  suspend fun getFolder(drive : Drive, name : String) : File
-  {
+  suspend fun getFolder(drive : Drive, name : String) : File {
     var folder = File().setId("root")
     MainScope().launch(Dispatchers.IO) {
       name.split(Regex("/")).forEach { component ->
@@ -81,8 +75,7 @@ object FDrive
          .setQ("name = '${component}' and '${folder.id}' in parents and trashed = false and mimeType = '$FOLDER_MIME_TYPE'")
          .setFields(NECESSARY_FIELDS_EXPRESSION)
          .execute()?.files
-        folder = when
-        {
+        folder = when {
           null == filelist || filelist.size == 0 -> createFolder(drive, folder, component)
           filelist.size == 1                     -> filelist[0]
           else                                   -> throw NotUniqueException(name)
@@ -93,14 +86,12 @@ object FDrive
   }
 
   // TODO : factor together with the above
-  suspend fun getDriveFile(drive : Drive, name : String, parentFolder : File) : File
-  {
+  suspend fun getDriveFile(drive : Drive, name : String, parentFolder : File) : File {
     val filelist = drive.files().list()
      .setQ("name = '${name}' and '${parentFolder.id}' in parents and trashed = false")
      .setFields(NECESSARY_FIELDS_EXPRESSION)
      .execute()?.files
-    return when
-    {
+    return when {
       null == filelist || filelist.size == 0 -> createFile(drive, parentFolder, name)
       filelist.size == 1                     -> filelist[0]
       else                                   -> throw NotUniqueException(name)
@@ -108,8 +99,7 @@ object FDrive
   }
 
   suspend fun createFolder(drive : Drive, parentFolder : File, name : String) : File = createFile(drive, parentFolder, name, FOLDER_MIME_TYPE)
-  suspend fun createFile(drive : Drive, parentFolder : File, name : String, mimeType : String = BINDATA_MIME_TYPE) : File
-  {
+  suspend fun createFile(drive : Drive, parentFolder : File, name : String, mimeType : String = BINDATA_MIME_TYPE) : File {
     val newFile = File().setName(name).setMimeType(mimeType).setParents(listOf(parentFolder.id))
     return drive.files().create(newFile).setFields(NECESSARY_FIELDS).execute()
   }
@@ -117,8 +107,7 @@ object FDrive
   // Legacy API stuff
   private fun newFolderChangeset(name : String) : MetadataChangeSet = MetadataChangeSet.Builder().setTitle(name).setMimeType(DriveFolder.MIME_TYPE).build()
 
-  suspend fun getFolder(resourceClient : DriveResourceClient, name : String) : DriveFolder
-  {
+  suspend fun getFolder(resourceClient : DriveResourceClient, name : String) : DriveFolder {
     var currentFolder = resourceClient.rootFolder.await()
     name.split(Regex("/")).forEach {
       val buffer : MetadataBuffer = resourceClient.query(Query.Builder()
@@ -126,8 +115,7 @@ object FDrive
        .addFilter(Filters.`in`(SearchableField.PARENTS, currentFolder.driveId))
        .addFilter(Filters.eq(SearchableField.TRASHED, false))
        .build()).await()
-      currentFolder = when
-      {
+      currentFolder = when {
         1 != buffer.count -> throw NotUniqueException(name)
         0 == buffer.count -> resourceClient.createFolder(currentFolder, newFolderChangeset(it)).await()
         else              -> buffer[0].let { metadata -> if (!metadata.isFolder) throw NotAFolderException(metadata.title) else metadata.driveId.asDriveFolder() }

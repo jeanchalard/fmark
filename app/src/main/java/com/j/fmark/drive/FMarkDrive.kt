@@ -18,13 +18,11 @@ import com.j.fmark.parseLocalSecond
 import kotlinx.coroutines.tasks.await
 import java.io.IOException
 
-suspend fun renameFolder(drive : Drive, clientFolder : File, newName : String, reading : String) : File? = try
-{
+suspend fun renameFolder(drive : Drive, clientFolder : File, newName : String, reading : String) : File? = try {
   drive.files().update(clientFolder.id, clientFolder.apply { this.name = encodeClientFolderName(newName, reading) }).execute()
 } catch (e : IOException) { null }
 
-suspend fun DriveResourceClient.findFile(clientFolder : DriveFolder, fileName : String) : DriveFile?
-{
+suspend fun DriveResourceClient.findFile(clientFolder : DriveFolder, fileName : String) : DriveFile? {
   val query = Query.Builder()
    .addFilter(Filters.eq(SearchableField.TITLE, fileName))
    .addFilter(Filters.eq(SearchableField.TRASHED, false))

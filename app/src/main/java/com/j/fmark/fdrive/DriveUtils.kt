@@ -7,8 +7,7 @@ import kotlinx.coroutines.withContext
 
 const val FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
 
-suspend fun Drive.Files.List.executeFully() : List<File>
-{
+suspend fun Drive.Files.List.executeFully() : List<File> {
   val list = this
   return withContext(Dispatchers.IO) {
     val result = ArrayList<File>()

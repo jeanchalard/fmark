@@ -1,6 +1,5 @@
 package com.j.fmark
 
-object ErrorHandling
-{
+object ErrorHandling {
   fun unableToSave() {}
 }
