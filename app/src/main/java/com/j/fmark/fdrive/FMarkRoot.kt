@@ -15,12 +15,15 @@ import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
-import com.google.api.services.drive.model.File
+import com.j.fmark.CREATION_DATE_FILE_NAME
+import com.google.api.services.drive.model.File as DriveFile
 import com.j.fmark.R
 import com.j.fmark.fdrive.FDrive.encodeClientFolderName
+import com.j.fmark.toBytes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import java.io.File
 
 interface FMarkRoot {
   suspend fun clearCache()
@@ -28,8 +31,28 @@ interface FMarkRoot {
   suspend fun createClient(name : String, reading : String) : ClientFolder
 }
 
+suspend fun LocalDiskFMarkRoot(context : Context) : LocalDiskFMarkRoot = LocalDiskFMarkRoot.make(context)
+class LocalDiskFMarkRoot private constructor (private val context : Context, private val root : File) : FMarkRoot {
+  companion object {
+    suspend fun make(context : Context) : LocalDiskFMarkRoot = LocalDiskFMarkRoot(context, context.cacheDir.resolve(context.getString(R.string.fmark_root_directory)))
+  }
+
+  init {
+    android.util.Log.e("ROOT", root.toString())
+    if (!root.exists()) root.mkdir()
+  }
+
+  override suspend fun clearCache() = Unit // No cache for local files
+  override suspend fun clientList(searchString : String?, exactMatch : Boolean) : LocalDiskClientFolderList =
+   LocalDiskClientFolderList(if (searchString == null)
+     root.listFiles().toList()
+   else
+     root.listFiles().filter { if (exactMatch) it.name == searchString else it.name.contains(searchString) })
+  override suspend fun createClient(name : String, reading : String) : LocalDiskClientFolder = LocalDiskClientFolder(root.resolve(encodeClientFolderName(name, reading)))
+}
+
 suspend fun RESTFMarkRoot(context : Context, account : GoogleSignInAccount) : RESTFMarkRoot = RESTFMarkRoot.make(context, account)
-class RESTFMarkRoot(private val drive : Drive, private val rootFolder : File) : FMarkRoot {
+class RESTFMarkRoot private constructor(private val drive : Drive, private val rootFolder : DriveFile) : FMarkRoot {
   companion object {
     suspend fun make(context : Context, account : GoogleSignInAccount) : RESTFMarkRoot {
       val credential = GoogleAccountCredential.usingOAuth2(context, arrayListOf(DriveScopes.DRIVE_FILE))

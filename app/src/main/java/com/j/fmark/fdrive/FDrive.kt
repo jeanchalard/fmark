@@ -17,6 +17,7 @@ import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
 import com.j.fmark.LocalSecond
 import com.j.fmark.R
+import com.j.fmark.parseLocalSecond
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
@@ -34,6 +35,7 @@ object FDrive {
 
   fun decodeName(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[0] else folderName
   fun decodeReading(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[1] else folderName
+  fun decodeSessionFolderName(name : String) = parseLocalSecond(name)
 
   suspend fun getAccount(c : Activity, resultCode : Int) : GoogleSignInAccount? {
     val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)

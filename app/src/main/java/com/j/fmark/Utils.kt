@@ -39,3 +39,6 @@ fun parseLocalSecond(s : String) : LocalSecond {
   val r = Regex("(\\d\\d\\d\\d)-(\\d\\d)-(\\d\\d) (\\d\\d):(\\d\\d):(\\d\\d)").matchEntire(s)?.groupValues ?: throw IllegalDateException(s)
   return LocalSecond(r[1].toInt(), r[2].toInt(), r[3].toInt(), r[4].toInt(), r[5].toInt(), r[6].toInt())
 }
+
+fun ByteArray.toLong() = if (size != Long.SIZE_BYTES) throw NumberFormatException() else fold(0L) { acc, b -> acc shl 8 + b }
+fun Long.toBytes() = ByteArray(Long.SIZE_BYTES) { index -> ((this shr (index * 8)) and 0xFF).toByte() }

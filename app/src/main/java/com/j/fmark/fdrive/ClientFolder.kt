@@ -9,17 +9,19 @@ import com.google.android.gms.drive.query.SearchableField
 import com.google.android.gms.drive.query.SortOrder
 import com.google.android.gms.drive.query.SortableField
 import com.google.api.services.drive.Drive
-import com.google.api.services.drive.model.File
+import com.j.fmark.CREATION_DATE_FILE_NAME
 import com.j.fmark.LocalSecond
 import com.j.fmark.fdrive.FDrive.decodeName
 import com.j.fmark.fdrive.FDrive.decodeReading
 import com.j.fmark.fdrive.FDrive.encodeClientFolderName
 import com.j.fmark.fdrive.FDrive.encodeSessionFolderName
+import com.j.fmark.toBytes
+import com.j.fmark.toLong
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import java.io.File
+import com.google.api.services.drive.model.File as DriveFile
 
 interface ClientFolder {
   val driveId : String
@@ -38,27 +40,75 @@ interface ClientFolderList {
   fun indexOfFirst(folder : ClientFolder) : Int
 }
 
-class RESTClientFolder(private val drive : Drive, private val clientFolder : File) : ClientFolder {
+/*
+abstract class BaseCachedClientFolder(protected val underlying : Deferred<RESTClientFolder>) : ClientFolder
+class CachedClientFolder(underlying : Deferred<RESTClientFolder>,
+                         override val driveId : String, override val name : String, override val reading : String,
+                         override val createdDate : Long, override val modifiedDate : Long) : BaseCachedClientFolder(underlying) {
+  private val folderList : Deferred<RESTSessionFolderList> by lazy { GlobalScope.async(Dispatchers.IO, CoroutineStart.LAZY) {
+    underlying.getCompleted().getSessions()
+  } }
+  override suspend fun getSessions() = folderList.getCompleted()
+  override suspend fun rename(name : String, reading : String) : CachedClientFolder =
+   CachedClientFolder(GlobalScope.async(Dispatchers.IO) { underlying.getCompleted().rename(name, reading) },
+    driveId, name, reading, createdDate, System.currentTimeMillis())
+  override suspend fun newSession() : SessionFolder {
+  }
+}
+*/
+
+class LocalDiskClientFolder(private val file : File) : ClientFolder {
+  init {
+    if (!file.exists()) {
+      file.mkdir()
+      file.resolve(CREATION_DATE_FILE_NAME).writeBytes(System.currentTimeMillis().toBytes())
+    }
+  }
+
+  override val driveId : String = file.absolutePath
+  override val name = decodeName(file.name.toString())
+  override val reading = decodeReading(file.name.toString())
+  override val createdDate : Long = file.resolve(CREATION_DATE_FILE_NAME).readBytes().toLong()
+  override val modifiedDate : Long = file.lastModified()
+
+  override suspend fun newSession() : SessionFolder =
+   LocalDiskSessionFolder(file.resolve(encodeSessionFolderName(LocalSecond(System.currentTimeMillis()))))
+
+  override suspend fun getSessions() : LocalDiskSessionFolderList = LocalDiskSessionFolderList(file.listFiles().filter { it.isDirectory })
+
+  override suspend fun rename(name : String, reading : String) : LocalDiskClientFolder = File(encodeClientFolderName(name, reading)).let { newFile ->
+    file.renameTo(newFile)
+    LocalDiskClientFolder(newFile)
+  }
+}
+
+class LocalDiskClientFolderList(private val folders : List<File>) : ClientFolderList {
+  override val count : Int get() = folders.size
+  override fun get(i : Int) : LocalDiskClientFolder = LocalDiskClientFolder(folders[i])
+  override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.absolutePath == folder.driveId }
+}
+
+class RESTClientFolder(private val drive : Drive, private val clientFolder : DriveFile) : ClientFolder {
   override val driveId : String = clientFolder.id
   override val name = decodeName(clientFolder.name)
   override val reading = decodeReading(clientFolder.name)
   override val createdDate = clientFolder.createdTime.value
   override val modifiedDate = clientFolder.modifiedTime.value
 
-  override suspend fun getSessions() : SessionFolderList = withContext(Dispatchers.IO) {
+  override suspend fun getSessions() : RESTSessionFolderList = withContext(Dispatchers.IO) {
     RESTSessionFolderList(drive, FDrive.getFolders(drive, clientFolder))
   }
 
-  override suspend fun newSession() : SessionFolder = withContext(Dispatchers.IO) {
+  override suspend fun newSession() : RESTSessionFolder = withContext(Dispatchers.IO) {
     RESTSessionFolder(drive, FDrive.createFolder(drive, clientFolder, encodeSessionFolderName(LocalSecond(System.currentTimeMillis()))))
   }
 
-  override suspend fun rename(name : String, reading : String) : ClientFolder = withContext(Dispatchers.IO) {
-    RESTClientFolder(drive, drive.files().update(clientFolder.id, File().setName(encodeClientFolderName(name, reading))).setFields(NECESSARY_FIELDS).execute())
+  override suspend fun rename(name : String, reading : String) : RESTClientFolder = withContext(Dispatchers.IO) {
+    RESTClientFolder(drive, drive.files().update(clientFolder.id, DriveFile().setName(encodeClientFolderName(name, reading))).setFields(NECESSARY_FIELDS).execute())
   }
 }
 
-class RESTClientFolderList(private val drive : Drive, private val folders : List<File>) : ClientFolderList {
+class RESTClientFolderList(private val drive : Drive, private val folders : List<DriveFile>) : ClientFolderList {
   override val count = folders.size
   override fun get(i : Int) = RESTClientFolder(drive, folders[i])
   override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.id == folder.driveId }

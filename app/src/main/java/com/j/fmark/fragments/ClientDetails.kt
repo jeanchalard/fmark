@@ -29,8 +29,8 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
     if (null != clientFolder) {
       view.findViewById<EditText>(R.id.client_details_name)?.setText(clientFolder.name)
       view.findViewById<EditText>(R.id.client_details_reading)?.setText(clientFolder.reading)
-      view.findViewById<TextView>(R.id.client_details_creation_date_value)?.text = formatDate(clientFolder.modifiedDate)
-      view.findViewById<TextView>(R.id.client_details_last_update_date_value)?.text = formatDate(clientFolder.createdDate)
+      view.findViewById<TextView>(R.id.client_details_creation_date_value)?.text = formatDate(clientFolder.createdDate)
+      view.findViewById<TextView>(R.id.client_details_last_update_date_value)?.text = formatDate(clientFolder.modifiedDate)
     } else {
       val now = System.currentTimeMillis()
       view.findViewById<TextView>(R.id.client_details_creation_date_value)?.text = formatDate(now)
