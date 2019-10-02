@@ -14,7 +14,7 @@ import com.google.android.gms.drive.query.Filters
 import com.google.android.gms.drive.query.Query
 import com.google.android.gms.drive.query.SearchableField
 import com.google.api.services.drive.Drive
-import com.google.api.services.drive.model.File
+import com.google.api.services.drive.model.File as DriveFile
 import com.j.fmark.LocalSecond
 import com.j.fmark.R
 import com.j.fmark.parseLocalSecond
@@ -54,11 +54,11 @@ object FDrive {
     return null
   }
 
-  suspend fun getFMarkFolder(drive : Drive, context : Context) : File = withContext(Dispatchers.Default) {
+  suspend fun getFMarkFolder(drive : Drive, context : Context) : DriveFile = withContext(Dispatchers.Default) {
     getFolder(drive, context.getString(R.string.fmark_root_directory))
   }
 
-  suspend fun getFolders(drive : Drive, parentFolder : File, name : String? = null, exactMatch : Boolean = true) : List<File> {
+  suspend fun getFolders(drive : Drive, parentFolder : DriveFile, name : String? = null, exactMatch : Boolean = true) : List<DriveFile> {
     val constraints = mutableListOf("trashed = false", "mimeType = '$FOLDER_MIME_TYPE'", "'${parentFolder.id}' in parents")
     if (null != name) constraints.add("name ${if (exactMatch) "=" else "contains"} '${name}'")
     return drive.files().list().apply {
@@ -69,8 +69,8 @@ object FDrive {
     }.executeFully()
   }
 
-  suspend fun getFolder(drive : Drive, name : String) : File {
-    var folder = File().setId("root")
+  suspend fun getFolder(drive : Drive, name : String) : DriveFile {
+    var folder = DriveFile().setId("root")
     MainScope().launch(Dispatchers.IO) {
       name.split(Regex("/")).forEach { component ->
         val filelist = drive.files().list()
@@ -88,7 +88,7 @@ object FDrive {
   }
 
   // TODO : factor together with the above
-  suspend fun getDriveFile(drive : Drive, name : String, parentFolder : File) : File {
+  suspend fun getDriveFile(drive : Drive, name : String, parentFolder : DriveFile) : DriveFile {
     val filelist = drive.files().list()
      .setQ("name = '${name}' and '${parentFolder.id}' in parents and trashed = false")
      .setFields(NECESSARY_FIELDS_EXPRESSION)
@@ -100,9 +100,9 @@ object FDrive {
     }
   }
 
-  suspend fun createFolder(drive : Drive, parentFolder : File, name : String) : File = createFile(drive, parentFolder, name, FOLDER_MIME_TYPE)
-  suspend fun createFile(drive : Drive, parentFolder : File, name : String, mimeType : String = BINDATA_MIME_TYPE) : File {
-    val newFile = File().setName(name).setMimeType(mimeType).setParents(listOf(parentFolder.id))
+  suspend fun createFolder(drive : Drive, parentFolder : DriveFile, name : String) : DriveFile = createFile(drive, parentFolder, name, FOLDER_MIME_TYPE)
+  suspend fun createFile(drive : Drive, parentFolder : DriveFile, name : String, mimeType : String = BINDATA_MIME_TYPE) : DriveFile {
+    val newFile = DriveFile().setName(name).setMimeType(mimeType).setParents(listOf(parentFolder.id))
     return drive.files().create(newFile).setFields(NECESSARY_FIELDS).execute()
   }
 

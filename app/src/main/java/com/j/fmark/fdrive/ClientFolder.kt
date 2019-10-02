@@ -88,12 +88,8 @@ class LocalDiskClientFolderList(private val folders : List<File>) : ClientFolder
   override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.absolutePath == folder.driveId }
 }
 
-class RESTClientFolder(private val drive : Drive, private val clientFolder : DriveFile) : ClientFolder {
+class RESTClientFolder(override val name : String, override val reading : String, override val createdDate : Long, override val modifiedDate : Long) : ClientFolder {
   override val driveId : String = clientFolder.id
-  override val name = decodeName(clientFolder.name)
-  override val reading = decodeReading(clientFolder.name)
-  override val createdDate = clientFolder.createdTime.value
-  override val modifiedDate = clientFolder.modifiedTime.value
 
   override suspend fun getSessions() : RESTSessionFolderList = withContext(Dispatchers.IO) {
     RESTSessionFolderList(drive, FDrive.getFolders(drive, clientFolder))
@@ -108,10 +104,13 @@ class RESTClientFolder(private val drive : Drive, private val clientFolder : Dri
   }
 }
 
-class RESTClientFolderList(private val drive : Drive, private val folders : List<DriveFile>) : ClientFolderList {
+class RESTClientFolderList(private val root : File, private val drive : Drive) : ClientFolderList {
+  private val folders = arrayListOf<RESTClientFolder>()
   override val count = folders.size
-  override fun get(i : Int) = RESTClientFolder(drive, folders[i])
-  override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.id == folder.driveId }
+  override fun get(i : Int) = folders[i]
+  override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.driveId == folder.driveId }
+  fun createClient(name : String, reading : String, createdDate : Long, modifiedDate : Long) : RESTClientFolder =
+   RESTClientFolder(name, reading, createdDate, modifiedDate).also { folders.add(it) }
 }
 
 class LegacyClientFolder(private val metadata : Metadata, private val resourceClient : DriveResourceClient) : ClientFolder {
