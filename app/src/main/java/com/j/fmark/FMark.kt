@@ -14,9 +14,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.FDrive
 import com.j.fmark.fdrive.FMarkRoot
-import com.j.fmark.fdrive.LegacyFMarkRoot
 import com.j.fmark.fdrive.LocalDiskFMarkRoot
-import com.j.fmark.fdrive.RESTFMarkRoot
 import com.j.fmark.fdrive.SessionFolder
 import com.j.fmark.fdrive.SignInException
 import com.j.fmark.fragments.ClientDetails
@@ -29,8 +27,6 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
-
-const val USE_REST = true
 
 class FMark : AppCompatActivity() {
   private val lastFragment : Fragment?

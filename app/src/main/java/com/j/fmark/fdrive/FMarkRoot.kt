@@ -15,11 +15,8 @@ import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
-import com.j.fmark.CREATION_DATE_FILE_NAME
-import com.google.api.services.drive.model.File as DriveFile
 import com.j.fmark.R
 import com.j.fmark.fdrive.FDrive.encodeClientFolderName
-import com.j.fmark.toBytes
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -27,6 +24,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.stream.Stream.iterate
+import com.google.api.services.drive.model.File as DriveFile
 
 interface FMarkRoot {
   suspend fun clearCache()
