@@ -47,7 +47,7 @@ class RESTFMarkRoot private constructor(private val root : File, private val dri
     }
   }
 
-  val cachedClientList = RESTClientFolderList(root, drive)
+  private val cachedClientList = RESTClientFolderList(root, drive)
 
   override suspend fun createClient(name : String, reading : String) : ClientFolder = withContext(Dispatchers.IO) {
     val command = CreateClientCommand(encodeClientFolderName(name, reading))
@@ -86,35 +86,4 @@ class LocalDiskFMarkRoot private constructor (private val context : Context, pri
    else
      root.listFiles().filter { if (exactMatch) it.name == searchString else it.name.contains(searchString) })
   override suspend fun createClient(name : String, reading : String) : LocalDiskClientFolder = LocalDiskClientFolder(root.resolve(encodeClientFolderName(name, reading)))
-}
-
-suspend fun LegacyFMarkRoot(context : Context, account : GoogleSignInAccount) : LegacyFMarkRoot = LegacyFMarkRoot.make(context, account)
-class LegacyFMarkRoot private constructor(private val driveClient : DriveClient, private val resourceClient : DriveResourceClient, private val rootFolder : DriveFolder) : FMarkRoot {
-  companion object {
-    suspend fun make(context : Context, account : GoogleSignInAccount) : LegacyFMarkRoot {
-      val resourceClient = com.google.android.gms.drive.Drive.getDriveResourceClient(context, account)
-      val driveClient = com.google.android.gms.drive.Drive.getDriveClient(context, account)
-      val rootFolder = FDrive.getFolder(resourceClient, context.getString(R.string.fmark_root_directory))
-      return LegacyFMarkRoot(driveClient, resourceClient, rootFolder)
-    }
-  }
-
-  override suspend fun clearCache() {
-    driveClient.requestSync()?.await()
-  }
-
-  override suspend fun clientList(searchString : String?, exactMatch : Boolean) : ClientFolderList {
-    val query = Query.Builder().apply {
-      if (null != searchString)
-        addFilter(if (exactMatch) Filters.eq(SearchableField.TITLE, searchString) else Filters.contains(SearchableField.TITLE, searchString))
-      addFilter(Filters.eq(SearchableField.TRASHED, false))
-      setSortOrder(SortOrder.Builder().addSortAscending(SortableField.TITLE).build())
-    }.build()
-    return LegacyClientFolderList(resourceClient.queryChildren(rootFolder, query).await(), resourceClient)
-  }
-
-  override suspend fun createClient(name : String, reading : String) : ClientFolder {
-    val folder = resourceClient.createFolder(rootFolder, FDrive.metadataForClient(name, reading)).await()
-    return LegacyClientFolder(resourceClient.getMetadata(folder).await(), resourceClient)
-  }
 }

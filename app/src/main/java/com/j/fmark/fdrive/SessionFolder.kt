@@ -169,14 +169,3 @@ class LegacySessionFolder(private val metadata : Metadata, private val resourceC
       resourceClient.createFile(metadata.driveId.asDriveFolder(), cs, contents).await()
   }
 }
-
-class LegacySessionFolderList(private val buffer : MetadataBuffer, private val resourceClient : DriveResourceClient) : SessionFolderList {
-  override val count : Int = buffer.count
-  override fun get(i : Int) : LegacySessionFolder = LegacySessionFolder(buffer[i], resourceClient)
-  override fun iterator() : SessionIterator = SessionIterator(buffer.iterator())
-
-  inner class SessionIterator(private val metadataIterator : Iterator<Metadata>) : Iterator<LegacySessionFolder> {
-    override fun hasNext() = metadataIterator.hasNext()
-    override fun next() : LegacySessionFolder = LegacySessionFolder(metadataIterator.next(), resourceClient)
-  }
-}

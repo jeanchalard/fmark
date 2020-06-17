@@ -105,37 +105,4 @@ object FDrive {
     val newFile = DriveFile().setName(name).setMimeType(mimeType).setParents(listOf(parentFolder.id))
     return drive.files().create(newFile).setFields(NECESSARY_FIELDS).execute()
   }
-
-  // Legacy API stuff
-  private fun newFolderChangeset(name : String) : MetadataChangeSet = MetadataChangeSet.Builder().setTitle(name).setMimeType(DriveFolder.MIME_TYPE).build()
-
-  suspend fun getFolder(resourceClient : DriveResourceClient, name : String) : DriveFolder {
-    var currentFolder = resourceClient.rootFolder.await()
-    name.split(Regex("/")).forEach {
-      val buffer : MetadataBuffer = resourceClient.query(Query.Builder()
-       .addFilter(Filters.eq(SearchableField.TITLE, it))
-       .addFilter(Filters.`in`(SearchableField.PARENTS, currentFolder.driveId))
-       .addFilter(Filters.eq(SearchableField.TRASHED, false))
-       .build()).await()
-      currentFolder = when {
-        1 != buffer.count -> throw NotUniqueException(name)
-        0 == buffer.count -> resourceClient.createFolder(currentFolder, newFolderChangeset(it)).await()
-        else              -> buffer[0].let { metadata -> if (!metadata.isFolder) throw NotAFolderException(metadata.title) else metadata.driveId.asDriveFolder() }
-      }
-    }
-    return currentFolder
-  }
-
-  fun metadataForClient(name : String, reading : String) : MetadataChangeSet = MetadataChangeSet.Builder()
-   .setTitle(encodeClientFolderName(name, reading))
-   .setDescription(reading)
-   .setIndexableText(encodeIndexableText(name, reading))
-   .setMimeType(DriveFolder.MIME_TYPE)
-   .build()
-
-  fun metadataForSession(date : LocalSecond) : MetadataChangeSet = MetadataChangeSet.Builder()
-   .setTitle(encodeSessionFolderName(date))
-   .setDescription(date.toString())
-   .setMimeType(DriveFolder.MIME_TYPE)
-   .build()
 }

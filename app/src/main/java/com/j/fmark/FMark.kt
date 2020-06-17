@@ -15,6 +15,7 @@ import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.FDrive
 import com.j.fmark.fdrive.FMarkRoot
 import com.j.fmark.fdrive.LocalDiskFMarkRoot
+import com.j.fmark.fdrive.RESTFMarkRoot
 import com.j.fmark.fdrive.SessionFolder
 import com.j.fmark.fdrive.SignInException
 import com.j.fmark.fragments.ClientDetails
@@ -83,8 +84,8 @@ class FMark : AppCompatActivity() {
   }
 
   private suspend fun startClientList(account : GoogleSignInAccount) {
-    val root = LocalDiskFMarkRoot(this)
-//    val root = if (USE_REST) RESTFMarkRoot(this, account) else LegacyFMarkRoot(this, account)
+//    val root = LocalDiskFMarkRoot(this)
+    val root = RESTFMarkRoot(this, account)
     insertSpinnerVisible = false
     supportFragmentManager.beginTransaction().replace(R.id.list_fragment, ClientListFragment(this@FMark, root)).commit()
   }

@@ -1,13 +1,5 @@
 package com.j.fmark.fdrive
 
-import com.google.android.gms.drive.DriveResourceClient
-import com.google.android.gms.drive.Metadata
-import com.google.android.gms.drive.MetadataBuffer
-import com.google.android.gms.drive.query.Filters
-import com.google.android.gms.drive.query.Query
-import com.google.android.gms.drive.query.SearchableField
-import com.google.android.gms.drive.query.SortOrder
-import com.google.android.gms.drive.query.SortableField
 import com.google.api.services.drive.Drive
 import com.j.fmark.CREATION_DATE_FILE_NAME
 import com.j.fmark.LocalSecond
@@ -18,7 +10,6 @@ import com.j.fmark.fdrive.FDrive.encodeSessionFolderName
 import com.j.fmark.toBytes
 import com.j.fmark.toLong
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.io.File
 import com.google.api.services.drive.model.File as DriveFile
@@ -88,7 +79,8 @@ class LocalDiskClientFolderList(private val folders : List<File>) : ClientFolder
   override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.absolutePath == folder.driveId }
 }
 
-class RESTClientFolder(override val name : String, override val reading : String, override val createdDate : Long, override val modifiedDate : Long) : ClientFolder {
+class RESTClientFolder(private val drive : Drive, private val clientFolder : DriveFile,
+                       override val name : String, override val reading : String, override val createdDate : Long, override val modifiedDate : Long) : ClientFolder {
   override val driveId : String = clientFolder.id
 
   override suspend fun getSessions() : RESTSessionFolderList = withContext(Dispatchers.IO) {
@@ -104,46 +96,13 @@ class RESTClientFolder(override val name : String, override val reading : String
   }
 }
 
-class RESTClientFolderList(private val root : File, private val drive : Drive) : ClientFolderList {
+class RESTClientFolderList(private val root : DriveFile, private val drive : Drive) : ClientFolderList {
   private val folders = arrayListOf<RESTClientFolder>()
   override val count = folders.size
   override fun get(i : Int) = folders[i]
   override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.driveId == folder.driveId }
-  fun createClient(name : String, reading : String, createdDate : Long, modifiedDate : Long) : RESTClientFolder =
-   RESTClientFolder(name, reading, createdDate, modifiedDate).also { folders.add(it) }
-}
-
-class LegacyClientFolder(private val metadata : Metadata, private val resourceClient : DriveResourceClient) : ClientFolder {
-  override val driveId : String get() = metadata.driveId.encodeToString()
-  override val name get() = decodeName(metadata.title)
-  override val reading get() = decodeReading(metadata.title)
-  override val createdDate : Long get() = metadata.createdDate.time
-  override val modifiedDate : Long get() = metadata.modifiedDate.time
-
-  override suspend fun rename(name : String, reading : String) =
-   LegacyClientFolder(resourceClient.updateMetadata(metadata.driveId.asDriveFolder(), FDrive.metadataForClient(name, reading)).await(), resourceClient)
-
-  override suspend fun newSession() : SessionFolder {
-    val folder = resourceClient.createFolder(metadata.driveId.asDriveFolder(), FDrive.metadataForSession(LocalSecond(System.currentTimeMillis()))).await()
-    return LegacySessionFolder(resourceClient.getMetadata(folder).await(), resourceClient)
-  }
-
-  override suspend fun getSessions() : SessionFolderList {
-    val clientFolder = metadata.driveId.asDriveFolder()
-    val query = Query.Builder().apply {
-      addFilter(Filters.eq(SearchableField.TRASHED, false))
-      setSortOrder(SortOrder.Builder().addSortDescending(SortableField.TITLE).build())
-    }.build()
-    val result = resourceClient.queryChildren(clientFolder, query).await()
-    return LegacySessionFolderList(result, resourceClient)
-  }
-}
-
-class LegacyClientFolderList(private val buffer : MetadataBuffer, private val resourceClient : DriveResourceClient) : ClientFolderList {
-  override val count = buffer.count
-  override fun get(i : Int) : ClientFolder = LegacyClientFolder(buffer[i], resourceClient)
-  override fun indexOfFirst(folder : ClientFolder) : Int {
-    buffer.forEachIndexed { index, it -> if (folder.driveId == it.driveId.encodeToString()) return index }
-    return -1
+  suspend fun createClient(name : String, reading : String, createdDate : Long, modifiedDate : Long) : RESTClientFolder {
+    val f = FDrive.createFolder(drive, root, encodeClientFolderName(name, reading))
+    return RESTClientFolder(drive, f, name, reading, createdDate, modifiedDate).also { folders.add(it) }
   }
 }
