@@ -10,6 +10,7 @@ import com.google.android.gms.drive.query.Query
 import com.google.android.gms.drive.query.SearchableField
 import com.google.android.gms.drive.query.SortOrder
 import com.google.android.gms.drive.query.SortableField
+import com.google.android.gms.dynamic.DeferredLifecycleHelper
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
@@ -17,6 +18,8 @@ import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
 import com.j.fmark.R
 import com.j.fmark.fdrive.FDrive.encodeClientFolderName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -33,38 +36,30 @@ interface FMarkRoot {
   suspend fun createClient(name : String, reading : String) : ClientFolder
 }
 
-fun RESTFMarkRoot(context : Context, account : GoogleSignInAccount) : RESTFMarkRoot = RESTFMarkRoot.make(context, account)
-class RESTFMarkRoot private constructor(private val root : File, private val drive : Drive, private val rootFolder : Deferred<DriveFile>) : FMarkRoot {
-  companion object {
-    fun make(context : Context, account : GoogleSignInAccount) : RESTFMarkRoot {
-      val credential = GoogleAccountCredential.usingOAuth2(context, arrayListOf(DriveScopes.DRIVE_FILE))
-      credential.selectedAccount = account.account
-      val drive = Drive.Builder(NetHttpTransport(), GsonFactory(), credential)
-       .setApplicationName(context.getString(R.string.gservices_app_name))
-       .build()
-      val folder = GlobalScope.async(Dispatchers.IO) { FDrive.getFolder(drive, context.getString(R.string.fmark_root_directory)) }
-      return RESTFMarkRoot(context.cacheDir.resolve(context.getString(R.string.fmark_root_directory)), drive, folder)
+suspend fun RESTFMarkRoot(context : Context, account : GoogleSignInAccount) : RESTFMarkRoot {
+  val credential = GoogleAccountCredential.usingOAuth2(context, arrayListOf(DriveScopes.DRIVE_FILE))
+  credential.selectedAccount = account.account
+  val drive = Drive.Builder(NetHttpTransport(), GsonFactory(), credential)
+   .setApplicationName(context.getString(R.string.gservices_app_name))
+   .build()
+  val folder = FDrive.getFolder(drive, context.getString(R.string.fmark_root_directory))
+  return RESTFMarkRoot(drive, folder)
+}
+class RESTFMarkRoot internal constructor(private val drive : Drive, private val root : DriveFile) : FMarkRoot {
+  private val clientList = CoroutineScope(Dispatchers.IO).async(start = CoroutineStart.LAZY) { RESTClientFolderList(drive, root) }
+
+  override suspend fun createClient(name : String, reading : String) : ClientFolder = withContext(Dispatchers.IO) {
+    System.currentTimeMillis().let { now ->
+      clientList.await().createClient(name, reading, createdDate = now, modifiedDate = now)
     }
   }
 
-  private val cachedClientList = RESTClientFolderList(root, drive)
-
-  override suspend fun createClient(name : String, reading : String) : ClientFolder = withContext(Dispatchers.IO) {
-    val command = CreateClientCommand(encodeClientFolderName(name, reading))
-    addCommand(command)
-    val now = System.currentTimeMillis()
-    cachedClientList.createClient(name, reading, createdDate = now, modifiedDate = now)
-  }
-
   override suspend fun clientList(searchString : String?, exactMatch : Boolean) : ClientFolderList = withContext(Dispatchers.IO) {
-    RESTClientFolderList(drive, FDrive.getFolders(drive, rootFolder, searchString, exactMatch))
+    RESTClientFolderList(drive, root, searchString, exactMatch)
   }
 
   override suspend fun clearCache() {
     throw RuntimeException("Cache not implemented yet, implement it")
-  }
-
-  fun addCommand(command : RESTCommand) {
   }
 }
 

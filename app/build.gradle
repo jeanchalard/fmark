@@ -43,6 +43,11 @@ android {
         exclude 'META-INF/ASL2.0'
         exclude 'META-INF/atomicfu.kotlin_module'
     }
+    compileOptions {
+        sourceCompatibility = 1.8
+        targetCompatibility = 1.8
+    }
+    buildToolsVersion = '28.0.3'
 }
 
 dependencies {
@@ -61,7 +66,4 @@ dependencies {
     implementation "com.google.api-client:google-api-client-android:1.28.0"
     implementation "com.google.apis:google-api-services-drive:v3-rev20181213-1.28.0"
     implementation "com.google.http-client:google-http-client-gson:1.28.0"
-    testImplementation "junit:junit:4.12"
-    androidTestImplementation 'androidx.test:runner:1.1.0'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.1.0'
 }

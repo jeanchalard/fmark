@@ -40,6 +40,7 @@ object FDrive {
   suspend fun getAccount(c : Activity, resultCode : Int) : GoogleSignInAccount? {
     val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
      .requestScopes(com.google.android.gms.drive.Drive.SCOPE_FILE)
+     .requestEmail()
      .build()
     val client = GoogleSignIn.getClient(c, options)
     val signInTask = client.silentSignIn()
@@ -58,7 +59,7 @@ object FDrive {
     getFolder(drive, context.getString(R.string.fmark_root_directory))
   }
 
-  suspend fun getFolders(drive : Drive, parentFolder : DriveFile, name : String? = null, exactMatch : Boolean = true) : List<DriveFile> {
+  suspend fun getFolders(drive : Drive, parentFolder : DriveFile, name : String? = null, exactMatch : Boolean = false) : List<DriveFile> {
     val constraints = mutableListOf("trashed = false", "mimeType = '$FOLDER_MIME_TYPE'", "'${parentFolder.id}' in parents")
     if (null != name) constraints.add("name ${if (exactMatch) "=" else "contains"} '${name}'")
     return drive.files().list().apply {
@@ -102,7 +103,14 @@ object FDrive {
 
   suspend fun createFolder(drive : Drive, parentFolder : DriveFile, name : String) : DriveFile = createFile(drive, parentFolder, name, FOLDER_MIME_TYPE)
   suspend fun createFile(drive : Drive, parentFolder : DriveFile, name : String, mimeType : String = BINDATA_MIME_TYPE) : DriveFile {
-    val newFile = DriveFile().setName(name).setMimeType(mimeType).setParents(listOf(parentFolder.id))
+    val now = com.google.api.client.util.DateTime(System.currentTimeMillis())
+    val newFile = DriveFile().apply {
+      this.name = name
+      this.mimeType = mimeType
+      this.parents = listOf(parentFolder.id)
+      this.modifiedTime = now
+      this.createdTime = now
+    }
     return drive.files().create(newFile).setFields(NECESSARY_FIELDS).execute()
   }
 }

@@ -12,8 +12,6 @@ import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
 import com.j.fmark.LocalSecond
 import com.j.fmark.fdrive.FDrive.encodeClientFolderName
-import com.j.fmark.fdrive.FDrive.metadataForClient
-import com.j.fmark.fdrive.FDrive.metadataForSession
 import com.j.fmark.parseLocalSecond
 import kotlinx.coroutines.tasks.await
 import java.io.IOException
