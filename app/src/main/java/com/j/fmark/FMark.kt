@@ -121,7 +121,7 @@ class FMark : AppCompatActivity() {
     return super.onCreateOptionsMenu(menu)
   }
 
-  override fun onOptionsItemSelected(item : MenuItem?) : Boolean {
+  override fun onOptionsItemSelected(item : MenuItem) : Boolean {
     val fragment = lastFragment
     when (fragment) {
       is FEditor            -> return fragment.onOptionsItemSelected(item)
@@ -138,8 +138,8 @@ class FMark : AppCompatActivity() {
 
   private fun onSignIn(data : Intent?) {
     val signInResult = Auth.GoogleSignInApi.getSignInResultFromIntent(data)
-    val account = signInResult.signInAccount
-    if (!signInResult.isSuccess || null == account) {
+    val account = signInResult?.signInAccount
+    if (null == account || !signInResult.isSuccess) {
       findViewById<View>(R.id.insert_loading).visibility = View.GONE
       offlineError(R.string.sign_in_fail_eventual)
     } else

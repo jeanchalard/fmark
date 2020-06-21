@@ -168,9 +168,8 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     canvasView.readData(drawing.data)
   }
 
-  override fun onOptionsItemSelected(menuItem : MenuItem?) : Boolean {
+  override fun onOptionsItemSelected(item : MenuItem) : Boolean {
     if (fmarkHost.topSpinnerVisible) return false
-    val item = menuItem ?: return super.onOptionsItemSelected(menuItem)
     when (item.itemId) {
       R.id.action_button_save  -> startSaveEverything()
       R.id.action_button_undo  -> view?.findViewById<CanvasView>(R.id.feditor_canvas)?.undo()
@@ -193,14 +192,14 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     val switcher = view?.findViewById<ViewFlipper>(R.id.feditor_comment_canvas_flipper)
     if (null == switcher) {
       canvasView.saveData(shownPicture.data)
-      startSave(contents.comment, SaveBitmapData(shownPicture, canvasView.getBitmap(), fmarkHost.getDrawable(shownPicture.guideId)))
+      startSave(contents.comment, SaveBitmapData(shownPicture, canvasView.getBitmap(), fmarkHost.getDrawable(shownPicture.guideId)!!))
     } else if (switcher.currentView.hasChild(canvasView)) startSaveBitmap() else startSaveComment()
   }
 
   private fun startSaveComment() = startSave(contents.comment, null)
   private fun startSaveBitmap() {
     canvasView.saveData(shownPicture.data)
-    startSave(null, SaveBitmapData(shownPicture, canvasView.getBitmap(), fmarkHost.getDrawable(shownPicture.guideId)))
+    startSave(null, SaveBitmapData(shownPicture, canvasView.getBitmap(), fmarkHost.getDrawable(shownPicture.guideId)!!))
   }
 
   // Always saves the entire data file, but only the separate big file corresponding to the arg that was non-null

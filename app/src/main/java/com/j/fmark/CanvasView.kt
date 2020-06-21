@@ -13,6 +13,7 @@ import android.graphics.PorterDuffXfermode
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.widget.ImageView
+import androidx.appcompat.widget.AppCompatImageView
 
 // Context#getColor is only supported from API 23 onward
 const val DEFAULT_BRUSH_COLOR = 0xFFE53935.toInt()
@@ -28,28 +29,29 @@ data class Brush(val mode : PorterDuff.Mode, val color : Int, val width : Float)
   companion object { @JvmStatic fun isEraser(v : FEditorDataType) = v == ERASE }
 }
 
-abstract class BrushView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : ImageView(context, attrs, defStyleAttr, defStyleRes) {
+abstract class BrushView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0) : AppCompatImageView(context, attrs, defStyleAttr) {
+
   abstract fun changeBrush(brush : Brush) : Brush
   abstract fun isActive(brush : Brush) : Boolean
 }
 
-class PaletteView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : BrushView(context, attrs, defStyleAttr, defStyleRes) {
-  override fun changeBrush(brush : Brush) : Brush = Brush(PorterDuff.Mode.SRC_OVER, imageTintList.defaultColor, brush.width)
-  override fun isActive(brush : Brush) : Boolean = brush.color == imageTintList.defaultColor && brush.mode == PorterDuff.Mode.SRC_OVER
+class PaletteView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0) : BrushView(context, attrs, defStyleAttr) {
+  override fun changeBrush(brush : Brush) : Brush = Brush(PorterDuff.Mode.SRC_OVER, imageTintList!!.defaultColor, brush.width)
+  override fun isActive(brush : Brush) : Boolean = brush.color == imageTintList!!.defaultColor && brush.mode == PorterDuff.Mode.SRC_OVER
 }
 
-class BrushWidthView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : BrushView(context, attrs, defStyleAttr, defStyleRes) {
+class BrushWidthView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : BrushView(context, attrs, defStyleAttr) {
   private val width : Float = context.obtainStyledAttributes(attrs, R.styleable.BrushWidthView, defStyleAttr, defStyleRes)?.getFloat(R.styleable.BrushWidthView_widthFactor, 1.0f) ?: 1.0f
   override fun changeBrush(brush : Brush) : Brush = Brush(brush.mode, brush.color, width)
   override fun isActive(brush : Brush) : Boolean = brush.width == width && brush.mode == PorterDuff.Mode.SRC_OVER
 }
 
-class EraserView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : BrushView(context, attrs, defStyleAttr, defStyleRes) {
+class EraserView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0) : BrushView(context, attrs, defStyleAttr) {
   override fun changeBrush(brush : Brush) : Brush = Brush(PorterDuff.Mode.CLEAR, brush.color, brush.width)
   override fun isActive(brush : Brush) : Boolean = brush.mode == PorterDuff.Mode.CLEAR
 }
 
-class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : ImageView(context, attrs, defStyleAttr, defStyleRes) {
+class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0, defStyleRes : Int = 0) : AppCompatImageView(context, attrs, defStyleAttr) {
   class CommandList : ArrayList<FEditorDataType>() {
     fun addCommand(command : Action) = add(command.value)
   }
