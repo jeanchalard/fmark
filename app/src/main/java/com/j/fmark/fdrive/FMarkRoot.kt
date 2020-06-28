@@ -36,15 +36,22 @@ interface FMarkRoot {
   suspend fun createClient(name : String, reading : String) : ClientFolder
 }
 
-class RESTFMarkRoot(private val root : FDrive.Root) : FMarkRoot {
-  private val clientList = CoroutineScope(Dispatchers.IO).async(start = CoroutineStart.LAZY) { RESTClientFolderList(root.drive, root.root) }
+suspend fun RESTFMarkRoot(context : Context) : RESTFMarkRoot {
+  val root = FDrive.Root(context)
+  return RESTFMarkRoot(root)
+}
+class RESTFMarkRoot internal constructor(private val root : FDrive.Root) : FMarkRoot {
+  private val clientList = CoroutineScope(Dispatchers.IO).async(start = CoroutineStart.LAZY) { RESTClientFolderList(root) }
 
   override suspend fun createClient(name : String, reading : String) : ClientFolder = withContext(Dispatchers.IO) {
     clientList.await().createClient(name, reading)
   }
 
   override suspend fun clientList(searchString : String?, exactMatch : Boolean) : ClientFolderList = withContext(Dispatchers.IO) {
-    RESTClientFolderList(root.drive, root.root, searchString, exactMatch)
+    if (searchString != null)
+      RESTClientFolderList(root, searchString, exactMatch)
+    else
+      clientList.await()
   }
 
   override suspend fun clearCache() {

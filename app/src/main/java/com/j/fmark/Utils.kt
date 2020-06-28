@@ -8,7 +8,7 @@ import java.util.Date
 import java.util.GregorianCalendar
 import java.util.Locale
 
-fun log(msg : String) = Log.e("FMark", msg)
+fun log(msg : String, e : Exception? = null) = Log.e("Clients", msg, e)
 fun logStackTrace(msg : String) = stackTrace().drop(2).forEach { Log.e(msg, "{$it}") }
 val <T> T.unit get() = Unit
 

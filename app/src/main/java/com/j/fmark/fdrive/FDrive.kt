@@ -3,6 +3,7 @@ package com.j.fmark.fdrive
 import android.accounts.Account
 import android.app.Activity
 import android.content.Context
+import android.util.Log
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -16,7 +17,6 @@ import com.j.fmark.GOOGLE_SIGN_IN_CODE
 import com.j.fmark.LocalSecond
 import com.j.fmark.R
 import com.j.fmark.parseLocalSecond
-import com.j.fmark.stackTrace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
@@ -28,7 +28,7 @@ const val NECESSARY_FIELDS = "id,name,parents,createdTime,modifiedTime"
 const val NECESSARY_FIELDS_EXPRESSION = "files(${NECESSARY_FIELDS})"
 
 object FDrive {
-  data class Root(val context : Context, val account : Account, val drive : Drive, val root : DriveFile)
+  data class Root(val context : Context, val account : Account, val drive : Drive, val root : DriveFile, val rest : RESTManager)
 
   fun encodeClientFolderName(name : String, reading : String) = "${name} -- ${reading}"
   fun encodeSessionFolderName(date : LocalSecond) = date.toString()
@@ -47,23 +47,24 @@ object FDrive {
      .setApplicationName(context.getString(R.string.gservices_app_name))
      .build()
     val folder = fetchDriveFolder(drive, name = context.getString(R.string.fmark_root_directory))
-    return Root(context, account, drive, folder)
+    return Root(context, account, drive, folder, RESTManager(context))
   }
 
-  private suspend fun fetchAccount(c : Context, resultCode : Int) : GoogleSignInAccount? {
+  private suspend fun fetchAccount(context : Context, resultCode : Int) : GoogleSignInAccount? {
     val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
      .requestScopes(com.google.android.gms.drive.Drive.SCOPE_FILE)
      .requestEmail()
      .build()
-    val client = GoogleSignIn.getClient(c, options)
+    val client = GoogleSignIn.getClient(context, options)
     val signInTask = client.silentSignIn()
     try {
-      if (signInTask.isSuccessful) return signInTask.result ?: throw SignInException(c.getString(R.string.sign_in_fail_instant))
-      return signInTask.await() ?: throw SignInException(c.getString(R.string.sign_in_fail_eventual))
+      if (signInTask.isSuccessful) return signInTask.result ?: throw SignInException(context.getString(R.string.sign_in_fail_instant))
+      return signInTask.await() ?: throw SignInException(context.getString(R.string.sign_in_fail_eventual))
     } catch (e : Exception) {
       when (e) {
         is ExecutionException, is ApiException ->
-          if (c is Activity) c.startActivityForResult(client.signInIntent, resultCode)
+          if (context is Activity) context.startActivityForResult(client.signInIntent, resultCode)
+          else Log.e("Clients", "Cannot UI sign in without an activity")
       }
     }
     return null

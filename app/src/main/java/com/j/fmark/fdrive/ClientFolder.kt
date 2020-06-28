@@ -1,8 +1,10 @@
 package com.j.fmark.fdrive
 
+import android.graphics.Bitmap
 import com.google.api.services.drive.Drive
 import com.j.fmark.CREATION_DATE_FILE_NAME
 import com.j.fmark.LocalSecond
+import com.j.fmark.SessionData
 import com.j.fmark.fdrive.FDrive.decodeName
 import com.j.fmark.fdrive.FDrive.decodeReading
 import com.j.fmark.fdrive.FDrive.encodeClientFolderName
@@ -12,9 +14,9 @@ import com.j.fmark.toLong
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.lang.IllegalArgumentException
 import java.util.concurrent.CopyOnWriteArrayList
 import com.google.api.services.drive.model.File as DriveFile
+import com.j.fmark.fdrive.FDrive.Root
 
 interface ClientFolder {
   val driveId : String
@@ -101,14 +103,32 @@ class RESTClientFolder(private val drive : Drive, private val clientFolder : Dri
   }
 }
 
-suspend fun RESTClientFolderList(drive : Drive, root : DriveFile, name : String? = null, exactMatch : Boolean = false) =
-  RESTClientFolderList(drive, root, CopyOnWriteArrayList(FDrive.fetchFolderList(drive, root, name, exactMatch).map { RESTClientFolder(drive, it) }))
-class RESTClientFolderList internal constructor(private val drive : Drive, private val root : DriveFile, private val folders : CopyOnWriteArrayList<RESTClientFolder>) : ClientFolderList {
+suspend fun RESTClientFolderList(root : Root, name : String? = null, exactMatch : Boolean = false) =
+  RESTClientFolderList(root, CopyOnWriteArrayList(FDrive.fetchFolderList(root.drive, root.root, name, exactMatch).map { RESTClientFolder(root.drive, it) }))
+class RESTClientFolderList internal constructor(private val root : Root, private val folders : CopyOnWriteArrayList<RESTClientFolder>) : ClientFolderList {
   override val count = folders.size
   override fun get(i : Int) = folders[i]
   override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.driveId == folder.driveId }
-  suspend fun createClient(name : String, reading : String) : RESTClientFolder {
-    val f = FDrive.createDriveFolder(drive, root, encodeClientFolderName(name, reading))
-    return RESTClientFolder(drive, f).also { folders.add(it) }
+  suspend fun createClient(name : String, reading : String) : ClientFolder {
+    root.rest.exec(CreateFolderCommand(encodeClientFolderName(name, reading)))
+    //val f = FDrive.createDriveFolder(root.drive, root.root, encodeClientFolderName(name, reading))
+    return object : ClientFolder {
+      override val driveId : String get() = "phony"
+      override val name : String get() = name
+      override val reading : String = reading
+      override val createdDate : Long get() = 1
+      override val modifiedDate : Long get() = 1
+      override suspend fun rename(name : String, reading : String) : ClientFolder = this
+      override suspend fun newSession() : SessionFolder = object : SessionFolder {
+        override val date : LocalSecond get() = LocalSecond(0L)
+        override val lastUpdateDate : LocalSecond get() = LocalSecond(0L)
+        override suspend fun openData() : SessionData = SessionData()
+        override suspend fun saveData(data : SessionData) {}
+        override suspend fun saveComment(comment : String) {}
+        override suspend fun saveImage(image : Bitmap, fileName : String) {}
+      }
+      override suspend fun getSessions() : SessionFolderList = RESTSessionFolderList(root.drive, CopyOnWriteArrayList())
+    }
+    //RESTClientFolder(root.drive, f).also { folders.add(it) }
   }
 }

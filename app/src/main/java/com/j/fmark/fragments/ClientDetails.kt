@@ -18,6 +18,7 @@ import com.j.fmark.fdrive.FMarkRoot
 import com.j.fmark.formatDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -45,8 +46,8 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
     val name = view?.findViewById<EditText>(R.id.client_details_name)?.text?.toString()
     val reading = view?.findViewById<EditText>(R.id.client_details_reading)?.text?.toString()
     if (null == name || null == reading) throw NullPointerException("Neither name or reading can be null when validating the dialog")
-    GlobalScope.launch {
-      root.clientList(name).count.let { count ->
+    MainScope().launch {
+      root.clientList(searchString = name, exactMatch = true).count.let { count ->
         if (count == 0)
           validateDetails(clientFolder, name, reading)
         else {

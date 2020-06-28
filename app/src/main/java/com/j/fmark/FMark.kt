@@ -1,5 +1,6 @@
 package com.j.fmark
 
+import android.app.Application
 import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
@@ -9,6 +10,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
+import androidx.work.Configuration
 import com.google.android.gms.auth.api.Auth
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.j.fmark.fdrive.ClientFolder
@@ -29,6 +31,10 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+
+class FMarkApp : Application(), Configuration.Provider {
+  override fun getWorkManagerConfiguration() : Configuration = Configuration.Builder().setMinimumLoggingLevel(android.util.Log.VERBOSE).build()
+}
 
 class FMark : AppCompatActivity() {
   private val lastFragment : Fragment?
