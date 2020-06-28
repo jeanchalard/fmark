@@ -12,7 +12,7 @@ fun log(msg : String) = Log.e("FMark", msg)
 fun logStackTrace(msg : String) = stackTrace().drop(2).forEach { Log.e(msg, "{$it}") }
 val <T> T.unit get() = Unit
 
-fun stackTrace() = try { throw RuntimeException() } catch (e : RuntimeException) { e.stackTrace }
+fun stackTrace() = try { throw RuntimeException() } catch (e : RuntimeException) { e.stackTrace.slice(1 until e.stackTrace.size) }
 
 fun color(l : Long) : Int = (l and -1L).toInt()
 fun formatDate(date : Date?) : String = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date ?: Date())

@@ -1,32 +1,21 @@
 package com.j.fmark.fdrive
 
 import android.graphics.Bitmap
-import com.google.android.gms.drive.DriveResourceClient
-import com.google.android.gms.drive.Metadata
-import com.google.android.gms.drive.MetadataBuffer
-import com.google.android.gms.drive.MetadataChangeSet
 import com.google.api.client.http.InputStreamContent
 import com.google.api.services.drive.Drive
 import com.j.fmark.COMMENT_FILE_NAME
 import com.j.fmark.DATA_FILE_NAME
-import com.j.fmark.ErrorHandling
 import com.j.fmark.LocalSecond
 import com.j.fmark.SessionData
-import com.j.fmark.drive.findFile
 import com.j.fmark.fdrive.FDrive.decodeSessionFolderName
-import com.j.fmark.parseLocalSecond
 import com.j.fmark.save
 import com.j.fmark.unit
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.FileInputStream
 import java.io.InputStream
-import java.io.OutputStreamWriter
 import java.util.concurrent.CopyOnWriteArrayList
-import com.google.android.gms.drive.DriveFile as LegacyDriveFile
 import com.google.api.services.drive.model.File as DriveFile
 
 interface SessionFolder {
@@ -89,12 +78,12 @@ class RESTSessionFolder(private val drive : Drive, private val sessionFolder : D
   override val lastUpdateDate = LocalSecond(sessionFolder.modifiedTime)
 
   override suspend fun openData() : SessionData = withContext(Dispatchers.IO) {
-    val f = FDrive.getDriveFile(drive, DATA_FILE_NAME, sessionFolder)
+    val f = FDrive.fetchDriveFile(drive, DATA_FILE_NAME, sessionFolder)
     SessionData(drive.files().get(f.id).executeMediaAsInputStream())
   }
 
   private suspend fun saveToDriveFile(fileName : String, inputStream : InputStream) = withContext(Dispatchers.IO) {
-    FDrive.getDriveFile(drive, fileName, sessionFolder).let { file ->
+    FDrive.fetchDriveFile(drive, fileName, sessionFolder).let { file ->
       drive.files().update(file.id, null /* no metadata updates */, InputStreamContent(BINDATA_MIME_TYPE, inputStream)).execute()
     }
   }

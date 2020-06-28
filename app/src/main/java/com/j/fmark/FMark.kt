@@ -25,6 +25,7 @@ import com.j.fmark.fragments.FEditor
 import com.j.fmark.fragments.SignInErrorFragment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -70,12 +71,12 @@ class FMark : AppCompatActivity() {
   private fun startSignIn() {
     if (DBGLOG) log("Starting sign in...")
     insertSpinnerVisible = true
-    GlobalScope.launch(Dispatchers.Main) {
+    MainScope().launch() {
       try {
         if (DBGLOG) log("Getting account...")
-        val account = FDrive.getAccount(this@FMark, GOOGLE_SIGN_IN_CODE)
-        if (DBGLOG) log("Account : ${account}")
-        if (null != account) startClientList(account)
+        val root = FDrive.Root(this@FMark)
+        if (DBGLOG) log("Account : ${root.account}")
+        startClientList(root)
         // else, wait for sign in activity → onActivityResult
       } catch (e : SignInException) {
         offlineError(e.message)
@@ -83,11 +84,11 @@ class FMark : AppCompatActivity() {
     }
   }
 
-  private suspend fun startClientList(account : GoogleSignInAccount) {
-//    val root = LocalDiskFMarkRoot(this)
-    val root = RESTFMarkRoot(this, account)
+  private suspend fun startClientList(root : FDrive.Root) {
+//    val froot = LocalDiskFMarkRoot(this)
+    val froot = RESTFMarkRoot(root)
     insertSpinnerVisible = false
-    supportFragmentManager.beginTransaction().replace(R.id.list_fragment, ClientListFragment(this@FMark, root)).commit()
+    supportFragmentManager.beginTransaction().replace(R.id.list_fragment, ClientListFragment(this@FMark, froot)).commit()
   }
 
   fun offlineError(msgId : Int) = offlineError(resources.getString(msgId))
@@ -138,12 +139,12 @@ class FMark : AppCompatActivity() {
 
   private fun onSignIn(data : Intent?) {
     val signInResult = Auth.GoogleSignInApi.getSignInResultFromIntent(data)
-    val account = signInResult?.signInAccount
+    val account = signInResult?.signInAccount?.account
     if (null == account || !signInResult.isSuccess) {
       findViewById<View>(R.id.insert_loading).visibility = View.GONE
       offlineError(R.string.sign_in_fail_eventual)
     } else
-      GlobalScope.launch(Dispatchers.Main) { startClientList(account) }
+      GlobalScope.launch(Dispatchers.Main) { startClientList(FDrive.Root(this@FMark, account)) }
   }
 
   fun showClientDetails(clientFolder : ClientFolder?, root : FMarkRoot) {

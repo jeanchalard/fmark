@@ -1,34 +1,35 @@
 package com.j.fmark.fdrive
 
+import android.accounts.Account
 import android.app.Activity
 import android.content.Context
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.drive.DriveFolder
-import com.google.android.gms.drive.DriveResourceClient
-import com.google.android.gms.drive.MetadataBuffer
-import com.google.android.gms.drive.MetadataChangeSet
-import com.google.android.gms.drive.query.Filters
-import com.google.android.gms.drive.query.Query
-import com.google.android.gms.drive.query.SearchableField
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
+import com.google.api.client.http.javanet.NetHttpTransport
+import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.drive.Drive
-import com.google.api.services.drive.model.File as DriveFile
+import com.google.api.services.drive.DriveScopes
+import com.j.fmark.GOOGLE_SIGN_IN_CODE
 import com.j.fmark.LocalSecond
 import com.j.fmark.R
 import com.j.fmark.parseLocalSecond
+import com.j.fmark.stackTrace
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ExecutionException
+import com.google.api.services.drive.model.File as DriveFile
 
 const val NECESSARY_FIELDS = "id,name,parents,createdTime,modifiedTime"
 const val NECESSARY_FIELDS_EXPRESSION = "files(${NECESSARY_FIELDS})"
 
 object FDrive {
+  data class Root(val context : Context, val account : Account, val drive : Drive, val root : DriveFile)
+
   fun encodeClientFolderName(name : String, reading : String) = "${name} -- ${reading}"
   fun encodeSessionFolderName(date : LocalSecond) = date.toString()
   fun encodeIndexableText(name : String, reading : String) = "${name} ${reading}"
@@ -37,7 +38,19 @@ object FDrive {
   fun decodeReading(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[1] else folderName
   fun decodeSessionFolderName(name : String) = parseLocalSecond(name)
 
-  suspend fun getAccount(c : Activity, resultCode : Int) : GoogleSignInAccount? {
+  suspend fun Root(context : Context) : Root = Root(context, fetchAccount(context, GOOGLE_SIGN_IN_CODE)?.account ?: throw SignInException("Can't get account"))
+
+  suspend fun Root(context : Context, account : Account) : Root {
+    val credential = GoogleAccountCredential.usingOAuth2(context, arrayListOf(DriveScopes.DRIVE_FILE))
+    credential.selectedAccount = account
+    val drive = Drive.Builder(NetHttpTransport(), GsonFactory(), credential)
+     .setApplicationName(context.getString(R.string.gservices_app_name))
+     .build()
+    val folder = fetchDriveFolder(drive, name = context.getString(R.string.fmark_root_directory))
+    return Root(context, account, drive, folder)
+  }
+
+  private suspend fun fetchAccount(c : Context, resultCode : Int) : GoogleSignInAccount? {
     val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
      .requestScopes(com.google.android.gms.drive.Drive.SCOPE_FILE)
      .requestEmail()
@@ -49,17 +62,14 @@ object FDrive {
       return signInTask.await() ?: throw SignInException(c.getString(R.string.sign_in_fail_eventual))
     } catch (e : Exception) {
       when (e) {
-        is ExecutionException, is ApiException -> c.startActivityForResult(client.signInIntent, resultCode)
+        is ExecutionException, is ApiException ->
+          if (c is Activity) c.startActivityForResult(client.signInIntent, resultCode)
       }
     }
     return null
   }
 
-  suspend fun getFMarkFolder(drive : Drive, context : Context) : DriveFile = withContext(Dispatchers.Default) {
-    getFolder(drive, context.getString(R.string.fmark_root_directory))
-  }
-
-  suspend fun getFolders(drive : Drive, parentFolder : DriveFile, name : String? = null, exactMatch : Boolean = false) : List<DriveFile> {
+  suspend fun fetchFolderList(drive : Drive, parentFolder : DriveFile, name : String? = null, exactMatch : Boolean = false) : List<DriveFile> {
     val constraints = mutableListOf("trashed = false", "mimeType = '$FOLDER_MIME_TYPE'", "'${parentFolder.id}' in parents")
     if (null != name) constraints.add("name ${if (exactMatch) "=" else "contains"} '${name}'")
     return drive.files().list().apply {
@@ -70,47 +80,54 @@ object FDrive {
     }.executeFully()
   }
 
-  suspend fun getFolder(drive : Drive, name : String) : DriveFile {
-    var folder = DriveFile().setId("root")
-    MainScope().launch(Dispatchers.IO) {
-      name.split(Regex("/")).forEach { component ->
-        val filelist = drive.files().list()
-         .setQ("name = '${component}' and '${folder.id}' in parents and trashed = false and mimeType = '$FOLDER_MIME_TYPE'")
+  private suspend fun fetchChild(drive : Drive, parentFolder : DriveFile, name : String, folder : Boolean) : DriveFile {
+    val q = "name = '${name}' and '${parentFolder.id}' in parents and trashed = false" + if (folder) " and mimeType = '$FOLDER_MIME_TYPE'" else ""
+    val filelist = drive.files().list()
+     .setQ(q)
          .setFields(NECESSARY_FIELDS_EXPRESSION)
          .execute()?.files
-        folder = when {
-          null == filelist || filelist.size == 0 -> createFolder(drive, folder, component)
-          filelist.size == 1                     -> filelist[0]
-          else                                   -> throw NotUniqueException(name)
-        }
-      }
-    }.join()
-    return folder
-  }
-
-  // TODO : factor together with the above
-  suspend fun getDriveFile(drive : Drive, name : String, parentFolder : DriveFile) : DriveFile {
-    val filelist = drive.files().list()
-     .setQ("name = '${name}' and '${parentFolder.id}' in parents and trashed = false")
-     .setFields(NECESSARY_FIELDS_EXPRESSION)
-     .execute()?.files
     return when {
-      null == filelist || filelist.size == 0 -> createFile(drive, parentFolder, name)
+      null == filelist || filelist.size == 0 -> if (folder) createDriveFolder(drive, parentFolder, name) else createDriveFile(drive, parentFolder, name)
       filelist.size == 1                     -> filelist[0]
       else                                   -> throw NotUniqueException(name)
     }
   }
 
-  suspend fun createFolder(drive : Drive, parentFolder : DriveFile, name : String) : DriveFile = createFile(drive, parentFolder, name, FOLDER_MIME_TYPE)
-  suspend fun createFile(drive : Drive, parentFolder : DriveFile, name : String, mimeType : String = BINDATA_MIME_TYPE) : DriveFile {
+  private tailrec suspend fun List<String>.fetchChildren(index : Int, drive : Drive, parentFolder : DriveFile, isFolder : Boolean, scope : CoroutineScope) : DriveFile {
+    val name = this[index]
+    return if (index == size - 1) fetchChild(drive, parentFolder, name, isFolder)
+      else fetchChildren(index + 1, drive, fetchChild(drive, parentFolder, name, true), isFolder, scope)
+  }
+
+  private suspend fun fetchDriveItem(drive : Drive, parentFolder : DriveFile, name : String, isFolder : Boolean) = withContext(Dispatchers.IO) {
+    name.split("/").fetchChildren(0, drive, parentFolder, isFolder, this)
+  }
+  suspend fun fetchDriveFolder(drive : Drive, name : String, parentFolder : DriveFile = DriveFile().setId("root")) = fetchDriveItem(drive, parentFolder, name, isFolder = true)
+  suspend fun fetchDriveFile(drive : Drive, name : String, parentFolder : DriveFile = DriveFile().setId("root")) = fetchDriveItem(drive, parentFolder, name, isFolder = false)
+
+  private fun String.dirBaseName() = lastIndexOf('/').let { delimiter ->
+    when (delimiter) {
+      -1 -> null to this
+      else -> substring(0 until delimiter) to substring(delimiter + 1)
+    }
+  }
+  private suspend fun createDriveItem(drive : Drive, parentFolder : DriveFile, name : String, mimeType : String) : DriveFile {
     val now = com.google.api.client.util.DateTime(System.currentTimeMillis())
+    val (dirname, basename) = name.dirBaseName()
+    val immediateParent = if (null == dirname) parentFolder else fetchDriveFolder(drive, dirname, parentFolder)
     val newFile = DriveFile().apply {
-      this.name = name
+      this.name = basename
       this.mimeType = mimeType
-      this.parents = listOf(parentFolder.id)
+      this.parents = listOf(immediateParent.id)
       this.modifiedTime = now
       this.createdTime = now
     }
-    return drive.files().create(newFile).setFields(NECESSARY_FIELDS).execute()
+    return withContext(Dispatchers.IO) { drive.files().create(newFile).setFields(NECESSARY_FIELDS).execute() }
+  }
+  suspend fun createDriveFolder(drive : Drive, parentFolder : DriveFile, name : String) : DriveFile = createDriveItem(drive, parentFolder, name, FOLDER_MIME_TYPE)
+  suspend fun createDriveFile(drive : Drive, parentFolder : DriveFile, name : String) : DriveFile = createDriveItem(drive, parentFolder, name, BINDATA_MIME_TYPE)
+
+  suspend fun renameFolder(drive : Drive, clientFolder : DriveFile, newName : String) : DriveFile? = withContext(Dispatchers.IO) {
+    drive.files().update(clientFolder.id, clientFolder.apply { this.name = newName }).execute()
   }
 }
