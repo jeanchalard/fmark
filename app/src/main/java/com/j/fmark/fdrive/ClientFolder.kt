@@ -1,6 +1,7 @@
 package com.j.fmark.fdrive
 
 import android.graphics.Bitmap
+import androidx.work.await
 import com.google.api.services.drive.Drive
 import com.j.fmark.CREATION_DATE_FILE_NAME
 import com.j.fmark.LocalSecond
@@ -83,7 +84,7 @@ class LocalDiskClientFolderList(private val folders : List<File>) : ClientFolder
   override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.absolutePath == folder.driveId }
 }
 
-class RESTClientFolder(private val drive : Drive, private val clientFolder : DriveFile) : ClientFolder {
+class RESTClientFolder(private val root : Root, private val clientFolder : DriveFile) : ClientFolder {
   override val name = FDrive.decodeName(clientFolder.name)
   override val reading = FDrive.decodeReading(clientFolder.name)
   override val createdDate = clientFolder.createdTime?.value ?: throw IllegalArgumentException("Created date not present in loaded folder")
@@ -91,44 +92,26 @@ class RESTClientFolder(private val drive : Drive, private val clientFolder : Dri
   override val driveId : String = clientFolder.id
 
   override suspend fun getSessions() : RESTSessionFolderList = withContext(Dispatchers.IO) {
-    RESTSessionFolderList(drive, CopyOnWriteArrayList(FDrive.fetchFolderList(drive, clientFolder).map { RESTSessionFolder(drive, it) }))
+    RESTSessionFolderList(root.drive, CopyOnWriteArrayList(FDrive.fetchFolderList(root.drive, clientFolder).map { RESTSessionFolder(root.drive, it) }))
   }
 
   override suspend fun newSession() : RESTSessionFolder = withContext(Dispatchers.IO) {
-    RESTSessionFolder(drive, FDrive.createDriveFolder(drive, clientFolder, encodeSessionFolderName(LocalSecond(System.currentTimeMillis()))))
+    RESTSessionFolder(root.drive, FDrive.createDriveFolder(root.drive, clientFolder, encodeSessionFolderName(LocalSecond(System.currentTimeMillis()))))
   }
 
   override suspend fun rename(name : String, reading : String) : RESTClientFolder = withContext(Dispatchers.IO) {
-    RESTClientFolder(drive, drive.files().update(clientFolder.id, DriveFile().setName(encodeClientFolderName(name, reading))).setFields(NECESSARY_FIELDS).execute())
+    RESTClientFolder(root, root.drive.files().update(clientFolder.id, DriveFile().setName(encodeClientFolderName(name, reading))).setFields(NECESSARY_FIELDS).execute())
   }
 }
 
 suspend fun RESTClientFolderList(root : Root, name : String? = null, exactMatch : Boolean = false) =
-  RESTClientFolderList(root, CopyOnWriteArrayList(FDrive.fetchFolderList(root.drive, root.root, name, exactMatch).map { RESTClientFolder(root.drive, it) }))
+  RESTClientFolderList(root, CopyOnWriteArrayList(FDrive.fetchFolderList(root.drive, root.root, name, exactMatch).map { RESTClientFolder(root, it) }))
 class RESTClientFolderList internal constructor(private val root : Root, private val folders : CopyOnWriteArrayList<RESTClientFolder>) : ClientFolderList {
   override val count = folders.size
   override fun get(i : Int) = folders[i]
   override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.driveId == folder.driveId }
   suspend fun createClient(name : String, reading : String) : ClientFolder {
-    root.rest.exec(CreateFolderCommand(encodeClientFolderName(name, reading)))
-    //val f = FDrive.createDriveFolder(root.drive, root.root, encodeClientFolderName(name, reading))
-    return object : ClientFolder {
-      override val driveId : String get() = "phony"
-      override val name : String get() = name
-      override val reading : String = reading
-      override val createdDate : Long get() = 1
-      override val modifiedDate : Long get() = 1
-      override suspend fun rename(name : String, reading : String) : ClientFolder = this
-      override suspend fun newSession() : SessionFolder = object : SessionFolder {
-        override val date : LocalSecond get() = LocalSecond(0L)
-        override val lastUpdateDate : LocalSecond get() = LocalSecond(0L)
-        override suspend fun openData() : SessionData = SessionData()
-        override suspend fun saveData(data : SessionData) {}
-        override suspend fun saveComment(comment : String) {}
-        override suspend fun saveImage(image : Bitmap, fileName : String) {}
-      }
-      override suspend fun getSessions() : SessionFolderList = RESTSessionFolderList(root.drive, CopyOnWriteArrayList())
-    }
-    //RESTClientFolder(root.drive, f).also { folders.add(it) }
+    val clientFolder = root.rest.exec(CreateFolderCommand(encodeClientFolderName(name, reading))).await()
+    return RESTClientFolder(root, clientFolder)
   }
 }

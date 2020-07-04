@@ -85,8 +85,8 @@ object FDrive {
     val q = "name = '${name}' and '${parentFolder.id}' in parents and trashed = false" + if (folder) " and mimeType = '$FOLDER_MIME_TYPE'" else ""
     val filelist = drive.files().list()
      .setQ(q)
-         .setFields(NECESSARY_FIELDS_EXPRESSION)
-         .execute()?.files
+     .setFields(NECESSARY_FIELDS_EXPRESSION)
+     .execute()?.files
     return when {
       null == filelist || filelist.size == 0 -> if (folder) createDriveFolder(drive, parentFolder, name) else createDriveFile(drive, parentFolder, name)
       filelist.size == 1                     -> filelist[0]
