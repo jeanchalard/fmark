@@ -1,11 +1,8 @@
 package com.j.fmark.fdrive
 
-import android.graphics.Bitmap
-import androidx.work.await
-import com.google.api.services.drive.Drive
 import com.j.fmark.CREATION_DATE_FILE_NAME
 import com.j.fmark.LocalSecond
-import com.j.fmark.SessionData
+import com.j.fmark.fdrive.FDrive.Root
 import com.j.fmark.fdrive.FDrive.decodeName
 import com.j.fmark.fdrive.FDrive.decodeReading
 import com.j.fmark.fdrive.FDrive.encodeClientFolderName
@@ -17,7 +14,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import com.google.api.services.drive.model.File as DriveFile
-import com.j.fmark.fdrive.FDrive.Root
 
 interface ClientFolder {
   val driveId : String
@@ -96,11 +92,13 @@ class RESTClientFolder(private val root : Root, private val clientFolder : Drive
   }
 
   override suspend fun newSession() : RESTSessionFolder = withContext(Dispatchers.IO) {
-    RESTSessionFolder(root.drive, FDrive.createDriveFolder(root.drive, clientFolder, encodeSessionFolderName(LocalSecond(System.currentTimeMillis()))))
+    val sessionFolder = root.rest.exec(CreateFolderCommand(clientFolder.id, encodeSessionFolderName(LocalSecond(System.currentTimeMillis())))).await()
+    RESTSessionFolder(root.drive, sessionFolder)
   }
 
   override suspend fun rename(name : String, reading : String) : RESTClientFolder = withContext(Dispatchers.IO) {
-    RESTClientFolder(root, root.drive.files().update(clientFolder.id, DriveFile().setName(encodeClientFolderName(name, reading))).setFields(NECESSARY_FIELDS).execute())
+    val newFolder = root.rest.exec(RenameFolderCommand(clientFolder.name, encodeClientFolderName(name, reading))).await()
+    RESTClientFolder(root, newFolder)
   }
 }
 
@@ -111,7 +109,7 @@ class RESTClientFolderList internal constructor(private val root : Root, private
   override fun get(i : Int) = folders[i]
   override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.driveId == folder.driveId }
   suspend fun createClient(name : String, reading : String) : ClientFolder {
-    val clientFolder = root.rest.exec(CreateFolderCommand(encodeClientFolderName(name, reading))).await()
+    val clientFolder = root.rest.exec(CreateFolderCommand(root.root.id, encodeClientFolderName(name, reading))).await()
     return RESTClientFolder(root, clientFolder)
   }
 }

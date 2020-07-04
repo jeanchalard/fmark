@@ -44,16 +44,18 @@ fun CoroutineWorker.finish(res : DriveFile?) = when (res) {
   else -> Result.success(workDataOf(JSON_OUT to res.toJson()))
 }
 
-class CreateFolderCommand(folderName : String) : RESTCommand() {
+class CreateFolderCommand(parentFolderId : String, folderName : String) : RESTCommand() {
   override val workerClass = W::class.java
-  override val inputData = workDataOf("folderName" to folderName)
+  override val inputData = workDataOf("parentFolderId" to parentFolderId, "folderName" to folderName)
   class W(private val context : Context, private val params : WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork() : Result = withContext(Dispatchers.IO) {
       try {
-        var drive = FDrive.Root(context)
+        val drive = FDrive.Root(context)
+        val parentFolderId = params.inputData.getString("parentFolderId") ?: throw IllegalArgumentException("No parent folder")
         val folderName = params.inputData.getString("folderName") ?: throw IllegalArgumentException("No folder name")
         log("Creating client ${folderName}")
-        finish(FDrive.createDriveFolder(drive.drive, drive.root, folderName))
+        val parent = DriveFile().also { it.id = parentFolderId }
+        finish(FDrive.createDriveFolder(drive.drive, parent, folderName))
       } catch (e : Exception) {
         log("Couldn't create folder", e)
         Result.retry()
