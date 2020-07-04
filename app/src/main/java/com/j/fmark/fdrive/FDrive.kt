@@ -29,6 +29,7 @@ const val NECESSARY_FIELDS_EXPRESSION = "files(${NECESSARY_FIELDS})"
 
 object FDrive {
   data class Root(val context : Context, val account : Account, val drive : Drive, val root : DriveFile, val rest : RESTManager)
+  private fun String.escape() = replace("'", "\\'")
 
   fun encodeClientFolderName(name : String, reading : String) = "${name} -- ${reading}"
   fun encodeSessionFolderName(date : LocalSecond) = date.toString()
@@ -72,7 +73,7 @@ object FDrive {
 
   suspend fun fetchFolderList(drive : Drive, parentFolder : DriveFile, name : String? = null, exactMatch : Boolean = false) : List<DriveFile> {
     val constraints = mutableListOf("trashed = false", "mimeType = '$FOLDER_MIME_TYPE'", "'${parentFolder.id}' in parents")
-    if (null != name) constraints.add("name ${if (exactMatch) "=" else "contains"} '${name}'")
+    if (null != name) constraints.add("name ${if (exactMatch) "=" else "contains"} '${name.escape()}'")
     return drive.files().list().apply {
       q = constraints.joinToString(" and ")
       fields = NECESSARY_FIELDS_EXPRESSION
@@ -82,7 +83,7 @@ object FDrive {
   }
 
   private suspend fun fetchChild(drive : Drive, parentFolder : DriveFile, name : String, folder : Boolean) : DriveFile {
-    val q = "name = '${name}' and '${parentFolder.id}' in parents and trashed = false" + if (folder) " and mimeType = '$FOLDER_MIME_TYPE'" else ""
+    val q = "name = '${name.escape()}' and '${parentFolder.id}' in parents and trashed = false" + if (folder) " and mimeType = '$FOLDER_MIME_TYPE'" else ""
     val filelist = drive.files().list()
      .setQ(q)
      .setFields(NECESSARY_FIELDS_EXPRESSION)
