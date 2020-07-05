@@ -78,12 +78,12 @@ class RESTSessionFolder(private val drive : Drive, private val sessionFolder : D
   override val lastUpdateDate = LocalSecond(sessionFolder.modifiedTime)
 
   override suspend fun openData() : SessionData = withContext(Dispatchers.IO) {
-    val f = FDrive.fetchDriveFile(drive, DATA_FILE_NAME, sessionFolder)
+    val f = FDrive.createDriveFile(drive, sessionFolder, DATA_FILE_NAME)
     SessionData(drive.files().get(f.id).executeMediaAsInputStream())
   }
 
   private suspend fun saveToDriveFile(fileName : String, inputStream : InputStream) = withContext(Dispatchers.IO) {
-    FDrive.fetchDriveFile(drive, fileName, sessionFolder).let { file ->
+    FDrive.createDriveFile(drive, sessionFolder, fileName).let { file ->
       drive.files().update(file.id, null /* no metadata updates */, InputStreamContent(BINDATA_MIME_TYPE, inputStream)).execute()
     }
   }

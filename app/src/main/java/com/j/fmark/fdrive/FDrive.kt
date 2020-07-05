@@ -17,7 +17,6 @@ import com.j.fmark.GOOGLE_SIGN_IN_CODE
 import com.j.fmark.LocalSecond
 import com.j.fmark.R
 import com.j.fmark.parseLocalSecond
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -47,7 +46,7 @@ object FDrive {
     val drive = Drive.Builder(NetHttpTransport(), GsonFactory(), credential)
      .setApplicationName(context.getString(R.string.gservices_app_name))
      .build()
-    val folder = fetchDriveFolder(drive, name = context.getString(R.string.fmark_root_directory))
+    val folder = createDriveFolder(drive, name = context.getString(R.string.fmark_root_directory), parentFolder = DriveFile().also { it.id = "root" })
     return Root(context, account, drive, folder, RESTManager(context))
   }
 
@@ -82,52 +81,47 @@ object FDrive {
     }.executeFully()
   }
 
-  private suspend fun fetchChild(drive : Drive, parentFolder : DriveFile, name : String, folder : Boolean) : DriveFile {
+  private suspend fun createDriveLeaf(drive : Drive, parentFolder : DriveFile, name : String, mimeType : String) : DriveFile {
+    val now = com.google.api.client.util.DateTime(System.currentTimeMillis())
+    val newFile = DriveFile().apply {
+      this.name = name
+      this.mimeType = mimeType
+      this.parents = listOf(parentFolder.id)
+      this.modifiedTime = now
+      this.createdTime = now
+    }
+    return withContext(Dispatchers.IO) { drive.files().create(newFile).setFields(NECESSARY_FIELDS).execute() }
+  }
+  private suspend fun fetchLeaf(drive : Drive, parentFolder : DriveFile, name : String, folder : Boolean, create : Boolean) : DriveFile? {
     val q = "name = '${name.escape()}' and '${parentFolder.id}' in parents and trashed = false" + if (folder) " and mimeType = '$FOLDER_MIME_TYPE'" else ""
     val filelist = drive.files().list()
      .setQ(q)
      .setFields(NECESSARY_FIELDS_EXPRESSION)
      .execute()?.files
     return when {
-      null == filelist || filelist.size == 0 -> if (folder) createDriveFolder(drive, parentFolder, name) else createDriveFile(drive, parentFolder, name)
+      null == filelist || filelist.size == 0 -> if (!create) null else createDriveLeaf(drive, parentFolder, name, if (folder) FOLDER_MIME_TYPE else BINDATA_MIME_TYPE)
       filelist.size == 1                     -> filelist[0]
       else                                   -> throw NotUniqueException(name)
     }
   }
 
-  private tailrec suspend fun List<String>.fetchChildren(index : Int, drive : Drive, parentFolder : DriveFile, isFolder : Boolean, scope : CoroutineScope) : DriveFile {
+  private tailrec suspend fun List<String>.fetchChildren(index : Int, drive : Drive, parentFolder : DriveFile, isFolder : Boolean, create : Boolean) : DriveFile? {
     val name = this[index]
-    return if (index == size - 1) fetchChild(drive, parentFolder, name, isFolder)
-      else fetchChildren(index + 1, drive, fetchChild(drive, parentFolder, name, true), isFolder, scope)
+    return if (index == size - 1) fetchLeaf(drive, parentFolder, name, isFolder, create)
+    else fetchChildren(index + 1, drive, fetchLeaf(drive, parentFolder, name, true, create) ?: return null, isFolder, create)
   }
 
-  private suspend fun fetchDriveItem(drive : Drive, parentFolder : DriveFile, name : String, isFolder : Boolean) = withContext(Dispatchers.IO) {
-    name.split("/").fetchChildren(0, drive, parentFolder, isFolder, this)
+  private suspend fun fetchDriveItem(drive : Drive, parentFolder : DriveFile, name : String, isFolder : Boolean, create : Boolean) = withContext(Dispatchers.IO) {
+    name.split("/").fetchChildren(0, drive, parentFolder, isFolder, create)
   }
-  suspend fun fetchDriveFolder(drive : Drive, name : String, parentFolder : DriveFile = DriveFile().setId("root")) = fetchDriveItem(drive, parentFolder, name, isFolder = true)
-  suspend fun fetchDriveFile(drive : Drive, name : String, parentFolder : DriveFile = DriveFile().setId("root")) = fetchDriveItem(drive, parentFolder, name, isFolder = false)
-
-  private fun String.dirBaseName() = lastIndexOf('/').let { delimiter ->
-    when (delimiter) {
-      -1 -> null to this
-      else -> substring(0 until delimiter) to substring(delimiter + 1)
-    }
-  }
-  private suspend fun createDriveItem(drive : Drive, parentFolder : DriveFile, name : String, mimeType : String) : DriveFile {
-    val now = com.google.api.client.util.DateTime(System.currentTimeMillis())
-    val (dirname, basename) = name.dirBaseName()
-    val immediateParent = if (null == dirname) parentFolder else fetchDriveFolder(drive, dirname, parentFolder)
-    val newFile = DriveFile().apply {
-      this.name = basename
-      this.mimeType = mimeType
-      this.parents = listOf(immediateParent.id)
-      this.modifiedTime = now
-      this.createdTime = now
-    }
-    return withContext(Dispatchers.IO) { drive.files().create(newFile).setFields(NECESSARY_FIELDS).execute() }
-  }
-  suspend fun createDriveFolder(drive : Drive, parentFolder : DriveFile, name : String) : DriveFile = createDriveItem(drive, parentFolder, name, FOLDER_MIME_TYPE)
-  suspend fun createDriveFile(drive : Drive, parentFolder : DriveFile, name : String) : DriveFile = createDriveItem(drive, parentFolder, name, BINDATA_MIME_TYPE)
+  suspend fun fetchDriveFolder(drive : Drive, name : String, parentFolder : DriveFile) =
+   fetchDriveItem(drive, parentFolder, name, isFolder = true, create = false)
+  suspend fun fetchDriveFile(drive : Drive, name : String, parentFolder : DriveFile) =
+   fetchDriveItem(drive, parentFolder, name, isFolder = false, create = false)
+  suspend fun createDriveFolder(drive : Drive, parentFolder : DriveFile, name : String) : DriveFile =
+   fetchDriveItem(drive, parentFolder, name, isFolder = true, create = true)!! // If create, fetchDriveItem never returns null, but contracts{} are experimental
+  suspend fun createDriveFile(drive : Drive, parentFolder : DriveFile, name : String) : DriveFile =
+   fetchDriveItem(drive, parentFolder, name, isFolder = false, create = true)!! // If create, fetchDriveItem never returns null, but contracts{} are experimental
 
   suspend fun renameFolder(drive : Drive, clientFolder : DriveFile, newName : String) : DriveFile? = withContext(Dispatchers.IO) {
     drive.files().update(clientFolder.id, clientFolder.apply { this.name = newName }).execute()

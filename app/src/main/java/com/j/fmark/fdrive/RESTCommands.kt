@@ -73,7 +73,8 @@ class RenameFolderCommand(oldFolderName : String, newFolderName : String) : REST
         var root = FDrive.Root(context)
         val oldFolderName = params.inputData.getString("oldFolderName") ?: throw IllegalArgumentException("No old folder name")
         val newFolderName = params.inputData.getString("newFolderName") ?: throw IllegalArgumentException("No new folder name")
-        finish(FDrive.renameFolder(root.drive, FDrive.fetchDriveFolder(root.drive, oldFolderName), newFolderName))
+        val existingFolder = FDrive.fetchDriveFolder(root.drive, oldFolderName, root.root) ?: throw IllegalArgumentException("Folder doesn't exist")
+        finish(FDrive.renameFolder(root.drive, existingFolder, newFolderName))
       } catch (e : Exception) {
         log("Couldn't rename folder", e)
         Result.retry()
