@@ -5,9 +5,11 @@ import com.google.api.client.http.InputStreamContent
 import com.google.api.services.drive.Drive
 import com.j.fmark.COMMENT_FILE_NAME
 import com.j.fmark.DATA_FILE_NAME
+import com.j.fmark.LiveCache
 import com.j.fmark.LocalSecond
 import com.j.fmark.SessionData
 import com.j.fmark.fdrive.FDrive.decodeSessionFolderName
+import com.j.fmark.fdrive.FDrive.Root
 import com.j.fmark.save
 import com.j.fmark.unit
 import kotlinx.coroutines.Dispatchers
@@ -73,18 +75,18 @@ class LocalDiskSessionFolderList(private val sessions : List<File>) : SessionFol
 
 const val BINDATA_MIME_TYPE = "application/octet-stream" // This is stupid >.> why do I have to specify this
 
-class RESTSessionFolder(private val drive : Drive, private val sessionFolder : DriveFile) : SessionFolder {
+class RESTSessionFolder(private val root : Root, private val sessionFolder : DriveFile) : SessionFolder {
   override val date = LocalSecond(sessionFolder.createdTime)
   override val lastUpdateDate = LocalSecond(sessionFolder.modifiedTime)
 
   override suspend fun openData() : SessionData = withContext(Dispatchers.IO) {
-    val f = FDrive.createDriveFile(drive, sessionFolder, DATA_FILE_NAME)
-    SessionData(drive.files().get(f.id).executeMediaAsInputStream())
+    val f = FDrive.createDriveFile(root.drive, sessionFolder, DATA_FILE_NAME)
+    LiveCache.getSession(f) { SessionData(root.drive.files().get(f.id).executeMediaAsInputStream()) }
   }
 
   private suspend fun saveToDriveFile(fileName : String, inputStream : InputStream) = withContext(Dispatchers.IO) {
-    FDrive.createDriveFile(drive, sessionFolder, fileName).let { file ->
-      drive.files().update(file.id, null /* no metadata updates */, InputStreamContent(BINDATA_MIME_TYPE, inputStream)).execute()
+    FDrive.createDriveFile(root.drive, sessionFolder, fileName).let { file ->
+      root.drive.files().update(file.id, null /* no metadata updates */, InputStreamContent(BINDATA_MIME_TYPE, inputStream)).execute()
     }
   }
 
@@ -103,7 +105,9 @@ class RESTSessionFolder(private val drive : Drive, private val sessionFolder : D
   }
 }
 
-class RESTSessionFolderList(private val drive : Drive, private val sessions : CopyOnWriteArrayList<RESTSessionFolder>) : SessionFolderList {
+suspend fun RESTSessionFolderList(root : Root, clientFolder : DriveFile) =
+ RESTSessionFolderList(root, CopyOnWriteArrayList(FDrive.getFolderList(root.drive, clientFolder).map { RESTSessionFolder(root, it) }))
+class RESTSessionFolderList internal constructor(private val root : Root, private val sessions : CopyOnWriteArrayList<RESTSessionFolder>) : SessionFolderList {
   override val count = sessions.size
   override fun get(i : Int) : RESTSessionFolder = sessions[i]
   override fun iterator() = sessions.iterator()

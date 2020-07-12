@@ -88,12 +88,12 @@ class RESTClientFolder(private val root : Root, private val clientFolder : Drive
   override val driveId : String = clientFolder.id
 
   override suspend fun getSessions() : RESTSessionFolderList = withContext(Dispatchers.IO) {
-    RESTSessionFolderList(root.drive, CopyOnWriteArrayList(FDrive.fetchFolderList(root.drive, clientFolder).map { RESTSessionFolder(root.drive, it) }))
+    RESTSessionFolderList(root, clientFolder)
   }
 
   override suspend fun newSession() : RESTSessionFolder = withContext(Dispatchers.IO) {
     val sessionFolder = root.rest.exec(CreateFolderCommand(clientFolder.id, encodeSessionFolderName(LocalSecond(System.currentTimeMillis())))).await()
-    RESTSessionFolder(root.drive, sessionFolder)
+    RESTSessionFolder(root, sessionFolder)
   }
 
   override suspend fun rename(name : String, reading : String) : RESTClientFolder = withContext(Dispatchers.IO) {
@@ -103,7 +103,7 @@ class RESTClientFolder(private val root : Root, private val clientFolder : Drive
 }
 
 suspend fun RESTClientFolderList(root : Root, name : String? = null, exactMatch : Boolean = false) =
-  RESTClientFolderList(root, CopyOnWriteArrayList(FDrive.fetchFolderList(root.drive, root.root, name, exactMatch).map { RESTClientFolder(root, it) }))
+  RESTClientFolderList(root, CopyOnWriteArrayList(FDrive.getFolderList(root.drive, root.root, name, exactMatch).map { RESTClientFolder(root, it) }))
 class RESTClientFolderList internal constructor(private val root : Root, private val folders : CopyOnWriteArrayList<RESTClientFolder>) : ClientFolderList {
   override val count = folders.size
   override fun get(i : Int) = folders[i]

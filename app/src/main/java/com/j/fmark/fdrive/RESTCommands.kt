@@ -16,6 +16,7 @@ import androidx.work.await
 import androidx.work.workDataOf
 import com.google.api.client.json.GenericJson
 import com.google.api.client.json.gson.GsonFactory
+import com.j.fmark.LiveCache
 import com.j.fmark.log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -50,7 +51,7 @@ class CreateFolderCommand(parentFolderId : String, folderName : String) : RESTCo
   class W(private val context : Context, private val params : WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork() : Result = withContext(Dispatchers.IO) {
       try {
-        val drive = FDrive.Root(context)
+        val drive = LiveCache.getRoot { FDrive.Root(context) }
         val parentFolderId = params.inputData.getString("parentFolderId") ?: throw IllegalArgumentException("No parent folder")
         val folderName = params.inputData.getString("folderName") ?: throw IllegalArgumentException("No folder name")
         log("Creating client ${folderName}")
@@ -70,7 +71,7 @@ class RenameFolderCommand(oldFolderName : String, newFolderName : String) : REST
   class W(private val context : Context, private val params : WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork() : Result = withContext(Dispatchers.IO) {
       try {
-        var root = FDrive.Root(context)
+        var root = LiveCache.getRoot { FDrive.Root(context) }
         val oldFolderName = params.inputData.getString("oldFolderName") ?: throw IllegalArgumentException("No old folder name")
         val newFolderName = params.inputData.getString("newFolderName") ?: throw IllegalArgumentException("No new folder name")
         val existingFolder = FDrive.fetchDriveFolder(root.drive, oldFolderName, root.root) ?: throw IllegalArgumentException("Folder doesn't exist")

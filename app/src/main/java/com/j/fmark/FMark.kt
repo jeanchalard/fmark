@@ -150,7 +150,7 @@ class FMark : AppCompatActivity() {
       findViewById<View>(R.id.insert_loading).visibility = View.GONE
       offlineError(R.string.sign_in_fail_eventual)
     } else
-      GlobalScope.launch(Dispatchers.Main) { startClientList(FDrive.Root(this@FMark, account)) }
+      GlobalScope.launch(Dispatchers.Main) { startClientList(LiveCache.getRoot { FDrive.Root(this@FMark, account) }) }
   }
 
   fun showClientDetails(clientFolder : ClientFolder?, root : FMarkRoot) {
