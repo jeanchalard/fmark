@@ -10,13 +10,22 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
+import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.MotionEvent
-import android.widget.ImageView
 import androidx.appcompat.widget.AppCompatImageView
+import kotlinx.collections.immutable.toImmutableList
+import kotlin.math.roundToInt
 
 // Context#getColor is only supported from API 23 onward
 const val DEFAULT_BRUSH_COLOR = 0xFFE53935.toInt()
+
+private fun codeToImageName(code : Int) = when (code) {
+  FACE_CODE  -> FACE_IMAGE_NAME
+  FRONT_CODE -> FRONT_IMAGE_NAME
+  BACK_CODE  -> BACK_IMAGE_NAME
+  else       -> throw IllegalArgumentException("Unknown image code ${code}")
+}
 
 enum class Action(val value : FEditorDataType) {
   NONE(0.0), DOWN(1.0), MOVE(2.0), UP(3.0)
@@ -30,7 +39,6 @@ data class Brush(val mode : PorterDuff.Mode, val color : Int, val width : Float)
 }
 
 abstract class BrushView @JvmOverloads constructor(context : Context, attrs : AttributeSet? = null, defStyleAttr : Int = 0) : AppCompatImageView(context, attrs, defStyleAttr) {
-
   abstract fun changeBrush(brush : Brush) : Brush
   abstract fun isActive(brush : Brush) : Boolean
 }
@@ -55,9 +63,8 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   class CommandList : ArrayList<FEditorDataType>() {
     fun addCommand(command : Action) = add(command.value)
   }
-
-  interface ChangeDelegate { fun onDataChanged() }
-
+  val fileName get() = codeToImageName(code)
+  val code : Int = context.obtainStyledAttributes(attrs, R.styleable.CanvasView, defStyleAttr, defStyleRes)?.getInt(R.styleable.CanvasView_imageCode, 0)!!
   private val touchEnabled : Boolean = context.obtainStyledAttributes(attrs, R.styleable.CanvasView, defStyleAttr, defStyleRes)?.getBoolean(R.styleable.CanvasView_touchEnabled, true) ?: true
   private val data = CommandList()
   private val oldData = CommandList()
@@ -77,11 +84,11 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   private val eraserFeedbackPaint = Paint().apply { color = color(0xFF000000); isAntiAlias = true; style = Paint.Style.STROKE; strokeWidth = 1f }
   private var eraserX = -1.0f;
   private var eraserY = -1.0f
-  private var changeDelegate : ChangeDelegate? = null
+  private var dirty = false
   var brush : Brush = Brush(PorterDuff.Mode.SRC_OVER, defaultColor, defaultWidth)
 
-  fun setOnChangeDelegate(cd : ChangeDelegate) {
-    changeDelegate = cd
+  init {
+    setImageResource(codeToResource(code))
   }
 
   override fun onSizeChanged(w : Int, h : Int, oldw : Int, oldh : Int) {
@@ -99,6 +106,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     cacheVector[0] = drawable.intrinsicWidth.toFloat(); cacheVector[1] = drawable.intrinsicHeight.toFloat()
     imageMatrix.mapPoints(cacheVector)
     replayData(ArrayList(data))
+    dirty = false
   }
 
   override fun onDraw(canvas : Canvas?) {
@@ -109,9 +117,9 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     if (eraserX > 0f) canvas.drawCircle(eraserX, eraserY, imageMatrix.mapRadius(eraserRadius), eraserFeedbackPaint)
   }
 
-  fun getBitmap() : Bitmap = pic.copy(pic.config, false)
-  fun saveData(dest : ArrayList<FEditorDataType>) = dest.apply { clear(); addAll(data) }
-  fun readData(source : ArrayList<FEditorDataType>) = replayData(source)
+  fun readData(source : List<FEditorDataType>) = replayData(source)
+  fun getDrawing() = Drawing(code, data.toImmutableList())
+  fun getSaveBitmap() : Bitmap? = (if (dirty) composePicture(pic) else null).also { dirty = false }
 
   private fun clamp(i : Float, min : Float, max : Float) = if (i < min) min else if (max < i) max else i
 
@@ -127,12 +135,12 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
       MotionEvent.ACTION_MOVE -> addMove(cacheVector[0].toDouble(), cacheVector[1].toDouble(), viewToImage.mapRadius(radius / 2).toDouble(), if (brush.mode == PorterDuff.Mode.CLEAR) ERASE else DRAW)
       MotionEvent.ACTION_UP   -> addUp(cacheVector[0].toDouble(), cacheVector[1].toDouble())
     }
-    changeDelegate?.onDataChanged()
+    dirty = true
     invalidate()
     return true
   }
 
-  private fun replayData(replayData : ArrayList<FEditorDataType>) {
+  private fun replayData(replayData : List<FEditorDataType>) {
     data.clear()
     startCommandIndices.clear()
     pic.eraseColor(Color.TRANSPARENT)
@@ -150,6 +158,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     oldData.clear()
     oldData.addAll(data)
     replayData(ArrayList())
+    dirty = true
   }
 
   fun undo() {
@@ -160,7 +169,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
       replayData(oldData)
       oldData.clear()
     }
-    changeDelegate?.onDataChanged()
+    dirty = true
   }
 
   private fun addDown(x : FEditorDataType, y : FEditorDataType, pressure : FEditorDataType, mode : FEditorDataType, color : FEditorDataType) {
@@ -219,4 +228,31 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     lastX = cacheVector[0]; lastY = cacheVector[1]
     eraserX = -1.0f; eraserY = -1.0f
   }
+
+  private fun composePicture(drawnBitmap : Bitmap) : Bitmap =
+   Bitmap.createBitmap(drawnBitmap.width, drawnBitmap.height, drawnBitmap.config).also { composedBitmap ->
+     val guide = resources.getDrawable(codeToResource(code))
+
+     // Floodfill the bitmap with white first.
+     val canvas = Canvas(composedBitmap)
+     canvas.drawColor(color(0xFFFFFFFF))
+
+     // Compute the aspect-ratio-respecting size of the guide and blit it.
+     val srcAspect = guide.intrinsicWidth.toDouble() / guide.intrinsicHeight
+     val dstAspect = composedBitmap.width.toDouble() / composedBitmap.height
+     if (srcAspect < dstAspect) // Guide is taller (relative to its width) than Dst : fit the height and center in width
+     {
+       val width = (composedBitmap.height * srcAspect).roundToInt()
+       val x = (composedBitmap.width - width) / 2
+       guide.setBounds(x, 0, x + width, composedBitmap.height)
+     } else { // Fit the width and center in height
+       val height = (composedBitmap.width / srcAspect).roundToInt()
+       val y = (composedBitmap.height - height) / 2
+       guide.setBounds(0, y, composedBitmap.width, y + height)
+     }
+     guide.draw(canvas)
+
+     // Blit the drawing.
+     canvas.drawBitmap(drawnBitmap, 0f, 0f, Paint())
+   }
 }

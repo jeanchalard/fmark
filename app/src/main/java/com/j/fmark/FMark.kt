@@ -3,6 +3,7 @@ package com.j.fmark
 import android.app.Application
 import android.content.Intent
 import android.os.Bundle
+import android.os.PersistableBundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -77,7 +78,7 @@ class FMark : AppCompatActivity() {
   private fun startSignIn() {
     if (DBGLOG) log("Starting sign in...")
     insertSpinnerVisible = true
-    MainScope().launch() {
+    MainScope().launch {
       try {
         if (DBGLOG) log("Getting account...")
         val root = FDrive.Root(this@FMark)
@@ -88,6 +89,11 @@ class FMark : AppCompatActivity() {
         offlineError(e.message)
       }
     }
+  }
+
+  override fun onSaveInstanceState(outState : Bundle, outPersistentState : PersistableBundle) {
+    super.onSaveInstanceState(outState, outPersistentState)
+    android.util.Log.e("Hmmm", "?")
   }
 
   private suspend fun startClientList(root : FDrive.Root) {

@@ -11,3 +11,7 @@ const val FRONT_IMAGE_NAME = "前"
 const val BACK_IMAGE_NAME = "後"
 
 const val DBGLOG = true
+
+const val FACE_CODE = 0
+const val FRONT_CODE = 1
+const val BACK_CODE = 2

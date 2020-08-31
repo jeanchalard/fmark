@@ -5,5 +5,6 @@
   </declare-styleable>
   <declare-styleable name="CanvasView">
     <attr name="touchEnabled" format="boolean" />
+    <attr name="imageCode" format="integer" />
   </declare-styleable>
 </resources>

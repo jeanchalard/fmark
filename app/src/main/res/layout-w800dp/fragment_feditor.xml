@@ -138,15 +138,42 @@
    android:layout_height="1px"
    android:background="@color/lightGrey" />
 
-  <com.j.fmark.CanvasView
-   android:id="@+id/feditor_canvas"
+  <ViewFlipper
+   android:id="@+id/feditor_canvas_flipper"
    app:layout_constraintTop_toBottomOf="@id/feditor_vsep1"
    app:layout_constraintBottom_toTopOf="@id/feditor_vsep2"
    app:layout_constraintStart_toStartOf="@id/feditor_palette_scroll"
    app:layout_constraintEnd_toEndOf="@id/feditor_palette_scroll"
    android:layout_width="0dp"
    android:layout_height="0dp"
-   android:scaleType="fitCenter" />
+   app:layout_constraintTop_toTopOf="parent">
+
+        <!-- Image code 0 = face, see Const.kt -->
+      <com.j.fmark.CanvasView
+       android:id="@+id/feditor_canvas_face"
+       app:imageCode="0"
+       android:background="@drawable/face"
+       android:layout_width="match_parent"
+       android:layout_height="match_parent"
+       android:scaleType="fitCenter" />
+
+      <com.j.fmark.CanvasView
+       android:id="@+id/feditor_canvas_front"
+       app:imageCode="1"
+       android:background="@drawable/front"
+       android:layout_width="match_parent"
+       android:layout_height="match_parent"
+       android:scaleType="fitCenter" />
+
+      <com.j.fmark.CanvasView
+       android:id="@+id/feditor_canvas_back"
+       app:imageCode="2"
+       android:background="@drawable/back"
+       android:layout_width="match_parent"
+       android:layout_height="match_parent"
+       android:scaleType="fitCenter" />
+
+  </ViewFlipper>
 
   <View
    android:id="@+id/feditor_vsep2"

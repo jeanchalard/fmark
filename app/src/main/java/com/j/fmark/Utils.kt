@@ -42,3 +42,10 @@ fun parseLocalSecond(s : String) : LocalSecond {
 
 fun ByteArray.toLong() = if (size != Long.SIZE_BYTES) throw NumberFormatException() else fold(0L) { acc, b -> acc shl 8 + b }
 fun Long.toBytes() = ByteArray(Long.SIZE_BYTES) { index -> ((this shr (index * 8)) and 0xFF).toByte() }
+
+fun codeToResource(code : Int) = when (code) {
+  FACE_CODE  -> R.drawable.face
+  FRONT_CODE -> R.drawable.front
+  BACK_CODE  -> R.drawable.back
+  else                                      -> throw IllegalArgumentException("Unknown image code ${code}")
+}

@@ -18,6 +18,7 @@ import com.j.fmark.FMark
 import com.j.fmark.LocalSecond
 import com.j.fmark.R
 import com.j.fmark.SessionData
+import com.j.fmark.codeToResource
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.SessionFolder
 import com.j.fmark.log
@@ -124,11 +125,11 @@ private class ClientHistoryAdapter(private val parent : ClientHistory, private v
       if (session.data.isCompleted) {
         val completedData = session.data.getCompleted()
         commentTextView.text = completedData.comment
-        faceImage.setImageResource(completedData.face.guideId)
+        faceImage.setImageResource(codeToResource(completedData.face.code))
         faceImage.readData(completedData.face.data)
-        frontImage.setImageResource(completedData.front.guideId)
+        frontImage.setImageResource(codeToResource(completedData.front.code))
         frontImage.readData(completedData.front.data)
-        backImage.setImageResource(completedData.back.guideId)
+        backImage.setImageResource(codeToResource(completedData.back.code))
         backImage.readData(completedData.back.data)
         commentTextView.visibility = View.VISIBLE
         loadingView.visibility = View.INVISIBLE

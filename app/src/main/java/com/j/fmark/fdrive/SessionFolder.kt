@@ -74,6 +74,8 @@ class LocalDiskSessionFolderList(private val sessions : List<File>) : SessionFol
 }
 
 const val BINDATA_MIME_TYPE = "application/octet-stream" // This is stupid >.> why do I have to specify this
+const val PNG_MIME_TYPE = "image/png"
+const val TEXT_MIME_TYPE = "text/plain"
 
 class RESTSessionFolder(private val root : Root, private val sessionFolder : DriveFile) : SessionFolder {
   override val date = LocalSecond(sessionFolder.createdTime)
@@ -84,24 +86,25 @@ class RESTSessionFolder(private val root : Root, private val sessionFolder : Dri
     LiveCache.getSession(f) { SessionData(root.drive.files().get(f.id).executeMediaAsInputStream()) }
   }
 
-  private suspend fun saveToDriveFile(fileName : String, inputStream : InputStream) = withContext(Dispatchers.IO) {
+  private suspend fun saveToDriveFile(fileName : String, inputStream : InputStream, dataType : String) = withContext(Dispatchers.IO) {
     FDrive.createDriveFile(root.drive, sessionFolder, fileName).let { file ->
-      root.drive.files().update(file.id, null /* no metadata updates */, InputStreamContent(BINDATA_MIME_TYPE, inputStream)).execute()
+      val f = DriveFile().apply { mimeType = dataType }
+      root.drive.files().update(file.id, f, InputStreamContent(dataType, inputStream)).execute()
     }
   }
 
   override suspend fun saveData(data : SessionData) {
     val s = ByteArrayOutputStream()
     data.save(s)
-    saveToDriveFile(DATA_FILE_NAME, s.toByteArray().inputStream())
+    saveToDriveFile(DATA_FILE_NAME, s.toByteArray().inputStream(), BINDATA_MIME_TYPE)
   }
 
-  override suspend fun saveComment(comment : String) = saveToDriveFile(COMMENT_FILE_NAME, comment.toByteArray().inputStream()).unit
+  override suspend fun saveComment(comment : String) = saveToDriveFile(COMMENT_FILE_NAME, comment.toByteArray().inputStream(), TEXT_MIME_TYPE).unit
 
   override suspend fun saveImage(image : Bitmap, fileName : String) {
     val s = ByteArrayOutputStream()
     image.compress(Bitmap.CompressFormat.PNG, 85, s)
-    saveToDriveFile(fileName, s.toByteArray().inputStream())
+    saveToDriveFile(fileName, s.toByteArray().inputStream(), PNG_MIME_TYPE)
   }
 }
 
