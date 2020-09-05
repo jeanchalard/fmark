@@ -26,6 +26,7 @@ import com.j.fmark.FRONT_CODE
 import com.j.fmark.R
 import com.j.fmark.SessionData
 import com.j.fmark.fdrive.SessionFolder
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -157,6 +158,8 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     private fun save() : Job {
       fmarkHost.saveIndicator.showInProgress()
 
+      val comment = commentData
+      commentData = SaveString(comment.string, dirty = false)
       val faceData = faceCanvas.getDrawing()
       val faceBitmap = faceCanvas.getSaveBitmap()
       val frontData = frontCanvas.getDrawing()
@@ -166,12 +169,15 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
 
       return lifecycleScope.launch(Dispatchers.IO) {
         try {
+          val tasks = mutableListOf<Deferred<Unit>>()
           if (commentData.dirty || faceBitmap != null || frontBitmap != null || backBitmap != null)
-            session.saveData(SessionData(commentData.string, faceData, frontData, backData))
-          if (commentData.dirty) session.saveComment(commentData.string)
-          if (faceBitmap != null) session.saveImage(faceBitmap, faceCanvas.fileName)
-          if (frontBitmap != null) session.saveImage(frontBitmap, frontCanvas.fileName)
-          if (backBitmap != null) session.saveImage(backBitmap, backCanvas.fileName)
+            tasks.add(async { session.saveData(SessionData(commentData.string, faceData, frontData, backData))})
+          if (commentData.dirty)
+            tasks.add(async { session.saveComment(commentData.string) })
+          if (faceBitmap != null) tasks.add(async { session.saveImage(faceBitmap, faceCanvas.fileName) })
+          if (frontBitmap != null) tasks.add(async { session.saveImage(frontBitmap, frontCanvas.fileName) })
+          if (backBitmap != null) tasks.add(async { session.saveImage(backBitmap, backCanvas.fileName) })
+          tasks.forEach { it.await() }
           withContext(Dispatchers.Main) { fmarkHost.saveIndicator.showOk() }
         } catch (e : ApiException) {
           withContext(Dispatchers.Main) { fmarkHost.saveIndicator.showError() }
@@ -184,8 +190,8 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     * ✓ L'image n'est pas sauvegardée quand il faut parce que dirty est mis à jour quand on change de dessin au lieu de quand on le touche ce qui est complètement con
     * ③ La sauvegarde est horriblement lente parce que :
     *   - les ids des DriveFile ne sont pas cachés, ce qui fait qu'il faut 800ms pour choper l'ID avant de pouvoir uploader le fichier
-    *   - les images sont uploadées séquentiellement au lieu de parallèlement
-    *   - par défaut l'upload est multipart au lieu de media, ce qui fait 2 requêtes au lieu d'une
+    *   ✓ les images sont uploadées séquentiellement au lieu de parallèlement
+    *   - par défaut l'upload est multipart au lieu de media, ce qui fait 2 requêtes au lieu d'une... pas pris en charge par l'API :( ✗
     * ④ Les thumbnails et les previews ne marchent pas sur drive, parce qu'apparemment ce connard de drive se repère uniquement à l'extension et pas au type mime
     * ⑤ Si tu coupes le réseau pendant que ça rame, ça plante parce que filelist().execute (ou autre) throw ConnectException
     * ⑥ Il semblerait que cliquer sur la session avant qu'elle ne soit chargée ne fasse juste une session vide
