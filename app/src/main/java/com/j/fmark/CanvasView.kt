@@ -10,11 +10,11 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
-import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.MotionEvent
 import androidx.appcompat.widget.AppCompatImageView
 import kotlinx.collections.immutable.toImmutableList
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.roundToInt
 
 // Context#getColor is only supported from API 23 onward
@@ -85,7 +85,13 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   private var eraserX = -1.0f;
   private var eraserY = -1.0f
   private var dirty = false
+    set(b) { field = b; changeListeners.forEach { it.onCanvasChanged() } }
   var brush : Brush = Brush(PorterDuff.Mode.SRC_OVER, defaultColor, defaultWidth)
+
+  interface OnChangeListener { fun onCanvasChanged() }
+  private val changeListeners = CopyOnWriteArrayList<OnChangeListener>()
+  fun addOnChangeListener(f : OnChangeListener) = changeListeners.add(f)
+  fun removeChangeListener(f : OnChangeListener) = changeListeners.remove(f)
 
   init {
     setImageResource(codeToResource(code))

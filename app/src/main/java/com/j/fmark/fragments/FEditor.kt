@@ -28,6 +28,7 @@ import com.j.fmark.SessionData
 import com.j.fmark.fdrive.SessionFolder
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -64,7 +65,7 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     return impl.view
   }
 
-  private inner class Impl(private val fmarkHost : FMark, private val session : SessionFolder, inflater : LayoutInflater, container : ViewGroup?) {
+  private inner class Impl(private val fmarkHost : FMark, private val session : SessionFolder, inflater : LayoutInflater, container : ViewGroup?) : CanvasView.OnChangeListener {
     val view : View = inflater.inflate(R.layout.fragment_feditor, container, false)
     private val commentContainer = view.findViewById<View>(R.id.feditor_comment_container)
     private val canvasFlipper = view.findViewById<ViewFlipper>(R.id.feditor_canvas_flipper)!!
@@ -115,9 +116,14 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
         faceCanvas.readData(data[FACE_CODE].data)
         frontCanvas.readData(data[FRONT_CODE].data)
         backCanvas.readData(data[BACK_CODE].data)
+        faceCanvas.addOnChangeListener(this@Impl)
+        frontCanvas.addOnChangeListener(this@Impl)
+        backCanvas.addOnChangeListener(this@Impl)
         fmarkHost.topSpinnerVisible = false
       }
     }
+
+    override fun onCanvasChanged() = fmarkHost.saveIndicator.hideOk()
 
     fun onBackPressed() {
       fmarkHost.topSpinnerVisible = true
@@ -166,7 +172,11 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
       val backData = backCanvas.getDrawing()
       val backBitmap = backCanvas.getSaveBitmap()
 
-      return lifecycleScope.launch(Dispatchers.IO) {
+      // Using lifecyclescope here would mean saving would be interrupted as soon as the fragment is paused.
+      // This is pretty bad when the home button is pressed. It also means the save indicator can't be set
+      // to showOk() because that message has to be thrown on the main thread and by the time it would be
+      // processed when exiting this editor this fragment has been terminated.
+      return GlobalScope.launch(Dispatchers.IO) {
         try {
           val tasks = mutableListOf<Deferred<Unit>>()
           if (commentData.dirty || faceBitmap != null || frontBitmap != null || backBitmap != null)
@@ -194,7 +204,7 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     * ④ Les thumbnails et les previews ne marchent pas sur drive, parce qu'apparemment ce connard de drive se repère uniquement à l'extension et pas au type mime
     * ⑤ Si tu coupes le réseau pendant que ça rame, ça plante parce que filelist().execute (ou autre) throw ConnectException
     * ⑥ Il semblerait que cliquer sur la session avant qu'elle ne soit chargée ne fasse juste une session vide
-    * ⑦ L'icône de save reste affichée quand un dessin est dirty
+    * ✓ L'icône de save reste affichée quand un dessin est dirty
     */
   }
 }
