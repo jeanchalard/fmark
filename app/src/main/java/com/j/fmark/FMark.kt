@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentTransaction
 import androidx.work.Configuration
 import com.google.android.gms.auth.api.Auth
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
@@ -31,7 +32,9 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.LinkedList
 import java.util.Locale
+import java.util.concurrent.ConcurrentLinkedQueue
 
 class FMarkApp : Application(), Configuration.Provider {
   override fun getWorkManagerConfiguration() : Configuration = Configuration.Builder().setMinimumLoggingLevel(android.util.Log.VERBOSE).build()
@@ -49,6 +52,8 @@ class FMark : AppCompatActivity() {
     get() = insertSpinner.visibility == View.VISIBLE
     set(v) { insertSpinner.visibility = if (v) View.VISIBLE else View.GONE }
   lateinit var saveIndicator : SaveIndicator
+  // Yeah Android fragment lifecycle is still horrendous
+  private val pendingFragmentTransactions = ConcurrentLinkedQueue<FragmentTransaction>()
 
   override fun onCreate(icicle : Bundle?) {
     super.onCreate(null)
@@ -91,6 +96,20 @@ class FMark : AppCompatActivity() {
     }
   }
 
+  // Yeah, fragment lifecycle is "not a bug" in the framework... it's just terrible design
+  fun replaceFragment(f : Fragment) {
+    val transaction = supportFragmentManager.beginTransaction().replace(R.id.list_fragment, f)
+    if (supportFragmentManager.isStateSaved)
+      pendingFragmentTransactions.add(transaction)
+    else
+      transaction.commit()
+  }
+  override fun onPostResume() {
+    super.onPostResume()
+    while (!pendingFragmentTransactions.isEmpty())
+      pendingFragmentTransactions.poll()?.commit()
+  }
+
   override fun onSaveInstanceState(outState : Bundle, outPersistentState : PersistableBundle) {
     super.onSaveInstanceState(outState, outPersistentState)
     android.util.Log.e("Hmmm", "?")
@@ -100,12 +119,12 @@ class FMark : AppCompatActivity() {
 //    val froot = LocalDiskFMarkRoot(this)
     val froot = RESTFMarkRoot(root)
     insertSpinnerVisible = false
-    supportFragmentManager.beginTransaction().replace(R.id.list_fragment, ClientListFragment(this@FMark, froot)).commit()
+    replaceFragment(ClientListFragment(this@FMark, froot))
   }
 
   fun offlineError(msgId : Int) = offlineError(resources.getString(msgId))
   private fun offlineError(msg : String?) {
-    supportFragmentManager.beginTransaction().replace(R.id.list_fragment, SignInErrorFragment(msg, ::startSignIn)).commit()
+    replaceFragment(SignInErrorFragment(msg, ::startSignIn))
   }
 
   override fun onBackPressed() {

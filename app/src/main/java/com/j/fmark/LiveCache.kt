@@ -45,14 +45,14 @@ object LiveCache {
     }
   }
   suspend fun getFileOrNull(name : String, create : suspend () -> DriveFile?) : DriveFile? {
+    android.util.Log.e("GET FROM CACHE", "${name} : ${files[name]}")
     val result = files.getOrCompute(name) { GlobalScope.async { create() } }
     return result.await()
   }
 
   suspend fun getFile(parentFolder : DriveFile, name : String, create : suspend () -> DriveFile) =
    getFile("${parentFolder.id}/${name}", create)
-  suspend fun getFileOrNull(parentFolder : DriveFile, name : String, create : suspend () -> DriveFile?) =
-   getFileOrNull("${parentFolder.id}/${name}", create)
+  suspend fun getFileOrNull(parentFolder : DriveFile, name : String, create : suspend () -> DriveFile?) = getFileOrNull("${parentFolder.id}/${name}", create)
 
   private val lists : HashMap<String, Deferred<List<DriveFile>>> = HashMap()
   suspend fun getFileList(folder : DriveFile, read : suspend () -> List<DriveFile>) =

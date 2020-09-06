@@ -2,17 +2,23 @@ package com.j.fmark.fdrive
 
 import android.graphics.Bitmap
 import com.google.api.client.http.InputStreamContent
-import com.google.api.services.drive.Drive
+import com.j.fmark.BACK_IMAGE_NAME
 import com.j.fmark.COMMENT_FILE_NAME
 import com.j.fmark.DATA_FILE_NAME
+import com.j.fmark.FACE_IMAGE_NAME
+import com.j.fmark.FRONT_IMAGE_NAME
 import com.j.fmark.LiveCache
 import com.j.fmark.LocalSecond
 import com.j.fmark.SessionData
 import com.j.fmark.fdrive.FDrive.decodeSessionFolderName
 import com.j.fmark.fdrive.FDrive.Root
+import com.j.fmark.fdrive.FDrive.fetchDriveFile
 import com.j.fmark.save
 import com.j.fmark.unit
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -77,13 +83,15 @@ const val BINDATA_MIME_TYPE = "application/octet-stream" // This is stupid >.> w
 const val PNG_MIME_TYPE = "image/png"
 const val TEXT_MIME_TYPE = "text/plain"
 
-class RESTSessionFolder(private val root : Root, private val sessionFolder : DriveFile) : SessionFolder {
+class RESTSessionFolder(private val root : Root, private val sessionFolder : com.google.api.services.drive.model.File) : SessionFolder {
   override val date = LocalSecond(sessionFolder.createdTime)
   override val lastUpdateDate = LocalSecond(sessionFolder.modifiedTime)
 
   override suspend fun openData() : SessionData = withContext(Dispatchers.IO) {
     val f = FDrive.createDriveFile(root.drive, sessionFolder, DATA_FILE_NAME)
-    LiveCache.getSession(f) { SessionData(root.drive.files().get(f.id).executeMediaAsInputStream()) }
+    val data = LiveCache.getSession(f) { SessionData(root.drive.files().get(f.id).executeMediaAsInputStream()) }
+    listOf(FACE_IMAGE_NAME, FRONT_IMAGE_NAME, BACK_IMAGE_NAME).forEach { async { fetchDriveFile(root.drive, it, sessionFolder) } }
+    data
   }
 
   private suspend fun saveToDriveFile(fileName : String, inputStream : InputStream, dataType : String) = withContext(Dispatchers.IO) {

@@ -88,7 +88,6 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
       view.findViewById<TextView>(R.id.feditor_date).text = session.date.toShortString()
       view.findViewById<EditText>(R.id.feditor_comment_text).addAfterTextChangedListener { text ->
         commentData = SaveString(text, dirty = true)
-        save()
       }
 
       val palette = view.findViewById<LinearLayout>(R.id.feditor_palette)
@@ -188,10 +187,10 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     /* ***** PROBLÈMES *****
     * ✓ L'image n'a ni le fond, ni le drawable, uniquement le dessin par dessus
     * ✓ L'image n'est pas sauvegardée quand il faut parce que dirty est mis à jour quand on change de dessin au lieu de quand on le touche ce qui est complètement con
-    * ③ La sauvegarde est horriblement lente parce que :
-    *   - les ids des DriveFile ne sont pas cachés, ce qui fait qu'il faut 800ms pour choper l'ID avant de pouvoir uploader le fichier
+    * ✓ La sauvegarde est horriblement lente parce que :
+    *   ✓ les ids des DriveFile ne sont pas cachés, ce qui fait qu'il faut 800ms pour choper l'ID avant de pouvoir uploader le fichier
     *   ✓ les images sont uploadées séquentiellement au lieu de parallèlement
-    *   - par défaut l'upload est multipart au lieu de media, ce qui fait 2 requêtes au lieu d'une... pas pris en charge par l'API :( ✗
+    *   ✗ par défaut l'upload est multipart au lieu de media, ce qui fait 2 requêtes au lieu d'une... pas pris en charge par l'API
     * ④ Les thumbnails et les previews ne marchent pas sur drive, parce qu'apparemment ce connard de drive se repère uniquement à l'extension et pas au type mime
     * ⑤ Si tu coupes le réseau pendant que ça rame, ça plante parce que filelist().execute (ou autre) throw ConnectException
     * ⑥ Il semblerait que cliquer sur la session avant qu'elle ne soit chargée ne fasse juste une session vide
