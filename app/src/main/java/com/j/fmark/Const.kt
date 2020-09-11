@@ -15,3 +15,6 @@ const val DBGLOG = true
 const val FACE_CODE = 0
 const val FRONT_CODE = 1
 const val BACK_CODE = 2
+
+const val SAVE_QUEUE_DIR = "saveQueue"
+const val CACHE_DIR = "clients"

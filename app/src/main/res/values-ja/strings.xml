@@ -35,4 +35,5 @@
   <string name="accessibility_description_save_inprogress">保存中</string>
   <string name="accessibility_description_save_done">保存済み</string>
   <string name="accessibility_description_save_error">保存エラー</string>
+  <string name="contains_filename_forbidden_chars">ファイル名に入れる為、次の文字を使えません / \ ? : " * | &gt; &lt;</string>
 </resources>

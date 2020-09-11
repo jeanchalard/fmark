@@ -16,7 +16,10 @@ import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
+import com.j.fmark.CACHE_DIR
+import com.j.fmark.ErrorHandling
 import com.j.fmark.R
+import com.j.fmark.SAVE_QUEUE_DIR
 import com.j.fmark.fdrive.FDrive.encodeClientFolderName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -33,7 +36,7 @@ import com.google.api.services.drive.model.File as DriveFile
 interface FMarkRoot {
   suspend fun clearCache()
   suspend fun clientList(searchString : String? = null, exactMatch : Boolean = true) : ClientFolderList
-  suspend fun createClient(name : String, reading : String) : ClientFolder
+  suspend fun createClient(name : String, reading : String, comment : String) : ClientFolder
 }
 
 suspend fun RESTFMarkRoot(context : Context) : RESTFMarkRoot {
@@ -43,8 +46,8 @@ suspend fun RESTFMarkRoot(context : Context) : RESTFMarkRoot {
 class RESTFMarkRoot internal constructor(private val root : FDrive.Root) : FMarkRoot {
   private val clientList = CoroutineScope(Dispatchers.IO).async(start = CoroutineStart.LAZY) { RESTClientFolderList(root) }
 
-  override suspend fun createClient(name : String, reading : String) : ClientFolder = withContext(Dispatchers.IO) {
-    clientList.await().createClient(name, reading)
+  override suspend fun createClient(name : String, reading : String, comment : String) : ClientFolder = withContext(Dispatchers.IO) {
+    clientList.await().createClient(name, reading, comment)
   }
 
   override suspend fun clientList(searchString : String?, exactMatch : Boolean) : ClientFolderList = withContext(Dispatchers.IO) {
@@ -55,7 +58,7 @@ class RESTFMarkRoot internal constructor(private val root : FDrive.Root) : FMark
   }
 
   override suspend fun clearCache() {
-    throw RuntimeException("Cache not implemented yet, implement it")
+    root.cache.deleteRecursively()
   }
 }
 
@@ -76,5 +79,6 @@ class LocalDiskFMarkRoot private constructor (private val context : Context, pri
      root.listFiles().toList()
    else
      root.listFiles().filter { if (exactMatch) it.name == searchString else it.name.contains(searchString) })
-  override suspend fun createClient(name : String, reading : String) : LocalDiskClientFolder = LocalDiskClientFolder(root.resolve(encodeClientFolderName(name, reading)))
+  override suspend fun createClient(name : String, reading : String, comment : String) : LocalDiskClientFolder =
+   LocalDiskClientFolder(root.resolve(encodeClientFolderName(name, reading, comment)))
 }

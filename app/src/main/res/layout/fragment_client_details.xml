@@ -56,13 +56,24 @@
    />
 
   <TextView
+   android:id="@+id/client_details_label_comment"
+   android:layout_width="wrap_content"
+   android:layout_height="wrap_content"
+   android:layout_marginTop="24dp"
+   android:text="@string/label_reading"
+   android:labelFor="@id/client_details_reading"
+   app:layout_constraintStart_toStartOf="@id/client_details_label_name"
+   app:layout_constraintTop_toBottomOf="@id/client_details_label_reading"
+   />
+
+  <TextView
    android:id="@+id/client_details_last_update_date_label"
    android:layout_width="wrap_content"
    android:layout_height="wrap_content"
    android:layout_marginTop="24dp"
    android:text="@string/last_update"
    app:layout_constraintStart_toStartOf="@id/client_details_label_name"
-   app:layout_constraintTop_toBottomOf="@id/client_details_label_reading"
+   app:layout_constraintTop_toBottomOf="@id/client_details_label_comment"
    />
 
   <TextView
@@ -103,6 +114,18 @@
    android:inputType="textPhonetic"
    android:importantForAutofill="no"
    app:layout_constraintBaseline_toBaselineOf="@id/client_details_label_reading"
+   app:layout_constraintEnd_toEndOf="parent"
+   app:layout_constraintStart_toEndOf="@id/client_details_form_barrier" />
+
+  <EditText
+   android:id="@+id/client_details_comment"
+   android:layout_width="0dp"
+   android:layout_height="wrap_content"
+   android:layout_marginStart="8dp"
+   android:layout_marginEnd="8dp"
+   android:inputType="text"
+   android:importantForAutofill="no"
+   app:layout_constraintBaseline_toBaselineOf="@id/client_details_label_comment"
    app:layout_constraintEnd_toEndOf="parent"
    app:layout_constraintStart_toEndOf="@id/client_details_form_barrier" />
 
@@ -149,5 +172,16 @@
    app:layout_constraintBaseline_toBaselineOf="@id/client_details_ok"
    app:layout_constraintBottom_toBottomOf="parent"
    app:layout_constraintEnd_toStartOf="@id/client_details_ok"/>
+
+  <TextView
+   android:id="@+id/client_details_character_error"
+   android:visibility="invisible"
+   android:layout_width="wrap_content"
+   android:layout_height="wrap_content"
+   android:textColor="@android:color/holo_red_light"
+   android:text="@string/contains_filename_forbidden_chars"
+   app:layout_constraintEnd_toStartOf="@+id/client_details_cancel"
+   app:layout_constraintStart_toEndOf="@+id/client_details_form_barrier"
+   app:layout_constraintBaseline_toBaselineOf="@id/client_details_ok" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

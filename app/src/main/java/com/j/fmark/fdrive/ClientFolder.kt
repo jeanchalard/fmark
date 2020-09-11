@@ -1,27 +1,33 @@
 package com.j.fmark.fdrive
 
 import com.j.fmark.CREATION_DATE_FILE_NAME
+import com.j.fmark.ErrorHandling
 import com.j.fmark.LocalSecond
 import com.j.fmark.fdrive.FDrive.Root
+import com.j.fmark.fdrive.FDrive.decodeComment
 import com.j.fmark.fdrive.FDrive.decodeName
 import com.j.fmark.fdrive.FDrive.decodeReading
 import com.j.fmark.fdrive.FDrive.encodeClientFolderName
 import com.j.fmark.fdrive.FDrive.encodeSessionFolderName
 import com.j.fmark.toBytes
 import com.j.fmark.toLong
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import com.google.api.services.drive.model.File as DriveFile
 
 interface ClientFolder {
-  val driveId : String
+  val id : String
   val name : String
   val reading : String
+  val comment : String
   val createdDate : Long
   val modifiedDate : Long
-  suspend fun rename(name : String, reading : String) : ClientFolder
+  suspend fun rename(name : String, reading : String, comment : String) : ClientFolder
   suspend fun newSession() : SessionFolder
   suspend fun getSessions() : SessionFolderList
 }
@@ -57,9 +63,10 @@ class LocalDiskClientFolder(private val file : File) : ClientFolder {
     }
   }
 
-  override val driveId : String = file.absolutePath
+  override val id : String = file.absolutePath
   override val name = decodeName(file.name.toString())
   override val reading = decodeReading(file.name.toString())
+  override val comment = decodeComment(file.name.toString())
   override val createdDate : Long = file.resolve(CREATION_DATE_FILE_NAME).readBytes().toLong()
   override val modifiedDate : Long = file.lastModified()
 
@@ -68,7 +75,7 @@ class LocalDiskClientFolder(private val file : File) : ClientFolder {
 
   override suspend fun getSessions() : LocalDiskSessionFolderList = LocalDiskSessionFolderList(file.listFiles().filter { it.isDirectory })
 
-  override suspend fun rename(name : String, reading : String) : LocalDiskClientFolder = File(encodeClientFolderName(name, reading)).let { newFile ->
+  override suspend fun rename(name : String, reading : String, comment : String) : LocalDiskClientFolder = File(encodeClientFolderName(name, reading, comment)).let { newFile ->
     file.renameTo(newFile)
     LocalDiskClientFolder(newFile)
   }
@@ -77,39 +84,64 @@ class LocalDiskClientFolder(private val file : File) : ClientFolder {
 class LocalDiskClientFolderList(private val folders : List<File>) : ClientFolderList {
   override val count : Int get() = folders.size
   override fun get(i : Int) : LocalDiskClientFolder = LocalDiskClientFolder(folders[i])
-  override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.absolutePath == folder.driveId }
+  override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.absolutePath == folder.id }
 }
 
-class RESTClientFolder(private val root : Root, private val clientFolder : DriveFile) : ClientFolder {
-  override val name = FDrive.decodeName(clientFolder.name)
-  override val reading = FDrive.decodeReading(clientFolder.name)
-  override val createdDate = clientFolder.createdTime?.value ?: throw IllegalArgumentException("Created date not present in loaded folder")
-  override val modifiedDate = clientFolder.modifiedTime?.value ?: throw IllegalArgumentException("Modified date not present in loaded folder")
-  override val driveId : String = clientFolder.id
+class RESTClientFolder(private val root : Root,
+                       override val name : String, override val reading : String, override val comment : String,
+                       private val clientFolder : Deferred<DriveFile>, private val cacheDir : File) : ClientFolder {
+  override val createdDate : Long
+   get() = if (clientFolder.isCompleted)
+     clientFolder.getCompleted().createdTime?.value ?: throw IllegalArgumentException("Created date not present in loaded folder")
+   else
+     cacheDir.resolve(CREATION_DATE_FILE_NAME).readBytes().toLong()
+  override val modifiedDate : Long
+   get() = if (clientFolder.isCompleted)
+     clientFolder.getCompleted().modifiedTime?.value ?: throw IllegalArgumentException("Modified date not present in loaded folder")
+   else
+     cacheDir.lastModified()
+  override val id : String
+   get() = if (clientFolder.isCompleted) clientFolder.getCompleted().id else cacheDir.absolutePath
 
   override suspend fun getSessions() : RESTSessionFolderList = withContext(Dispatchers.IO) {
-    RESTSessionFolderList(root, clientFolder)
+    RESTSessionFolderList(root, clientFolder, cacheDir)
   }
 
   override suspend fun newSession() : RESTSessionFolder = withContext(Dispatchers.IO) {
-    val sessionFolder = root.rest.exec(CreateFolderCommand(clientFolder.id, encodeSessionFolderName(LocalSecond(System.currentTimeMillis())))).await()
-    RESTSessionFolder(root, sessionFolder)
+    val sessionName = encodeSessionFolderName(LocalSecond(System.currentTimeMillis()))
+    val sessionCacheDir = cacheDir.resolve(sessionName)
+    if (!sessionCacheDir.exists()) {
+      if (!sessionCacheDir.mkdirs()) ErrorHandling.fileSystemIsNotWritable()
+    }
+    val sessionFolder = root.rest.exec(CreateFolderCommand(clientFolder.await().id, sessionName))
+    RESTSessionFolder(root, sessionFolder, sessionCacheDir)
   }
 
-  override suspend fun rename(name : String, reading : String) : RESTClientFolder = withContext(Dispatchers.IO) {
-    val newFolder = root.rest.exec(RenameFolderCommand(clientFolder.name, encodeClientFolderName(name, reading))).await()
-    RESTClientFolder(root, newFolder)
+  override suspend fun rename(name : String, reading : String, comment : String) : RESTClientFolder = withContext(Dispatchers.IO) {
+    val newDirName = encodeClientFolderName(name, reading, comment)
+    val newDir = cacheDir.resolveSibling(newDirName)
+    cacheDir.renameTo(newDir)
+    val newFolder = root.rest.exec(RenameFolderCommand(clientFolder.await().name, newDirName))
+    RESTClientFolder(root, name, reading, comment, newFolder, newDir)
   }
 }
 
 suspend fun RESTClientFolderList(root : Root, name : String? = null, exactMatch : Boolean = false) =
-  RESTClientFolderList(root, CopyOnWriteArrayList(FDrive.getFolderList(root.drive, root.root, name, exactMatch).map { RESTClientFolder(root, it) }))
+  RESTClientFolderList(root, CopyOnWriteArrayList(FDrive.getFolderList(root.drive, root.root, name, exactMatch).map {
+    RESTClientFolder(root, decodeName(it.name), decodeReading(it.name), decodeComment(it.name), CompletableDeferred(it), root.cache.resolve(it.name))
+  }))
 class RESTClientFolderList internal constructor(private val root : Root, private val folders : CopyOnWriteArrayList<RESTClientFolder>) : ClientFolderList {
   override val count = folders.size
   override fun get(i : Int) = folders[i]
-  override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.driveId == folder.driveId }
-  suspend fun createClient(name : String, reading : String) : ClientFolder {
-    val clientFolder = root.rest.exec(CreateFolderCommand(root.root.id, encodeClientFolderName(name, reading))).await()
-    return RESTClientFolder(root, clientFolder)
+  override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.id == folder.id }
+  suspend fun createClient(name : String, reading : String, comment : String) : ClientFolder {
+    val folderName = encodeClientFolderName(name, reading, comment)
+    val cacheDir = root.cache.resolve(folderName)
+    if (!cacheDir.exists()) {
+      if (!cacheDir.mkdirs()) ErrorHandling.fileSystemIsNotWritable()
+      cacheDir.resolve(CREATION_DATE_FILE_NAME).writeBytes(System.currentTimeMillis().toBytes())
+    }
+    val clientFolder = root.rest.exec(CreateFolderCommand(root.root.id, folderName))
+    return RESTClientFolder(root, name, reading, comment, clientFolder, cacheDir)
   }
 }

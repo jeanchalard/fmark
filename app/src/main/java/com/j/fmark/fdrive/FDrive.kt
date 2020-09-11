@@ -13,14 +13,18 @@ import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
+import com.j.fmark.CACHE_DIR
+import com.j.fmark.ErrorHandling
 import com.j.fmark.GOOGLE_SIGN_IN_CODE
 import com.j.fmark.LiveCache
 import com.j.fmark.LocalSecond
 import com.j.fmark.R
+import com.j.fmark.SAVE_QUEUE_DIR
 import com.j.fmark.parseLocalSecond
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.concurrent.ExecutionException
 import com.google.api.services.drive.model.File as DriveFile
 
@@ -28,15 +32,16 @@ const val NECESSARY_FIELDS = "id,name,parents,createdTime,modifiedTime"
 const val NECESSARY_FIELDS_EXPRESSION = "files(${NECESSARY_FIELDS})"
 
 object FDrive {
-  data class Root(val context : Context, val account : Account, val drive : Drive, val root : DriveFile, val rest : RESTManager)
+  data class Root(val context : Context, val account : Account, val drive : Drive, val root : DriveFile, val cache : File, val saveQueue : File, val rest : RESTManager)
   private fun String.escape() = replace("'", "\\'")
 
-  fun encodeClientFolderName(name : String, reading : String) = "${name} -- ${reading}"
+  fun encodeClientFolderName(name : String, reading : String, comment : String) = "${name} -- ${reading} -- ${comment}"
   fun encodeSessionFolderName(date : LocalSecond) = date.toString()
-  fun encodeIndexableText(name : String, reading : String) = "${name} ${reading}"
+  fun encodeIndexableText(name : String, reading : String, comment : String) = "${name} ${reading} ${comment}"
 
   fun decodeName(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[0] else folderName
   fun decodeReading(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[1] else folderName
+  fun decodeComment(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[2] else folderName
   fun decodeSessionFolderName(name : String) = parseLocalSecond(name)
 
   suspend fun Root(context : Context) : Root = Root(context, fetchAccount(context, GOOGLE_SIGN_IN_CODE)?.account ?: throw SignInException("Can't get account"))
@@ -48,7 +53,9 @@ object FDrive {
      .setApplicationName(context.getString(R.string.gservices_app_name))
      .build()
     val folder = createDriveFolder(drive, name = context.getString(R.string.fmark_root_directory), parentFolder = DriveFile().also { it.id = "root" })
-    return Root(context, account, drive, folder, RESTManager(context))
+    val cache = context.cacheDir.resolve(CACHE_DIR).also { if (!it.mkdirs()) ErrorHandling.fileSystemIsNotWritable() }
+    val saveQueue = context.filesDir.resolve(SAVE_QUEUE_DIR).also { if (!it.mkdirs()) ErrorHandling.fileSystemIsNotWritable() }
+    return Root(context, account, drive, folder, cache, saveQueue, RESTManager(context))
   }
 
   private suspend fun fetchAccount(context : Context, resultCode : Int) : GoogleSignInAccount? {

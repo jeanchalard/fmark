@@ -110,6 +110,7 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
 
       lifecycle.coroutineScope.launch(Dispatchers.Main) {
         val data = loadedData.await()
+        android.util.Log.e("LOADED", "" + data[FACE_CODE].data)
         val commentView = view.findViewById<EditText>(R.id.feditor_comment_text)
         commentView.setText(data.comment)
         commentData = SaveString(data.comment, dirty = false)
@@ -203,7 +204,7 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     *   ✗ par défaut l'upload est multipart au lieu de media, ce qui fait 2 requêtes au lieu d'une... pas pris en charge par l'API
     * ④ Les thumbnails et les previews ne marchent pas sur drive, parce qu'apparemment ce connard de drive se repère uniquement à l'extension et pas au type mime
     * ⑤ Si tu coupes le réseau pendant que ça rame, ça plante parce que filelist().execute (ou autre) throw ConnectException
-    * ⑥ Il semblerait que cliquer sur la session avant qu'elle ne soit chargée ne fasse juste une session vide
+    * ⑥ Il semblerait que dans certains cas la session est vide (et écrase la bonne session) mais je ne sais pas quand
     * ✓ L'icône de save reste affichée quand un dessin est dirty
     */
   }

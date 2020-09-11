@@ -2,6 +2,8 @@ package com.j.fmark.fragments
 
 import android.content.Context
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -23,13 +25,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class ClientDetails(private val fmarkHost : FMark, private val clientFolder : ClientFolder?, private val root : FMarkRoot) : DialogFragment() {
+  // - is allowed in a file name but I'm using it as a separator. It's a bit shitty but that's simplest
+  // TODO : remove this limitation. Drive doesn't have it, and it can be removed by storing the metadata in a file in the directory instead of in the file name
+  private val filenameForbiddenCharacters = arrayOf('?', ':', '\"', '*', '|', '/', '\\', '<', '>', '-')
+
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View? {
     val view = inflater.inflate(R.layout.fragment_client_details, container, false)
+    val inputName = view.findViewById<EditText>(R.id.client_details_name)
+    val inputReading = view.findViewById<EditText>(R.id.client_details_reading)
+    val inputComment = view.findViewById<EditText>(R.id.client_details_comment)
+
     view.findViewById<Button>(R.id.client_details_ok).setOnClickListener { onFinish(true) }
     view.findViewById<Button>(R.id.client_details_cancel).setOnClickListener { onFinish(false) }
     if (null != clientFolder) {
-      view.findViewById<EditText>(R.id.client_details_name)?.setText(clientFolder.name)
-      view.findViewById<EditText>(R.id.client_details_reading)?.setText(clientFolder.reading)
+      inputName.setText(clientFolder.name)
+      inputReading.setText(clientFolder.reading)
       view.findViewById<TextView>(R.id.client_details_creation_date_value)?.text = formatDate(clientFolder.createdDate)
       view.findViewById<TextView>(R.id.client_details_last_update_date_value)?.text = formatDate(clientFolder.modifiedDate)
     } else {
@@ -38,6 +48,20 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
       view.findViewById<TextView>(R.id.client_details_last_update_date_value)?.text = formatDate(now)
     }
     dialog?.window?.setBackgroundDrawableResource(R.drawable.rounded_square)
+    val listener = object : TextWatcher {
+      override fun beforeTextChanged(s : CharSequence?, start : Int, count : Int, after : Int) = Unit
+      override fun onTextChanged(s : CharSequence?, start : Int, before : Int, count : Int) {}
+      override fun afterTextChanged(s : Editable?) {
+        view.findViewById<TextView>(R.id.client_details_character_error).visibility =
+         if (filenameForbiddenCharacters.any { c -> inputName.text.contains(c) || inputReading.text.contains(c) || inputComment.text.contains(c) })
+           View.VISIBLE
+         else
+           View.INVISIBLE
+      }
+    }
+    inputName.addTextChangedListener(listener)
+    inputReading.addTextChangedListener(listener)
+    inputComment.addTextChangedListener(listener)
     return view
   }
 
@@ -45,17 +69,18 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
     if (!ok) { fmarkHost.supportFragmentManager.popBackStack(); return }
     val name = view?.findViewById<EditText>(R.id.client_details_name)?.text?.toString()
     val reading = view?.findViewById<EditText>(R.id.client_details_reading)?.text?.toString()
-    if (null == name || null == reading) throw NullPointerException("Neither name or reading can be null when validating the dialog")
+    val comment = view?.findViewById<EditText>(R.id.client_details_comment)?.text?.toString()
+    if (null == name || null == reading || null == comment) throw NullPointerException("Name, reading and comment can't be null when validating the dialog")
     MainScope().launch {
       root.clientList(searchString = name, exactMatch = true).count.let { count ->
         if (count == 0)
-          validateDetails(clientFolder, name, reading)
+          validateDetails(clientFolder, name, reading, comment)
         else {
           val message = resources.getQuantityString(R.plurals.client_already_exists, count, count)
           withContext(Dispatchers.Main) {
             AlertDialog.Builder(fmarkHost)
              .setMessage(message)
-             .setPositiveButton(android.R.string.ok) { _, _ -> GlobalScope.launch(Dispatchers.Main) { validateDetails(clientFolder, name, reading) } }
+             .setPositiveButton(android.R.string.ok) { _, _ -> GlobalScope.launch(Dispatchers.Main) { validateDetails(clientFolder, name, reading, comment) } }
              .setNegativeButton(R.string.cancel) { dialog, _ -> dialog.dismiss() }
              .show()
           }
@@ -64,12 +89,12 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
     }
   }
 
-  private suspend fun validateDetails(folder : ClientFolder?, name : String, reading : String) {
+  private suspend fun validateDetails(folder : ClientFolder?, name : String, reading : String, comment : String) {
     fmarkHost.supportFragmentManager.popBackStack()
     if (null == folder)
-      withContext(Dispatchers.Main) { fmarkHost.startSessionEditor(root.createClient(name, reading).newSession()) } // It's a new client.
+      withContext(Dispatchers.Main) { fmarkHost.startSessionEditor(root.createClient(name, reading, comment).newSession()) } // It's a new client.
     else
-      fmarkHost.renameClient(folder, name, reading)
+      fmarkHost.renameClient(folder, name, reading, comment)
   }
 
   override fun onDetach() {

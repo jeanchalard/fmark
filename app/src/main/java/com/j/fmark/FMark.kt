@@ -200,8 +200,8 @@ class FMark : AppCompatActivity() {
   }
 
   // TODO : remove this function and have listeners on the ClientFolder object
-  suspend fun renameClient(clientFolder : ClientFolder, name : String, reading : String) {
-    clientFolder.rename(name, reading)
+  suspend fun renameClient(clientFolder : ClientFolder, name : String, reading : String, comment : String) {
+    clientFolder.rename(name, reading, comment)
     withContext(Dispatchers.Main) {
       supportFragmentManager.fragments.forEach {
         if (it is ClientListFragment) it.notifyRenamed(clientFolder)

@@ -42,4 +42,5 @@
   <string name="accessibility_description_save_inprogress">Save in progress</string>
   <string name="accessibility_description_save_done">Saved</string>
   <string name="accessibility_description_save_error">Save error</string>
+  <string name="contains_filename_forbidden_chars">Illegal character</string>
 </resources>
