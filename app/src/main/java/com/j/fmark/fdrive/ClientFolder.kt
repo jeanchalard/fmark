@@ -9,6 +9,7 @@ import com.j.fmark.fdrive.FDrive.decodeName
 import com.j.fmark.fdrive.FDrive.decodeReading
 import com.j.fmark.fdrive.FDrive.encodeClientFolderName
 import com.j.fmark.fdrive.FDrive.encodeSessionFolderName
+import com.j.fmark.mkdir_p
 import com.j.fmark.toBytes
 import com.j.fmark.toLong
 import kotlinx.coroutines.CompletableDeferred
@@ -109,10 +110,7 @@ class RESTClientFolder(private val root : Root,
 
   override suspend fun newSession() : RESTSessionFolder = withContext(Dispatchers.IO) {
     val sessionName = encodeSessionFolderName(LocalSecond(System.currentTimeMillis()))
-    val sessionCacheDir = cacheDir.resolve(sessionName)
-    if (!sessionCacheDir.exists()) {
-      if (!sessionCacheDir.mkdirs()) ErrorHandling.fileSystemIsNotWritable()
-    }
+    val sessionCacheDir = cacheDir.resolve(sessionName).mkdir_p()
     val sessionFolder = root.rest.exec(CreateFolderCommand(clientFolder.await().id, sessionName))
     RESTSessionFolder(root, sessionFolder, sessionCacheDir)
   }
@@ -136,11 +134,7 @@ class RESTClientFolderList internal constructor(private val root : Root, private
   override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.id == folder.id }
   suspend fun createClient(name : String, reading : String, comment : String) : ClientFolder {
     val folderName = encodeClientFolderName(name, reading, comment)
-    val cacheDir = root.cache.resolve(folderName)
-    if (!cacheDir.exists()) {
-      if (!cacheDir.mkdirs()) ErrorHandling.fileSystemIsNotWritable()
-      cacheDir.resolve(CREATION_DATE_FILE_NAME).writeBytes(System.currentTimeMillis().toBytes())
-    }
+    val cacheDir = root.cache.resolve(folderName).mkdir_p()
     val clientFolder = root.rest.exec(CreateFolderCommand(root.root.id, folderName))
     return RESTClientFolder(root, name, reading, comment, clientFolder, cacheDir)
   }

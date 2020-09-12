@@ -52,3 +52,8 @@ fun codeToResource(code : Int) = when (code) {
   BACK_CODE  -> R.drawable.back
   else                                      -> throw IllegalArgumentException("Unknown image code ${code}")
 }
+
+fun File.mkdir_p() : File {
+  if (!exists() && !mkdirs()) ErrorHandling.fileSystemIsNotWritable()
+  return this
+}

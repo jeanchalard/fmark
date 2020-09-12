@@ -45,7 +45,7 @@ object LiveCache {
     }
   }
   suspend fun getFileOrNull(name : String, create : suspend () -> DriveFile?) : DriveFile? {
-    android.util.Log.e("GET FROM CACHE", "${name} : ${files[name]}")
+    android.util.Log.e("GET FROM LIVECACHE", "${name} : ${files[name]}")
     val result = files.getOrCompute(name) { GlobalScope.async { create() } }
     return result.await()
   }

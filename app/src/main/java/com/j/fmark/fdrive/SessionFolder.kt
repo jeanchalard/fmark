@@ -99,14 +99,14 @@ class RESTSessionFolder(private val root : Root, private val sessionFolder : Def
       LocalSecond(cacheDir.lastModified())
 
   override suspend fun openData() : SessionData = withContext(Dispatchers.IO) {
-    val f = FDrive.createDriveFile(root.drive, sessionFolder.getCompleted(), DATA_FILE_NAME)
+    val f = FDrive.createDriveFile(root.drive, sessionFolder.await(), DATA_FILE_NAME)
     val data = LiveCache.getSession(f) { SessionData(root.drive.files().get(f.id).executeMediaAsInputStream()) }
-    listOf(FACE_IMAGE_NAME, FRONT_IMAGE_NAME, BACK_IMAGE_NAME).forEach { async { fetchDriveFile(root.drive, it, sessionFolder.getCompleted()) } }
+    listOf(FACE_IMAGE_NAME, FRONT_IMAGE_NAME, BACK_IMAGE_NAME).forEach { async { fetchDriveFile(root.drive, it, sessionFolder.await()) } }
     data
   }
 
   private suspend fun saveToDriveFile(fileName : String, inputStream : InputStream, dataType : String) = withContext(Dispatchers.IO) {
-    FDrive.createDriveFile(root.drive, sessionFolder.getCompleted(), fileName).let { file ->
+    FDrive.createDriveFile(root.drive, sessionFolder.await(), fileName).let { file ->
       val f = DriveFile().apply { mimeType = dataType }
       root.drive.files().update(file.id, f, InputStreamContent(dataType, inputStream)).execute()
     }
@@ -127,7 +127,6 @@ class RESTSessionFolder(private val root : Root, private val sessionFolder : Def
 
   override suspend fun saveImage(image : Bitmap, fileName : String) {
     if (DBGLOG) Log.i("Clients", "Sending image ${fileName}")
-    cacheDir.resolve(DATA_FILE_NAME).outputStream().buffered().use { image.savePng(it) }
     ByteArrayOutputStream().use { s ->
       image.savePng(s)
       saveToDriveFile(fileName, s.toByteArray().inputStream(), PNG_MIME_TYPE)

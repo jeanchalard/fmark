@@ -30,6 +30,7 @@ data class SessionData(var comment : String, val face : Drawing, val front : Dra
 
 fun SessionData() = SessionData("", face = Drawing(FACE_CODE, ArrayList()), front = Drawing(FRONT_CODE, ArrayList()), back = Drawing(BACK_CODE, ArrayList()))
 fun SessionData(inputStream : InputStream) : SessionData {
+  fun SparseArray<Drawing>.getOrEmpty(code : Int) = this[code] ?: Drawing(code, ArrayList())
   var comment : String? = null
   val drawings = SparseArray<Drawing>()
   try {
@@ -45,7 +46,7 @@ fun SessionData(inputStream : InputStream) : SessionData {
   } catch (e : StreamCorruptedException) {
     Log.e("corrupted ?", "hm", e)
   }
-  return SessionData(comment = comment ?: "", face = drawings[FACE_CODE], front = drawings[FRONT_CODE], back = drawings[BACK_CODE])
+  return SessionData(comment = comment ?: "", face = drawings.getOrEmpty(FACE_CODE), front = drawings.getOrEmpty(FRONT_CODE), back = drawings.getOrEmpty(BACK_CODE))
 }
 
 fun SessionData.save(outputStream : OutputStream) {
