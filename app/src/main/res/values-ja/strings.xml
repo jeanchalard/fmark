@@ -4,6 +4,7 @@
   <string name="title">タイトル</string>
 
   <string name="search_hint">検索</string>
+  <string name="sign_in_fail_cant_get_account">グーグルアカウントを取得できません</string>
   <string name="sign_in_fail_instant">サインインに失敗しました</string>
   <string name="sign_in_fail_eventual">サインインはできませんでした。接続環境を確認してください。</string>
   <string name="label_name">氏名 :</string>

@@ -49,7 +49,7 @@ object FDrive {
   fun decodeComment(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ").getOrNull(2) ?: "" else folderName
   fun decodeSessionFolderName(name : String) = parseLocalSecond(name)
 
-  suspend fun Root(context : Context) : Root = Root(context, fetchAccount(context, GOOGLE_SIGN_IN_CODE)?.account ?: throw SignInException("Can't get account"))
+  suspend fun Root(context : Context) : Root = Root(context, fetchAccount(context, GOOGLE_SIGN_IN_CODE)?.account ?: throw SignInException(context.getString(R.string.sign_in_fail_cant_get_account)))
 
   suspend fun Root(context : Context, account : Account) : Root {
     log("Create root ${account}")
