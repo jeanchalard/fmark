@@ -19,7 +19,6 @@ import com.j.fmark.GOOGLE_SIGN_IN_CODE
 import com.j.fmark.LiveCache
 import com.j.fmark.LocalSecond
 import com.j.fmark.R
-import com.j.fmark.SAVE_QUEUE_DIR
 import com.j.fmark.logAlways
 import com.j.fmark.mkdir_p
 import com.j.fmark.parseLocalSecond
@@ -37,7 +36,7 @@ const val NECESSARY_FIELDS = "id,name,parents,createdTime,modifiedTime"
 const val NECESSARY_FIELDS_EXPRESSION = "files(${NECESSARY_FIELDS})"
 
 object FDrive {
-  data class Root(val context : Context, val account : Account, val drive : Drive, val root : DriveFile, val cache : File, val saveQueue : File, val rest : RESTManager)
+  data class Root(val context : Context, val account : Account, val drive : Drive, val root : DriveFile, val cache : File, val saveQueue : SyncQueue, val rest : RESTManager)
   private fun String.escape() = replace("'", "\\'")
 
   fun encodeClientFolderName(name : String, reading : String, comment : String) = if (comment.isEmpty()) "${name} -- ${reading}" else "${name} -- ${reading} -- ${comment}"
@@ -60,7 +59,7 @@ object FDrive {
      .build()
     val folder = createDriveFolder(drive, name = context.getString(R.string.fmark_root_directory), parentFolder = DriveFile().also { it.id = "root" })
     val cache = context.cacheDir.resolve(CACHE_DIR).mkdir_p()
-    val saveQueue = context.filesDir.resolve(SAVE_QUEUE_DIR).mkdir_p()
+    val saveQueue = SyncItemDatabase.queue(context)
     log("Drive folder ${folder}, cache dir ${cache}, save queue ${saveQueue}")
     return Root(context, account, drive, folder, cache, saveQueue, RESTManager(context))
   }
