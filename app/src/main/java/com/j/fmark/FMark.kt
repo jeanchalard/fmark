@@ -14,11 +14,9 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentTransaction
 import androidx.work.Configuration
 import com.google.android.gms.auth.api.Auth
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.FDrive
 import com.j.fmark.fdrive.FMarkRoot
-import com.j.fmark.fdrive.LocalDiskFMarkRoot
 import com.j.fmark.fdrive.RESTFMarkRoot
 import com.j.fmark.fdrive.SessionFolder
 import com.j.fmark.fdrive.SignInException
@@ -32,10 +30,13 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.LinkedList
 import java.util.Locale
 import java.util.concurrent.ConcurrentLinkedQueue
 
+private const val DBG = false
+@Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("FMark", s, e) }
+
+// Looks unused, but WorkManager likes to use reflection to figure out this stuff
 class FMarkApp : Application(), Configuration.Provider {
   override fun getWorkManagerConfiguration() : Configuration = Configuration.Builder().setMinimumLoggingLevel(android.util.Log.VERBOSE).build()
 }
@@ -55,8 +56,13 @@ class FMark : AppCompatActivity() {
   // Yeah Android fragment lifecycle is still horrendous
   private val pendingFragmentTransactions = ConcurrentLinkedQueue<FragmentTransaction>()
 
+  init {
+    log("FMark activity created")
+  }
+
   override fun onCreate(icicle : Bundle?) {
     super.onCreate(null)
+    log("onCreate with icicle = ${icicle}")
     setContentView(R.layout.activity_fmark)
     findViewById<View>(R.id.list_fragment).clipToOutline = true // This should be set in XML but a bug in the resource parser makes it impossible
     insertSpinner = findViewById(R.id.insert_loading)
@@ -76,28 +82,31 @@ class FMark : AppCompatActivity() {
 
   private fun createSaveIndicator(parent : ViewGroup) : SaveIndicator {
     val indicator = layoutInflater.inflate(R.layout.save_indicator, parent, false) as SaveIndicator
+    log("Created save indicator ${indicator}")
     parent.addView(indicator)
     return indicator
   }
 
   private fun startSignIn() {
-    if (DBGLOG) log("Starting sign in...")
+    log("Starting sign in...")
     insertSpinnerVisible = true
     MainScope().launch {
       try {
-        if (DBGLOG) log("Getting account...")
+        log("Getting account...")
         val root = FDrive.Root(this@FMark)
-        if (DBGLOG) log("Account : ${root.account}")
+        log("Account : ${root.account}")
         startClientList(root)
         // else, wait for sign in activity → onActivityResult
       } catch (e : SignInException) {
+        log("SignInException", e)
         offlineError(e.message)
       }
     }
   }
 
   // Yeah, fragment lifecycle is "not a bug" in the framework... it's just terrible design
-  fun replaceFragment(f : Fragment) {
+  private fun replaceFragment(f : Fragment) {
+    log("replaceFragment")
     val transaction = supportFragmentManager.beginTransaction().replace(R.id.list_fragment, f)
     if (supportFragmentManager.isStateSaved)
       pendingFragmentTransactions.add(transaction)
@@ -106,17 +115,18 @@ class FMark : AppCompatActivity() {
   }
   override fun onPostResume() {
     super.onPostResume()
+    log("onPostResume")
     while (!pendingFragmentTransactions.isEmpty())
       pendingFragmentTransactions.poll()?.commit()
   }
 
   override fun onSaveInstanceState(outState : Bundle, outPersistentState : PersistableBundle) {
     super.onSaveInstanceState(outState, outPersistentState)
-    android.util.Log.e("Hmmm", "?")
+    log("onSaveInstanceState, outState = ${outState}, outPersistentState = ${outPersistentState}")
   }
 
   private suspend fun startClientList(root : FDrive.Root) {
-//    val froot = LocalDiskFMarkRoot(this)
+    log("startClientListe")
     val froot = RESTFMarkRoot(root)
     insertSpinnerVisible = false
     replaceFragment(ClientListFragment(this@FMark, froot))
@@ -128,6 +138,7 @@ class FMark : AppCompatActivity() {
   }
 
   override fun onBackPressed() {
+    log("onBackPressed")
     when (val fragment = lastFragment) {
       is FEditor -> fragment.onBackPressed()
       else       -> super.onBackPressed()
@@ -135,6 +146,7 @@ class FMark : AppCompatActivity() {
   }
 
   override fun onPrepareOptionsMenu(menu : Menu?) : Boolean {
+    log("onPrepareOptionsMenu, menu = ${menu}")
     if (null == menu) return super.onPrepareOptionsMenu(menu)
     val isHome = when (lastFragment) {
       is ClientListFragment, is ClientDetails -> true
@@ -149,11 +161,13 @@ class FMark : AppCompatActivity() {
   }
 
   override fun onCreateOptionsMenu(menu : Menu) : Boolean {
+    log("onCreateOptionsMenu")
     menuInflater.inflate(R.menu.menu_feditor, menu)
     return super.onCreateOptionsMenu(menu)
   }
 
   override fun onOptionsItemSelected(item : MenuItem) : Boolean {
+    log("onOptionsItemSelected : ${item}")
     val fragment = lastFragment
     when (fragment) {
       is FEditor            -> return fragment.onOptionsItemSelected(item)
@@ -164,6 +178,7 @@ class FMark : AppCompatActivity() {
 
   override fun onActivityResult(requestCode : Int, resultCode : Int, data : Intent?) {
     super.onActivityResult(requestCode, resultCode, data)
+    log("onActivityResult, requestCode = ${requestCode}, resultCode = ${resultCode}, data = ${data}")
     if (GOOGLE_SIGN_IN_CODE != requestCode) return // How did the control get here ?
     onSignIn(data)
   }
@@ -171,6 +186,7 @@ class FMark : AppCompatActivity() {
   private fun onSignIn(data : Intent?) {
     val signInResult = Auth.GoogleSignInApi.getSignInResultFromIntent(data)
     val account = signInResult?.signInAccount?.account
+    log("onSignIn ${data}, signInResult = ${signInResult}, account = ${account}")
     if (null == account || !signInResult.isSuccess) {
       findViewById<View>(R.id.insert_loading).visibility = View.GONE
       offlineError(R.string.sign_in_fail_eventual)
@@ -179,19 +195,23 @@ class FMark : AppCompatActivity() {
   }
 
   fun showClientDetails(clientFolder : ClientFolder?, root : FMarkRoot) {
+    log("Show client details ${clientFolder?.name}")
     val f = ClientDetails(this, clientFolder, root)
     val transaction = supportFragmentManager.beginTransaction()
      .addToBackStack(null)
     f.show(transaction, "details")
   }
 
-  fun startClientEditor(clientFolder : ClientFolder) =
-   supportFragmentManager.beginTransaction()
-    .addToBackStack("client")
-    .replace(R.id.list_fragment, ClientHistory(this, clientFolder), "client")
-    .commit()
+  fun startClientEditor(clientFolder : ClientFolder) : Int {
+    log("Starting client editor ${clientFolder.name}")
+    return supportFragmentManager.beginTransaction()
+     .addToBackStack("client")
+     .replace(R.id.list_fragment, ClientHistory(this, clientFolder), "client")
+     .commit()
+  }
 
   fun startSessionEditor(sessionFolder : SessionFolder) {
+    log("Starting session editor ${sessionFolder}")
     val fEditor = FEditor(this, sessionFolder)
     supportFragmentManager.beginTransaction().apply {
       addToBackStack("editor")
@@ -201,6 +221,7 @@ class FMark : AppCompatActivity() {
 
   // TODO : remove this function and have listeners on the ClientFolder object
   suspend fun renameClient(clientFolder : ClientFolder, name : String, reading : String, comment : String) {
+    log("Rename client ${clientFolder.name} → ${name} -- ${reading} (${comment})")
     clientFolder.rename(name, reading, comment)
     withContext(Dispatchers.Main) {
       supportFragmentManager.fragments.forEach {

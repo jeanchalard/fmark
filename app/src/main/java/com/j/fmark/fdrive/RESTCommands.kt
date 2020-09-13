@@ -1,7 +1,6 @@
 package com.j.fmark.fdrive
 
 import android.content.Context
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.Observer
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
@@ -18,8 +17,9 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.google.api.client.json.GenericJson
 import com.google.api.client.json.gson.GsonFactory
+import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.LiveCache
-import com.j.fmark.log
+import com.j.fmark.logAlways
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +28,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 import com.google.api.services.drive.model.File as DriveFile
+
+private const val DBG = false
+@Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("RESTCommands", s, e) }
 
 const val JSON_OUT = "json"
 
@@ -43,24 +46,26 @@ inline fun <reified T> String.parseJson() : T = GsonFactory().createJsonParser(t
 inline fun GenericJson.toJson() = GsonFactory().toString(this)
 
 fun CoroutineWorker.finish(res : DriveFile?) = when (res) {
-  null -> Result.retry()
-  else -> Result.success(workDataOf(JSON_OUT to res.toJson()))
+  null -> Result.retry().also { log("Worker result : Retry") }
+  else -> Result.success(workDataOf(JSON_OUT to res.toJson())).also { log("Worker result : Success(${it})") }
 }
 
 class CreateFolderCommand(parentFolderId : String, folderName : String) : RESTCommand() {
+  init { log("Create folder command, ${parentFolderId}/${folderName}") }
   override val workerClass = W::class.java
   override val inputData = workDataOf("parentFolderId" to parentFolderId, "folderName" to folderName)
   class W(private val context : Context, private val params : WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork() : Result = withContext(Dispatchers.IO) {
+      log("Create folder command : doWork ${params} :: ${params.inputData}")
       try {
         val drive = LiveCache.getRoot { FDrive.Root(context) }
         val parentFolderId = params.inputData.getString("parentFolderId") ?: throw IllegalArgumentException("No parent folder")
         val folderName = params.inputData.getString("folderName") ?: throw IllegalArgumentException("No folder name")
-        log("Creating folder ${parentFolderId}/${folderName}")
+        logAlways("Creating folder ${parentFolderId}/${folderName}")
         val parent = DriveFile().also { it.id = parentFolderId }
         finish(FDrive.createDriveFolder(drive.drive, parent, folderName))
       } catch (e : Exception) {
-        log("Couldn't create folder", e)
+        logAlways("Couldn't create folder", e)
         Result.retry()
       }
     }
@@ -68,11 +73,12 @@ class CreateFolderCommand(parentFolderId : String, folderName : String) : RESTCo
 }
 
 class RenameFolderCommand(oldFolderName : String, newFolderName : String) : RESTCommand() {
+  init { log("Rename folder command, ${oldFolderName}/${newFolderName}") }
   override val workerClass = W::class.java
   override val inputData = workDataOf("oldFolderName" to oldFolderName, "newFolderName" to newFolderName)
   class W(private val context : Context, private val params : WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork() : Result = withContext(Dispatchers.IO) {
-      log("Running ${this::class} with ${params.inputData}")
+      log("Rename folder command, doWork with ${params} :: ${params.inputData}")
       try {
         val root = LiveCache.getRoot { FDrive.Root(context) }
         val oldFolderName = params.inputData.getString("oldFolderName") ?: throw IllegalArgumentException("No old folder name")
@@ -81,11 +87,11 @@ class RenameFolderCommand(oldFolderName : String, newFolderName : String) : REST
         if (null != existingFolder) {
           finish(FDrive.renameFolder(root.drive, existingFolder, newFolderName))
         } else {
-          log("Folder doesn't exist ${oldFolderName}")
+          logAlways("Folder doesn't exist ${oldFolderName}")
           Result.success() // Don't retry and don't cancel subsequent work
         }
       } catch (e : Exception) {
-        log("Couldn't rename folder", e)
+        logAlways("Couldn't rename folder", e)
         Result.retry()
       }
     }
@@ -100,11 +106,12 @@ class RESTManager(context : Context) {
   private val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
 
   fun exec(command : RESTCommand) : Deferred<DriveFile> {
-     val request = OneTimeWorkRequest.Builder(command.workerClass)
-      .setConstraints(constraints)
-      .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.SECONDS)
-      .setInputData(command.inputData)
-      .build()
+    log("Exec ${command::class}")
+    val request = OneTimeWorkRequest.Builder(command.workerClass)
+     .setConstraints(constraints)
+     .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.SECONDS)
+     .setInputData(command.inputData)
+     .build()
     workManager.enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.APPEND, request)
     val liveData = workManager.getWorkInfosForUniqueWorkLiveData(WORK_NAME)
     // This is terrible. I want to write liveData.observeForever { workInfos -> ... }, but that won't work because Kotlin doesn't like
@@ -113,10 +120,11 @@ class RESTManager(context : Context) {
     // I wonder if I'm not better off just polling the frigging workInfo.
     return GlobalScope.async(Dispatchers.Main) {
       val result = CompletableDeferred<DriveFile>()
+      log("Waiting for result")
       liveData.observeForever(object : Observer<List<WorkInfo>> {
         override fun onChanged(workInfos : List<WorkInfo>) {
           val workInfo = workInfos.last()
-          log("" + workInfo.state)
+          log("WorkInfos changed ${workInfos.size} " + workInfo.state)
           if (workInfo.state != WorkInfo.State.SUCCEEDED) return
           // This is awful, but that's because the Drive REST API is awful to work with
           when (val output = workInfo.outputData.getString(JSON_OUT)?.parseJson<DriveFile>()) {
@@ -126,7 +134,7 @@ class RESTManager(context : Context) {
           liveData.removeObserver(this)
         }
       })
-      result.await()
+      result.await().also { log("Finished waiting ${it.id} ${it.name}") }
     }
   }
 }

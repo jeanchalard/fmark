@@ -10,7 +10,8 @@ const val FACE_IMAGE_NAME = "顔"
 const val FRONT_IMAGE_NAME = "前"
 const val BACK_IMAGE_NAME = "後"
 
-const val DBGLOG = true
+const val LOGEVERYTHING = true
+const val DBGTHREAD = false
 
 const val FACE_CODE = 0
 const val FRONT_CODE = 1

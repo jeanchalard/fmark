@@ -6,15 +6,16 @@ import com.google.api.client.http.InputStreamContent
 import com.j.fmark.BACK_IMAGE_NAME
 import com.j.fmark.COMMENT_FILE_NAME
 import com.j.fmark.DATA_FILE_NAME
-import com.j.fmark.DBGLOG
 import com.j.fmark.FACE_IMAGE_NAME
 import com.j.fmark.FRONT_IMAGE_NAME
+import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.LiveCache
 import com.j.fmark.LocalSecond
 import com.j.fmark.SessionData
 import com.j.fmark.fdrive.FDrive.Root
 import com.j.fmark.fdrive.FDrive.decodeSessionFolderName
 import com.j.fmark.fdrive.FDrive.fetchDriveFile
+import com.j.fmark.logAlways
 import com.j.fmark.save
 import com.j.fmark.unit
 import kotlinx.coroutines.CompletableDeferred
@@ -28,6 +29,9 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.CopyOnWriteArrayList
 import com.google.api.services.drive.model.File as DriveFile
+
+private const val DBG = false
+@Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("SessionFolder", s, e) }
 
 interface SessionFolder {
   val date : LocalSecond
@@ -99,38 +103,50 @@ class RESTSessionFolder(private val root : Root, private val sessionFolder : Def
       LocalSecond(cacheDir.lastModified())
 
   override suspend fun openData() : SessionData = withContext(Dispatchers.IO) {
+    log("openData : start, creating Drive file...")
     val f = FDrive.createDriveFile(root.drive, sessionFolder.await(), DATA_FILE_NAME)
+    log("openData : created Drive file ${f.id} ${f.name}, reading data...")
     val data = LiveCache.getSession(f) { SessionData(root.drive.files().get(f.id).executeMediaAsInputStream()) }
+    log("openData : read data, comment = ${data.comment}, face has ${data.face.data.size} data points, starting priming tasks...")
     listOf(FACE_IMAGE_NAME, FRONT_IMAGE_NAME, BACK_IMAGE_NAME).forEach { async { fetchDriveFile(root.drive, it, sessionFolder.await()) } }
+    log("openData : done")
     data
   }
 
   private suspend fun saveToDriveFile(fileName : String, inputStream : InputStream, dataType : String) = withContext(Dispatchers.IO) {
+    log("saveToDriveFile : start, creating Drive file...")
     FDrive.createDriveFile(root.drive, sessionFolder.await(), fileName).let { file ->
+      log("saveToDriveFile : created Drive file : ${file.id} ${file.name}, updating...")
       val f = DriveFile().apply { mimeType = dataType }
       root.drive.files().update(file.id, f, InputStreamContent(dataType, inputStream)).execute()
-    }
+    }.also { log("saveToDriveFile : done") }
   }
 
   override suspend fun saveData(data : SessionData) {
-    if (DBGLOG) Log.i("Clients", "Sending data with ${data.face.data.size} data points for face")
+    log("saveData : start with ${data.face.data.size} data points for face, saving cache...")
     cacheDir.resolve(DATA_FILE_NAME).outputStream().buffered().use { data.save(it) }
+    log("saveData : cache saved, saving to Drive...")
     val s = ByteArrayOutputStream()
     data.save(s)
     saveToDriveFile(DATA_FILE_NAME, s.toByteArray().inputStream(), BINDATA_MIME_TYPE)
+    log("saveData : done")
   }
 
   override suspend fun saveComment(comment : String) {
+    log("saveComment : start with comment = ${comment}, saving cache...")
     cacheDir.resolve(DATA_FILE_NAME).bufferedWriter().use { it.write(comment) }
+    log("saveComment : cache saved, saving to Drive...")
     saveToDriveFile(COMMENT_FILE_NAME, comment.toByteArray().inputStream(), TEXT_MIME_TYPE)
+    log("saveComment : done")
   }
 
   override suspend fun saveImage(image : Bitmap, fileName : String) {
-    if (DBGLOG) Log.i("Clients", "Sending image ${fileName}")
+    log("saveImage : start with ${fileName}, saving to Drive (since images are not saved to cache)...")
     ByteArrayOutputStream().use { s ->
       image.savePng(s)
       saveToDriveFile(fileName, s.toByteArray().inputStream(), PNG_MIME_TYPE)
     }
+    log("saveImage : done")
   }
 }
 

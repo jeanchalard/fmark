@@ -1,37 +1,20 @@
 package com.j.fmark.fdrive
 
 import android.content.Context
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
-import com.google.android.gms.drive.DriveClient
-import com.google.android.gms.drive.DriveFolder
-import com.google.android.gms.drive.DriveResourceClient
-import com.google.android.gms.drive.query.Filters
-import com.google.android.gms.drive.query.Query
-import com.google.android.gms.drive.query.SearchableField
-import com.google.android.gms.drive.query.SortOrder
-import com.google.android.gms.drive.query.SortableField
-import com.google.android.gms.dynamic.DeferredLifecycleHelper
-import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
-import com.google.api.client.http.javanet.NetHttpTransport
-import com.google.api.client.json.gson.GsonFactory
-import com.google.api.services.drive.Drive
-import com.google.api.services.drive.DriveScopes
-import com.j.fmark.CACHE_DIR
-import com.j.fmark.ErrorHandling
+import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.R
-import com.j.fmark.SAVE_QUEUE_DIR
 import com.j.fmark.fdrive.FDrive.encodeClientFolderName
+import com.j.fmark.logAlways
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.stream.Stream.iterate
-import com.google.api.services.drive.model.File as DriveFile
+import java.lang.Exception
+
+private const val DBG = false
+@Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("FMarkRoot", s, e) }
 
 interface FMarkRoot {
   suspend fun clearCache()
@@ -47,10 +30,12 @@ class RESTFMarkRoot internal constructor(private val root : FDrive.Root) : FMark
   private val clientList = CoroutineScope(Dispatchers.IO).async(start = CoroutineStart.LAZY) { RESTClientFolderList(root) }
 
   override suspend fun createClient(name : String, reading : String, comment : String) : ClientFolder = withContext(Dispatchers.IO) {
+    log("Create client ${name} -- ${reading} (${comment})")
     clientList.await().createClient(name, reading, comment)
   }
 
   override suspend fun clientList(searchString : String?, exactMatch : Boolean) : ClientFolderList = withContext(Dispatchers.IO) {
+    log("Client list, search ${searchString}")
     if (searchString != null)
       RESTClientFolderList(root, searchString, exactMatch)
     else
@@ -69,7 +54,6 @@ class LocalDiskFMarkRoot private constructor (private val context : Context, pri
   }
 
   init {
-    android.util.Log.e("ROOT", root.toString())
     if (!root.exists()) root.mkdir()
   }
 

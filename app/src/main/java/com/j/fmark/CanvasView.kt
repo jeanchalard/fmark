@@ -17,6 +17,9 @@ import kotlinx.collections.immutable.toImmutableList
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.roundToInt
 
+private const val DBG = false
+@Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("CanvasView", s, e) }
+
 // Context#getColor is only supported from API 23 onward
 const val DEFAULT_BRUSH_COLOR = 0xFFE53935.toInt()
 
@@ -64,7 +67,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
     fun addCommand(command : Action) = add(command.value)
   }
   val fileName get() = codeToImageName(code)
-  val code : Int = context.obtainStyledAttributes(attrs, R.styleable.CanvasView, defStyleAttr, defStyleRes)?.getInt(R.styleable.CanvasView_imageCode, 0)!!
+  private val code : Int = context.obtainStyledAttributes(attrs, R.styleable.CanvasView, defStyleAttr, defStyleRes)?.getInt(R.styleable.CanvasView_imageCode, 0)!!
   private val touchEnabled : Boolean = context.obtainStyledAttributes(attrs, R.styleable.CanvasView, defStyleAttr, defStyleRes)?.getBoolean(R.styleable.CanvasView_touchEnabled, true) ?: true
   private val data = CommandList()
   private val oldData = CommandList()
@@ -90,24 +93,28 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
 
   interface OnChangeListener { fun onCanvasChanged() }
   private val changeListeners = CopyOnWriteArrayList<OnChangeListener>()
-  fun addOnChangeListener(f : OnChangeListener) = changeListeners.add(f)
-  fun removeChangeListener(f : OnChangeListener) = changeListeners.remove(f)
+  fun addOnChangeListener(l : OnChangeListener) = changeListeners.add(l).also { log("Add change listener ${l}") }
+  fun removeChangeListener(l : OnChangeListener) = changeListeners.remove(l).also { log("Remove change listener ${l}") }
 
   init {
+    log("Create CanvasView ${this}")
     setImageResource(codeToResource(code))
   }
 
   override fun onSizeChanged(w : Int, h : Int, oldw : Int, oldh : Int) {
     super.onSizeChanged(w, h, oldw, oldh)
+    log("CanvasView changed ${oldw}x${oldh} → ${w}→${h}")
     width = w.toDouble()
     height = h.toDouble()
     pic = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     canvas = Canvas(pic)
+    replayData(ArrayList(data))
   }
 
   private var viewToImage = Matrix()
   override fun onLayout(changed : Boolean, left : Int, top : Int, right : Int, bottom : Int) {
     super.onLayout(changed, left, top, right, bottom)
+    log("Layout CanvasView ${left}x${top}-${right}x${bottom}, changed = ${changed}")
     imageMatrix.invert(viewToImage)
     cacheVector[0] = drawable.intrinsicWidth.toFloat(); cacheVector[1] = drawable.intrinsicHeight.toFloat()
     imageMatrix.mapPoints(cacheVector)
@@ -116,6 +123,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   }
 
   override fun onDraw(canvas : Canvas?) {
+    log(if (null == canvas) "onDraw but canvas is null" else "onDraw")
     if (null == canvas) return
     super.onDraw(canvas)
     canvas.drawBitmap(pic, 0f, 0f, bitmapPaint)
@@ -132,6 +140,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   private var cacheVector = FloatArray(2)
   @SuppressLint("ClickableViewAccessibility") // This view is not clickable.
   override fun onTouchEvent(event : MotionEvent?) : Boolean {
+    log("onTouchEvent ${event}, touchEnabled = ${touchEnabled}")
     if (null == event || !touchEnabled) return false
     cacheVector[0] = event.x; cacheVector[1] = event.y
     viewToImage.mapPoints(cacheVector)
@@ -147,6 +156,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   }
 
   private fun replayData(replayData : List<FEditorDataType>) {
+    log("Replaying data on ${this} with ${replayData.size} data points")
     data.clear()
     startCommandIndices.clear()
     pic.eraseColor(Color.TRANSPARENT)
@@ -161,6 +171,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   }
 
   fun clear() {
+    log("Clearing data")
     oldData.clear()
     oldData.addAll(data)
     replayData(ArrayList())
@@ -169,9 +180,11 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
 
   fun undo() {
     if (startCommandIndices.size > 0) {
+      log("Undo command number ${startCommandIndices.size - 1}")
       val index = startCommandIndices.removeAt(startCommandIndices.size - 1)
       replayData(ArrayList(data.subList(0, index)))
     } else {
+      log("Undo clear")
       replayData(oldData)
       oldData.clear()
     }
@@ -179,6 +192,8 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   }
 
   private fun addDown(x : FEditorDataType, y : FEditorDataType, pressure : FEditorDataType, mode : FEditorDataType, color : FEditorDataType) {
+    // This commented out because it will trigger also on replayData, which is called whenever data is loaded and the like
+    // log("addDown ${x}x${y}x${pressure} with mode ${mode} and color ${color}")
     cacheVector[0] = x.toFloat(); cacheVector[1] = y.toFloat()
     imageMatrix.mapPoints(cacheVector)
     val radius = imageMatrix.mapRadius(pressure.toFloat())
@@ -198,6 +213,8 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   }
 
   private fun addMove(x : FEditorDataType, y : FEditorDataType, pressure : FEditorDataType, erase : FEditorDataType) {
+    // This commented out because it will trigger also on replayData, which is called whenever data is loaded and the like
+    // log("addMove ${x}x${y}x${pressure} with erase ${erase}")
     val isEraser = Brush.isEraser(erase)
     cacheVector[0] = x.toFloat(); cacheVector[1] = y.toFloat()
     imageMatrix.mapPoints(cacheVector)
@@ -223,6 +240,8 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   }
 
   private fun addUp(x : FEditorDataType, y : FEditorDataType) {
+    // This commented out because it will trigger also on replayData, which is called whenever data is loaded and the like
+    // log("addUp ${x}x${y}")
     cacheVector[0] = x.toFloat(); cacheVector[1] = y.toFloat()
     imageMatrix.mapPoints(cacheVector)
     val screenX = cacheVector[0]; val screenY = cacheVector[1]
@@ -238,6 +257,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   private fun composePicture(drawnBitmap : Bitmap) : Bitmap =
    Bitmap.createBitmap(drawnBitmap.width, drawnBitmap.height, drawnBitmap.config).also { composedBitmap ->
      val guide = resources.getDrawable(codeToResource(code))
+     log("${this} composing picture with guide ${guide}")
 
      // Floodfill the bitmap with white first.
      val canvas = Canvas(composedBitmap)

@@ -15,9 +15,11 @@ import com.google.android.gms.common.api.ApiException
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.j.fmark.ClientAdapter
 import com.j.fmark.FMark
+import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.R
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.FMarkRoot
+import com.j.fmark.logAlways
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +27,9 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private const val DBG = false
+@Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("ClientListFragment", s, e) }
 
 /**
  * A fragment implementing the client list.
@@ -37,6 +42,7 @@ class ClientListFragment(private val fmarkHost : FMark, private val root : FMark
   private var refreshRequested = false
 
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View {
+    log("onCreateView, icicle = ${savedInstanceState}")
     val view = inflater.inflate(R.layout.fragment_client_list, container, false)
     val field = view.findViewById<EditText>(R.id.client_name_search).also { it.addTextChangedListener(this) }
     searchField = field
@@ -48,11 +54,13 @@ class ClientListFragment(private val fmarkHost : FMark, private val root : FMark
 
   override fun onResume() {
     super.onResume()
+    log("onResume")
     fmarkHost.insertSpinnerVisible = true
     populateClientList(0L)
   }
 
   fun refresh() {
+    log("refresh")
     fmarkHost.insertSpinnerVisible = true
     refreshRequested = true
     populateClientList(0L)
@@ -63,11 +71,13 @@ class ClientListFragment(private val fmarkHost : FMark, private val root : FMark
   override fun onTextChanged(s : CharSequence?, start : Int, before : Int, count : Int) = populateClientList(if (currentSearch == null) 0 else 1000)
 
   private fun startSearch(start : CoroutineStart = CoroutineStart.DEFAULT, block : suspend CoroutineScope.() -> Unit) {
+    log("startSearch")
     currentSearch = GlobalScope.launch(Dispatchers.Main, start) { block(); currentSearch = null }
   }
 
   // If refresh is requested, this function will request a sync to make sure the data is fresh.
   private fun populateClientList(delayMs : Long) {
+    log("populateClientList, delay = ${delayMs}ms")
     val searchString = searchField?.text?.toString() ?: return
     startSearch {
       if (delayMs > 0) delay(delayMs)
@@ -79,13 +89,16 @@ class ClientListFragment(private val fmarkHost : FMark, private val root : FMark
         readClients(if (searchString.isEmpty() or searchString.isBlank()) null else searchString)
       } catch (e : ApiException) { // TODO : is this still useful ?
         // Can't reach Google servers
+        log("Can't read clients.")
         fmarkHost.offlineError(R.string.fail_data_fetch)
       }
+      log("Populated client list.")
       fmarkHost.insertSpinnerVisible = false
     }
   }
 
   private suspend fun readClients(searchString : String?) {
+    log("readClients, searchString = ${searchString}")
     val context = context ?: return
     val view = view ?: return
 

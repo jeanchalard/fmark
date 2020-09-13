@@ -11,7 +11,13 @@ import java.util.Date
 import java.util.GregorianCalendar
 import java.util.Locale
 
-fun log(msg : String, e : Exception? = null) = Log.e("Clients", msg, e)
+private const val DBG = false
+@Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("Utils", s, e) }
+
+@Suppress("NOTHING_TO_INLINE") inline fun logAlways(tag : String, msg : String, e : Exception? = null) {
+  Log.e(tag, if (DBGTHREAD) "${Thread.currentThread()} ${msg}" else msg, e)
+}
+@Suppress("NOTHING_TO_INLINE") inline fun logAlways(msg : String, e : Exception? = null) = logAlways("Clients", msg, e)
 fun logStackTrace(msg : String) = stackTrace().drop(2).forEach { Log.e(msg, "{$it}") }
 val <T> T.unit get() = Unit
 
@@ -54,6 +60,7 @@ fun codeToResource(code : Int) = when (code) {
 }
 
 fun File.mkdir_p() : File {
+  log("mkdir_p ${name}")
   if (!exists() && !mkdirs()) ErrorHandling.fileSystemIsNotWritable()
   return this
 }

@@ -13,13 +13,14 @@ import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
+import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.CACHE_DIR
-import com.j.fmark.ErrorHandling
 import com.j.fmark.GOOGLE_SIGN_IN_CODE
 import com.j.fmark.LiveCache
 import com.j.fmark.LocalSecond
 import com.j.fmark.R
 import com.j.fmark.SAVE_QUEUE_DIR
+import com.j.fmark.logAlways
 import com.j.fmark.mkdir_p
 import com.j.fmark.parseLocalSecond
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +29,9 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.ExecutionException
 import com.google.api.services.drive.model.File as DriveFile
+
+private const val DBG = false
+@Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("FDrive", s, e) }
 
 const val NECESSARY_FIELDS = "id,name,parents,createdTime,modifiedTime"
 const val NECESSARY_FIELDS_EXPRESSION = "files(${NECESSARY_FIELDS})"
@@ -48,6 +52,7 @@ object FDrive {
   suspend fun Root(context : Context) : Root = Root(context, fetchAccount(context, GOOGLE_SIGN_IN_CODE)?.account ?: throw SignInException("Can't get account"))
 
   suspend fun Root(context : Context, account : Account) : Root {
+    log("Create root ${account}")
     val credential = GoogleAccountCredential.usingOAuth2(context, arrayListOf(DriveScopes.DRIVE_FILE))
     credential.selectedAccount = account
     val drive = Drive.Builder(NetHttpTransport(), GsonFactory(), credential)
@@ -56,10 +61,12 @@ object FDrive {
     val folder = createDriveFolder(drive, name = context.getString(R.string.fmark_root_directory), parentFolder = DriveFile().also { it.id = "root" })
     val cache = context.cacheDir.resolve(CACHE_DIR).mkdir_p()
     val saveQueue = context.filesDir.resolve(SAVE_QUEUE_DIR).mkdir_p()
+    log("Drive folder ${folder}, cache dir ${cache}, save queue ${saveQueue}")
     return Root(context, account, drive, folder, cache, saveQueue, RESTManager(context))
   }
 
   private suspend fun fetchAccount(context : Context, resultCode : Int) : GoogleSignInAccount? {
+    log("Fetching account")
     val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
      .requestScopes(com.google.android.gms.drive.Drive.SCOPE_FILE)
      .requestEmail()
@@ -80,6 +87,7 @@ object FDrive {
   }
 
   private suspend fun fetchFolderList(drive : Drive, parentFolder : DriveFile, name : String? = null, exactMatch : Boolean = false) : List<DriveFile> {
+    log("Fetch folder list, parent = ${parentFolder.name}, search ${name}")
     val constraints = mutableListOf("trashed = false", "mimeType = '$FOLDER_MIME_TYPE'", "'${parentFolder.id}' in parents")
     if (null != name) constraints.add("name ${if (exactMatch) "=" else "contains"} '${name.escape()}'")
     return drive.files().list().apply {
@@ -87,15 +95,18 @@ object FDrive {
       fields = NECESSARY_FIELDS_EXPRESSION
       orderBy = "name"
       spaces = "drive"
-    }.executeFully()
+    }.executeFully().also {
+      log("Fetched list with ${it.size} items")
+    }
   }
   suspend fun getFolderList(drive : Drive, parentFolder : DriveFile, name : String? = null, exactMatch : Boolean = false) : List<DriveFile> =
    if (null == name)
-     LiveCache.getFileList(parentFolder) { fetchFolderList(drive, parentFolder) }
+     LiveCache.getFileList(parentFolder) { fetchFolderList(drive, parentFolder) }.also { log("Folder list fetched from livecache with ${it.size} items") }
    else
-     fetchFolderList(drive, parentFolder, name, exactMatch)
+     fetchFolderList(drive, parentFolder, name, exactMatch).also { log("Folder list fetched from Drive with ${it.size} items") }
 
   private suspend fun createDriveLeaf(drive : Drive, parentFolder : DriveFile, name : String, mimeType : String) : DriveFile {
+    log("Create Drive leaf ${parentFolder.name}/${name} with type ${mimeType}")
     val now = com.google.api.client.util.DateTime(System.currentTimeMillis())
     val newFile = DriveFile().apply {
       this.name = name
@@ -104,10 +115,11 @@ object FDrive {
       this.modifiedTime = now
       this.createdTime = now
     }
-    return withContext(Dispatchers.IO) { drive.files().create(newFile).setFields(NECESSARY_FIELDS).execute() }
+    return withContext(Dispatchers.IO) { drive.files().create(newFile).setFields(NECESSARY_FIELDS).execute() }.also { log("Created leaf ${it.id}") }
   }
 
   private suspend fun fetchLeaf(drive : Drive, parentFolder : DriveFile, name : String, folder : Boolean) : DriveFile? = LiveCache.getFileOrNull(parentFolder, name) {
+    log("Fetching leaf ${parentFolder.name}/${name}, folder = ${folder}")
     val q = "name = '${name.escape()}' and '${parentFolder.id}' in parents and trashed = false" + if (folder) " and mimeType = '$FOLDER_MIME_TYPE'" else ""
     val filelist = drive.files().list()
        .setQ(q)
@@ -117,7 +129,7 @@ object FDrive {
         null == filelist || filelist.size == 0 -> null
         filelist.size == 1                     -> filelist[0]
         else                                   -> throw NotUniqueException(name)
-      }
+      }.also { log("Fetched leaf ${it}") }
   }
   private suspend fun fetchOrCreateLeaf(drive : Drive, parentFolder : DriveFile, name : String, folder : Boolean) : DriveFile =
     fetchLeaf(drive, parentFolder, name, folder) ?: createDriveLeaf(drive, parentFolder, name, if (folder) FOLDER_MIME_TYPE else BINDATA_MIME_TYPE)
@@ -126,6 +138,7 @@ object FDrive {
 
   private tailrec suspend fun List<String>.fetchChildren(index : Int, drive : Drive, parentFolder : DriveFile, isFolder : Boolean, create : Boolean) : DriveFile? {
     val name = this[index]
+    log("Fetch children ${parentFolder.name}/${name}, isFolder = ${isFolder}, create = ${create}")
     return if (index == size - 1) fetchLeaf(drive, parentFolder, name, isFolder, create)
     else fetchChildren(index + 1, drive, fetchLeaf(drive, parentFolder, name, true, create) ?: return null, isFolder, create)
   }

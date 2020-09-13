@@ -13,15 +13,15 @@ import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.j.fmark.CanvasView
-import com.j.fmark.DBGLOG
 import com.j.fmark.FMark
+import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.LocalSecond
 import com.j.fmark.R
 import com.j.fmark.SessionData
 import com.j.fmark.codeToResource
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.SessionFolder
-import com.j.fmark.log
+import com.j.fmark.logAlways
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -32,6 +32,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+
+private const val DBG = false
+@Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("ClientHistory", s, e) }
 
 private data class LoadSession(val session : SessionFolder, val data : Deferred<SessionData>)
 
@@ -51,6 +54,7 @@ class ClientHistory(private val fmarkHost : FMark, private val clientFolder : Cl
   private var currentJob : Job? = null
 
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View? {
+    log("onCreateView icicle = ${savedInstanceState}")
     val view = inflater.inflate(R.layout.fragment_client_history, container, false)
     view.findViewById<LinearLayout>(R.id.new_session_button).setOnClickListener {
       GlobalScope.launch {
@@ -66,11 +70,13 @@ class ClientHistory(private val fmarkHost : FMark, private val clientFolder : Cl
 
   override fun onResume() {
     super.onResume()
+    log("onResume")
     view?.let { populateClientHistory(it) }
   }
 
   private fun populateClientHistory(view : View) {
     GlobalScope.launch(Dispatchers.Main) {
+      log("populateClientHistory, currentJob = ${currentJob}")
       // This works though currentJob is not locked because this always runs on the
       // main thread courtesy of Dispatchers.Main. If it was not the case the
       // insertSpinnerVisible = true instruction would crash, too.
@@ -82,12 +88,14 @@ class ClientHistory(private val fmarkHost : FMark, private val clientFolder : Cl
           if (inProgress.isNotEmpty()) inProgress.first().data.start()
           withContext(Dispatchers.Main) {
             val list = view.findViewById<RecyclerView>(R.id.client_history)
+            log("Adding adapter")
             if (null == list.adapter) {
               list.addItemDecoration(DividerItemDecoration(context, (list.layoutManager as LinearLayoutManager).orientation))
               list.adapter = ClientHistoryAdapter(this@ClientHistory, inProgress)
             } else (list.adapter as ClientHistoryAdapter).setSource(inProgress)
             fmarkHost.insertSpinnerVisible = false
             currentJob = null
+            log("Client history populated")
           }
         }
       }
@@ -112,18 +120,19 @@ private class ClientHistoryAdapter(private val parent : ClientHistory, private v
     var session : LoadSession = LoadSession(EMPTY_SESSION, CompletableDeferred())
       set(session) {
         field = session
-        if (DBGLOG) log("Setting session ${session.session.date} in ${this}")
+        log("Setting session ${session.session.date} in ${this}")
         session.data.invokeOnCompletion { populate(session) }
-        if (!session.data.isActive) session.data.start().also { log("Start loading ${session.session.date} now") }
+        if (!session.data.isActive) session.data.start().also { logAlways("Start loading ${session.session.date} now") }
       }
 
     private fun populate(session : LoadSession) {
-      if (DBGLOG) log("Populating with ${session.session.date} ${if (session.data.isCompleted) session.data.getCompleted().comment else session.data.toString()}")
+      log("Populating with ${session.session.date} ${if (session.data.isCompleted) session.data.getCompleted().comment else session.data.toString()}")
       dateLabel.text = if (session.session !== EMPTY_SESSION) session.session.date.toShortString() else ""
       val lastUpdateDateString = if (session.session !== EMPTY_SESSION) session.session.lastUpdateDate.toShortString() else ""
       lastUpdateLabel.text = String.format(Locale.getDefault(), lastUpdateLabel.context.getString(R.string.update_time_with_placeholder), lastUpdateDateString)
       if (session.data.isCompleted) {
         val completedData = session.data.getCompleted()
+        log("Populated, comment = ${completedData.comment}")
         commentTextView.text = completedData.comment
         faceImage.setImageResource(codeToResource(completedData.face.code))
         faceImage.readData(completedData.face.data)
@@ -148,6 +157,7 @@ private class ClientHistoryAdapter(private val parent : ClientHistory, private v
   }
 
   fun setSource(source : List<LoadSession>) {
+    log("setSource with size ${source.size}")
     this.source = source
     notifyDataSetChanged()
   }

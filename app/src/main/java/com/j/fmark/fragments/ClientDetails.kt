@@ -14,15 +14,20 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.DialogFragment
 import com.j.fmark.FMark
+import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.R
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.FMarkRoot
 import com.j.fmark.formatDate
+import com.j.fmark.logAlways
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private const val DBG = false
+@Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("ClientDetails", s, e) }
 
 class ClientDetails(private val fmarkHost : FMark, private val clientFolder : ClientFolder?, private val root : FMarkRoot) : DialogFragment() {
   // - is allowed in a file name but I'm using it as a separator. It's a bit shitty but that's simplest
@@ -30,6 +35,7 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
   private val filenameForbiddenCharacters = arrayOf('?', ':', '\"', '*', '|', '/', '\\', '<', '>', '-')
 
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View? {
+    log("onCreateView ${savedInstanceState}")
     val view = inflater.inflate(R.layout.fragment_client_details, container, false)
     val inputName = view.findViewById<EditText>(R.id.client_details_name)
     val inputReading = view.findViewById<EditText>(R.id.client_details_reading)
@@ -37,6 +43,7 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
 
     view.findViewById<Button>(R.id.client_details_ok).setOnClickListener { onFinish(true) }
     view.findViewById<Button>(R.id.client_details_cancel).setOnClickListener { onFinish(false) }
+    log("Client folder ${clientFolder}")
     if (null != clientFolder) {
       inputName.setText(clientFolder.name)
       inputReading.setText(clientFolder.reading)
@@ -62,17 +69,21 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
     inputName.addTextChangedListener(listener)
     inputReading.addTextChangedListener(listener)
     inputComment.addTextChangedListener(listener)
+    log("onCreateView end")
     return view
   }
 
   private fun onFinish(ok : Boolean) {
+    log("onFinish ok = ${ok}")
     if (!ok) { fmarkHost.supportFragmentManager.popBackStack(); return }
     val name = view?.findViewById<EditText>(R.id.client_details_name)?.text?.toString()
     val reading = view?.findViewById<EditText>(R.id.client_details_reading)?.text?.toString()
     val comment = view?.findViewById<EditText>(R.id.client_details_comment)?.text?.toString()
+    log("Finishing with ${name} -- ${reading} (${comment})")
     if (null == name || null == reading || null == comment) throw NullPointerException("Name, reading and comment can't be null when validating the dialog")
     MainScope().launch {
       root.clientList(searchString = name, exactMatch = true).count.let { count ->
+        log("Existing client count named ${name} : ${count}")
         if (count == 0)
           validateDetails(clientFolder, name, reading, comment)
         else {
@@ -91,6 +102,7 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
 
   private suspend fun validateDetails(folder : ClientFolder?, name : String, reading : String, comment : String) {
     fmarkHost.supportFragmentManager.popBackStack()
+    log("Validating ${name}, folder = ${folder}")
     if (null == folder)
       withContext(Dispatchers.Main) { fmarkHost.startSessionEditor(root.createClient(name, reading, comment).newSession()) } // It's a new client.
     else
@@ -98,6 +110,7 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
   }
 
   override fun onDetach() {
+    log("onDetach")
     super.onDetach()
     // This is atrocious. Why do I need to say "post" for this to work when a button is pressed (as opposed to dismissing by clicking outside the dialog ?)
     // I've spent too much valuable time on this. This solution sucks but it works.

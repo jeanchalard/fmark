@@ -2,9 +2,11 @@
   <dictionary name="j">
     <words>
       <w>changeset</w>
+      <w>dbgthread</w>
       <w>fmark</w>
       <w>indexable</w>
       <w>lateinit</w>
+      <w>livecache</w>
       <w>pokable</w>
     </words>
   </dictionary>

@@ -23,9 +23,11 @@ import com.j.fmark.CanvasView
 import com.j.fmark.FACE_CODE
 import com.j.fmark.FMark
 import com.j.fmark.FRONT_CODE
+import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.R
 import com.j.fmark.SessionData
 import com.j.fmark.fdrive.SessionFolder
+import com.j.fmark.logAlways
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -33,6 +35,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private const val DBG = false
+@Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("FEditor", s, e) }
 
 private fun EditText.addAfterTextChangedListener(f : (String) -> Unit) {
   this.addTextChangedListener(object : TextWatcher {
@@ -46,6 +51,7 @@ private fun EditText.addAfterTextChangedListener(f : (String) -> Unit) {
 }
 
 private fun ViewFlipper.flipTo(v : View) {
+  log("flipTo ${v}")
   displayedChild = indexOfChild(v)
 }
 private val ViewFlipper.shownView get() = getChildAt(displayedChild)
@@ -78,6 +84,7 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     private val loadedData = lifecycle.coroutineScope.async(Dispatchers.IO) { session.openData() }
 
     init {
+      log("Starting editor for ${session}")
       fmarkHost.topSpinnerVisible = true
       fmarkHost.saveIndicator.hideOk()
 
@@ -109,8 +116,9 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
       brushViews.forEach { it.isActivated = it.isActive(faceCanvas.brush) }
 
       lifecycle.coroutineScope.launch(Dispatchers.Main) {
+        log("Loading editor data for ${session}...")
         val data = loadedData.await()
-        android.util.Log.e("LOADED", "" + data[FACE_CODE].data)
+        log("Session loaded, comment = ${data.comment}, face data has ${data[FACE_CODE].data.size} data points")
         val commentView = view.findViewById<EditText>(R.id.feditor_comment_text)
         commentView.setText(data.comment)
         commentData = SaveString(data.comment, dirty = false)
@@ -127,9 +135,11 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     override fun onCanvasChanged() = fmarkHost.saveIndicator.hideOk()
 
     fun onBackPressed() {
+      log("Back pressed, quitting")
       fmarkHost.topSpinnerVisible = true
       lifecycleScope.launch(Dispatchers.Main) {
         save().join()
+        log("Data saved, exiting")
         if (isVisible) {
           fmarkHost.supportFragmentManager.popBackStack()
           fmarkHost.topSpinnerVisible = false
@@ -140,28 +150,32 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     fun onPause() = save()
 
     private fun switchToComment() {
+      log("switchToComment")
       commentContainer.visibility = View.VISIBLE
     }
 
     private fun switchDrawing(canvas : CanvasView) {
+      log("switchDrawing ${canvas}")
       commentContainer?.visibility = View.GONE
       canvasFlipper.flipTo(canvas)
     }
 
     fun onOptionsItemSelected(item : MenuItem) : Boolean {
-      if (fmarkHost.topSpinnerVisible) return false
+      if (fmarkHost.topSpinnerVisible) {
+        log("Option tapped but spinner visible, ignoring")
+        return false
+      }
       when (item.itemId) {
-        R.id.action_button_save  -> {
-          save()
-        }
-        R.id.action_button_undo  -> (view.findViewById<ViewFlipper>(R.id.feditor_canvas_flipper)?.shownView as CanvasView).undo()
-        R.id.action_button_clear -> (view.findViewById<ViewFlipper>(R.id.feditor_canvas_flipper)?.shownView as CanvasView).clear()
+        R.id.action_button_save  -> save().also { log("Option save tapped") }
+        R.id.action_button_undo  -> (view.findViewById<ViewFlipper>(R.id.feditor_canvas_flipper)?.shownView as CanvasView).undo().also { log("Option undo tapped") }
+        R.id.action_button_clear -> (view.findViewById<ViewFlipper>(R.id.feditor_canvas_flipper)?.shownView as CanvasView).clear().also { log("Option clear tapped") }
       }
       return true
     }
 
     // Only saves dirty data, though the data file contains the comment and all drawing data and has to be saved together anyway
     private fun save() : Job {
+      log("Saving data...")
       fmarkHost.saveIndicator.showInProgress()
 
       val comment = commentData
@@ -177,19 +191,23 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
       // This is pretty bad when the home button is pressed. It also means the save indicator can't be set
       // to showOk() because that message has to be thrown on the main thread and by the time it would be
       // processed when exiting this editor this fragment has been terminated.
+      log("Launching save job on IO pool, comment = ${if (comment.dirty) comment else "//not dirty//"}, face = ${faceBitmap}, front = ${frontBitmap}, back = ${backBitmap}")
       return GlobalScope.launch(Dispatchers.IO) {
         try {
           val tasks = mutableListOf<Deferred<Unit>>()
           if (commentData.dirty || faceBitmap != null || frontBitmap != null || backBitmap != null)
-            tasks.add(async { session.saveData(SessionData(commentData.string, faceData, frontData, backData))})
+            tasks.add(async { session.saveData(SessionData(commentData.string, faceData, frontData, backData))}).also { log("Saving data") }
           if (commentData.dirty)
-            tasks.add(async { session.saveComment(commentData.string) })
-          if (faceBitmap != null) tasks.add(async { session.saveImage(faceBitmap, faceCanvas.fileName) })
-          if (frontBitmap != null) tasks.add(async { session.saveImage(frontBitmap, frontCanvas.fileName) })
-          if (backBitmap != null) tasks.add(async { session.saveImage(backBitmap, backCanvas.fileName) })
+            tasks.add(async { session.saveComment(commentData.string) }).also { log("Saving comment") }
+          if (faceBitmap != null) tasks.add(async { session.saveImage(faceBitmap, faceCanvas.fileName) }).also { log("Saving face") }
+          if (frontBitmap != null) tasks.add(async { session.saveImage(frontBitmap, frontCanvas.fileName) }).also { log("Saving front") }
+          if (backBitmap != null) tasks.add(async { session.saveImage(backBitmap, backCanvas.fileName) }).also { log("Saving back") }
+          log("Waiting for ${tasks.size} to finish")
           tasks.forEach { it.await() }
           withContext(Dispatchers.Main) { fmarkHost.saveIndicator.showOk() }
+          log("Data saved successfully.")
         } catch (e : ApiException) {
+          log("Error saving data", e)
           withContext(Dispatchers.Main) { fmarkHost.saveIndicator.showError() }
         }
       }

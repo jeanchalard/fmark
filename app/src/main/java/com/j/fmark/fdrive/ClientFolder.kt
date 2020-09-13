@@ -1,7 +1,7 @@
 package com.j.fmark.fdrive
 
+import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.CREATION_DATE_FILE_NAME
-import com.j.fmark.ErrorHandling
 import com.j.fmark.LocalSecond
 import com.j.fmark.fdrive.FDrive.Root
 import com.j.fmark.fdrive.FDrive.decodeComment
@@ -9,17 +9,21 @@ import com.j.fmark.fdrive.FDrive.decodeName
 import com.j.fmark.fdrive.FDrive.decodeReading
 import com.j.fmark.fdrive.FDrive.encodeClientFolderName
 import com.j.fmark.fdrive.FDrive.encodeSessionFolderName
+import com.j.fmark.logAlways
 import com.j.fmark.mkdir_p
 import com.j.fmark.toBytes
 import com.j.fmark.toLong
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.lang.Exception
 import java.util.concurrent.CopyOnWriteArrayList
 import com.google.api.services.drive.model.File as DriveFile
+
+private const val DBG = false
+@Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("ClientFolder", s, e) }
 
 interface ClientFolder {
   val id : String
@@ -38,23 +42,6 @@ interface ClientFolderList {
   operator fun get(i : Int) : ClientFolder
   fun indexOfFirst(folder : ClientFolder) : Int
 }
-
-/*
-abstract class BaseCachedClientFolder(protected val underlying : Deferred<RESTClientFolder>) : ClientFolder
-class CachedClientFolder(underlying : Deferred<RESTClientFolder>,
-                         override val driveId : String, override val name : String, override val reading : String,
-                         override val createdDate : Long, override val modifiedDate : Long) : BaseCachedClientFolder(underlying) {
-  private val folderList : Deferred<RESTSessionFolderList> by lazy { GlobalScope.async(Dispatchers.IO, CoroutineStart.LAZY) {
-    underlying.getCompleted().getSessions()
-  } }
-  override suspend fun getSessions() = folderList.getCompleted()
-  override suspend fun rename(name : String, reading : String) : CachedClientFolder =
-   CachedClientFolder(GlobalScope.async(Dispatchers.IO) { underlying.getCompleted().rename(name, reading) },
-    driveId, name, reading, createdDate, System.currentTimeMillis())
-  override suspend fun newSession() : SessionFolder {
-  }
-}
-*/
 
 class LocalDiskClientFolder(private val file : File) : ClientFolder {
   init {
@@ -110,6 +97,7 @@ class RESTClientFolder(private val root : Root,
 
   override suspend fun newSession() : RESTSessionFolder = withContext(Dispatchers.IO) {
     val sessionName = encodeSessionFolderName(LocalSecond(System.currentTimeMillis()))
+    log("New session ${sessionName}")
     val sessionCacheDir = cacheDir.resolve(sessionName).mkdir_p()
     val sessionFolder = root.rest.exec(CreateFolderCommand(clientFolder.await().id, sessionName))
     RESTSessionFolder(root, sessionFolder, sessionCacheDir)
@@ -117,6 +105,7 @@ class RESTClientFolder(private val root : Root,
 
   override suspend fun rename(name : String, reading : String, comment : String) : RESTClientFolder = withContext(Dispatchers.IO) {
     val newDirName = encodeClientFolderName(name, reading, comment)
+    log("Rename session ${newDirName}")
     val newDir = cacheDir.resolveSibling(newDirName)
     cacheDir.renameTo(newDir)
     val newFolder = root.rest.exec(RenameFolderCommand(clientFolder.await().name, newDirName))
@@ -134,6 +123,7 @@ class RESTClientFolderList internal constructor(private val root : Root, private
   override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.id == folder.id }
   suspend fun createClient(name : String, reading : String, comment : String) : ClientFolder {
     val folderName = encodeClientFolderName(name, reading, comment)
+    log("Create client ${folderName}")
     val cacheDir = root.cache.resolve(folderName).mkdir_p()
     val clientFolder = root.rest.exec(CreateFolderCommand(root.root.id, folderName))
     return RESTClientFolder(root, name, reading, comment, clientFolder, cacheDir)

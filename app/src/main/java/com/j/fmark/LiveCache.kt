@@ -10,6 +10,9 @@ import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
 import com.google.api.services.drive.model.File as DriveFile
 
+private const val DBG = false
+@Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("LiveCache", s, e) }
+
 @OptIn(ExperimentalContracts::class)
 private inline fun <T> Deferred<T?>?.isValid() : Boolean {
   contract { returns(true) implies (this@isValid != null) }
@@ -35,17 +38,29 @@ object LiveCache {
   private val lock = ReentrantLock()
 
   private var root : Deferred<Root>? = null
-  suspend fun getRoot(create : suspend () -> Root) = lock.withLock { root ?: GlobalScope.async { create() }.also { root = it } }.await()
+  suspend fun getRoot(create : suspend () -> Root) : Root {
+    return lock.withLock {
+      val r = root
+      if (r != null) {
+        log("getRoot, already existed : ${r}")
+        r
+      } else {
+        log("getRoot, creating it")
+        GlobalScope.async { create() }.also { log("getRoot : created Root ${it}"); root = it }
+      }
+    }.await()
+  }
 
   // Key : <parent id>/<name>, because the parent of course never knows its path
   private val files : HashMap<String, Deferred<DriveFile?>> = HashMap()
-  suspend fun getFile(name : String, create : suspend () -> DriveFile) : DriveFile {
+  private suspend fun getFile(name : String, create : suspend () -> DriveFile) : DriveFile {
     while (true) {
-      getFileOrNull(name, create)?.let { return it }
+      log("getFile ${name}...")
+      getFileOrNull(name, create)?.let { log("Got file : ${it}"); return it }
     }
   }
-  suspend fun getFileOrNull(name : String, create : suspend () -> DriveFile?) : DriveFile? {
-    android.util.Log.e("GET FROM LIVECACHE", "${name} : ${files[name]}")
+  private suspend fun getFileOrNull(name : String, create : suspend () -> DriveFile?) : DriveFile? {
+    log("Get file from live cache, ${name} : ${files[name]}")
     val result = files.getOrCompute(name) { GlobalScope.async { create() } }
     return result.await()
   }
@@ -55,10 +70,14 @@ object LiveCache {
   suspend fun getFileOrNull(parentFolder : DriveFile, name : String, create : suspend () -> DriveFile?) = getFileOrNull("${parentFolder.id}/${name}", create)
 
   private val lists : HashMap<String, Deferred<List<DriveFile>>> = HashMap()
-  suspend fun getFileList(folder : DriveFile, read : suspend () -> List<DriveFile>) =
-   synchronized(lists) { lists.getOrPut(folder.id) { GlobalScope.async { read() } } }.await()
+  suspend fun getFileList(folder : DriveFile, read : suspend () -> List<DriveFile>) = synchronized(lists) {
+     log("getFileList, ${folder.id} : ${lists[folder.id]}")
+     lists.getOrPut(folder.id) { GlobalScope.async { read() } }
+   }.await()
 
   private val sessions : HashMap<String, Deferred<SessionData>> = HashMap()
-  suspend fun getSession(file : DriveFile, read : suspend () -> SessionData) =
-   synchronized(sessions) { sessions.getOrPut(file.id) { GlobalScope.async { read() } } }.await()
+  suspend fun getSession(file : DriveFile, read : suspend () -> SessionData) = synchronized(sessions) {
+    log("getSession, ${file.id} : ${sessions[file.id]}")
+    sessions.getOrPut(file.id) { GlobalScope.async { read() } }
+  }.await()
 }
