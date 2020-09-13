@@ -68,7 +68,6 @@ object FDrive {
   private suspend fun fetchAccount(context : Context, resultCode : Int) : GoogleSignInAccount? {
     log("Fetching account")
     val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-     .requestScopes(com.google.android.gms.drive.Drive.SCOPE_FILE)
      .requestEmail()
      .build()
     val client = GoogleSignIn.getClient(context, options)
