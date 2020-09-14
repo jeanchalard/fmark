@@ -2,6 +2,7 @@ package com.j.fmark.fdrive
 
 import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.CREATION_DATE_FILE_NAME
+import com.j.fmark.ErrorHandling
 import com.j.fmark.LocalSecond
 import com.j.fmark.fdrive.FDrive.Root
 import com.j.fmark.fdrive.FDrive.decodeComment
@@ -99,8 +100,8 @@ class RESTClientFolder(private val root : Root,
     val sessionName = encodeSessionFolderName(LocalSecond(System.currentTimeMillis()))
     log("New session ${sessionName}")
     val sessionCacheDir = cacheDir.resolve(sessionName).mkdir_p()
-    val sessionFolder = root.rest.exec(CreateFolderCommand(clientFolder.await().id, sessionName))
-    RESTSessionFolder(root, sessionFolder, sessionCacheDir)
+    val newSession = root.saveQueue.createFolder(clientFolder.await(), sessionName).await().driveFile!!
+    RESTSessionFolder(root, CompletableDeferred(newSession), sessionCacheDir)
   }
 
   override suspend fun rename(name : String, reading : String, comment : String) : RESTClientFolder = withContext(Dispatchers.IO) {
@@ -108,8 +109,8 @@ class RESTClientFolder(private val root : Root,
     log("Rename session ${newDirName}")
     val newDir = cacheDir.resolveSibling(newDirName)
     cacheDir.renameTo(newDir)
-    val newFolder = root.rest.exec(RenameFolderCommand(clientFolder.await().name, newDirName))
-    RESTClientFolder(root, name, reading, comment, newFolder, newDir)
+    val newFolder = root.saveQueue.renameFile(clientFolder.await(), newDirName).await().driveFile!!
+    RESTClientFolder(root, name, reading, comment, CompletableDeferred(newFolder), newDir)
   }
 }
 
@@ -125,7 +126,7 @@ class RESTClientFolderList internal constructor(private val root : Root, private
     val folderName = encodeClientFolderName(name, reading, comment)
     log("Create client ${folderName}")
     val cacheDir = root.cache.resolve(folderName).mkdir_p()
-    val clientFolder = root.rest.exec(CreateFolderCommand(root.root.id, folderName))
-    return RESTClientFolder(root, name, reading, comment, clientFolder, cacheDir)
+    val createdFolder = root.saveQueue.createFolder(root.root, folderName).await().driveFile!!
+    return RESTClientFolder(root, name, reading, comment, CompletableDeferred(createdFolder), cacheDir)
   }
 }

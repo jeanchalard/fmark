@@ -36,7 +36,7 @@ const val NECESSARY_FIELDS = "id,name,parents,createdTime,modifiedTime"
 const val NECESSARY_FIELDS_EXPRESSION = "files(${NECESSARY_FIELDS})"
 
 object FDrive {
-  data class Root(val context : Context, val account : Account, val drive : Drive, val root : DriveFile, val cache : File, val saveQueue : SyncQueue, val rest : RESTManager)
+  data class Root(val context : Context, val account : Account, val drive : Drive, val root : DriveFile, val cache : File, val saveQueue : SaveQueue, val rest : RESTManager)
   private fun String.escape() = replace("'", "\\'")
 
   fun encodeClientFolderName(name : String, reading : String, comment : String) = if (comment.isEmpty()) "${name} -- ${reading}" else "${name} -- ${reading} -- ${comment}"
@@ -59,7 +59,7 @@ object FDrive {
      .build()
     val folder = createDriveFolder(drive, name = context.getString(R.string.fmark_root_directory), parentFolder = DriveFile().also { it.id = "root" })
     val cache = context.cacheDir.resolve(CACHE_DIR).mkdir_p()
-    val saveQueue = SyncItemDatabase.queue(context)
+    val saveQueue = SaveQueue.get(context)
     log("Drive folder ${folder}, cache dir ${cache}, save queue ${saveQueue}")
     return Root(context, account, drive, folder, cache, saveQueue, RESTManager(context))
   }
@@ -153,7 +153,7 @@ object FDrive {
   suspend fun createDriveFile(drive : Drive, parentFolder : DriveFile, name : String) : DriveFile =
    fetchDriveItem(drive, parentFolder, name, isFolder = false, create = true)!! // If create, fetchDriveItem never returns null, but contracts{} are experimental and stupidly limited to top-level functions
 
-  suspend fun renameFolder(drive : Drive, clientFolder : DriveFile, newName : String) : DriveFile? = withContext(Dispatchers.IO) {
+  suspend fun renameFile(drive : Drive, clientFolder : DriveFile, newName : String) : DriveFile? = withContext(Dispatchers.IO) {
     drive.files().update(clientFolder.id, clientFolder.apply { this.name = newName }).execute()
   }
 }

@@ -13,4 +13,7 @@ object ErrorHandling {
   fun unableToSave() {
     log("Error : unable to save")
   }
+  fun renameCommandFailed() {
+
+  }
 }

@@ -1,31 +1,26 @@
 package com.j.fmark.fdrive
 
 import android.content.Context
-import androidx.lifecycle.Observer
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ListenableWorker
-import androidx.work.ListenableWorker.Result
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
-import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import androidx.work.workDataOf
 import com.google.api.client.json.GenericJson
 import com.google.api.client.json.gson.GsonFactory
 import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.LiveCache
+import com.j.fmark.fdrive.CommandStatus.CommandResult
 import com.j.fmark.logAlways
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.net.ConnectException
 import java.util.concurrent.TimeUnit
 import com.google.api.services.drive.model.File as DriveFile
 
@@ -45,57 +40,67 @@ sealed class RESTCommand {
 inline fun <reified T> String.parseJson() : T = GsonFactory().createJsonParser(this).parse(T::class.java)
 inline fun GenericJson.toJson() = GsonFactory().toString(this)
 
-fun CoroutineWorker.finish(res : DriveFile?) = when (res) {
-  null -> Result.retry().also { log("Worker result : Retry") }
-  else -> Result.success(workDataOf(JSON_OUT to res.toJson())).also { log("Worker result : Success(${it})") }
-}
-
-class CreateFolderCommand(parentFolderId : String, folderName : String) : RESTCommand() {
-  init { log("Create folder command, ${parentFolderId}/${folderName}") }
-  override val workerClass = W::class.java
-  override val inputData = workDataOf("parentFolderId" to parentFolderId, "folderName" to folderName)
-  class W(private val context : Context, private val params : WorkerParameters) : CoroutineWorker(context, params) {
-    override suspend fun doWork() : Result = withContext(Dispatchers.IO) {
-      log("Create folder command : doWork ${params} :: ${params.inputData}")
-      try {
-        val drive = LiveCache.getRoot { FDrive.Root(context) }
-        val parentFolderId = params.inputData.getString("parentFolderId") ?: throw IllegalArgumentException("No parent folder")
-        val folderName = params.inputData.getString("folderName") ?: throw IllegalArgumentException("No folder name")
-        logAlways("Creating folder ${parentFolderId}/${folderName}")
-        val parent = DriveFile().also { it.id = parentFolderId }
-        finish(FDrive.createDriveFolder(drive.drive, parent, folderName))
-      } catch (e : Exception) {
-        logAlways("Couldn't create folder", e)
-        Result.retry()
-      }
+class Worker(private val context : Context, params : WorkerParameters) : CoroutineWorker(context, params) {
+  // Returns null if this has to be retried later. Returns a CommandResult with a null DriveFile if it failed.
+  suspend fun createFolder(seq : Long, root : FDrive.Root, parentFolderId : String?, folderName : String?, tryCount : Int = 0) : CommandResult? {
+    log("Create folder command : ${parentFolderId}/${folderName}")
+    if (null == parentFolderId) throw IllegalArgumentException("Parent folder ID can't be null in createFolder")
+    if (null == folderName) throw IllegalArgumentException("Folder name can't be null in createFolder")
+    try {
+      val parent = DriveFile().also { it.id = parentFolderId }
+      return CommandResult(seq, FDrive.createDriveFolder(root.drive, parent, folderName))
+    } catch (_ : ConnectException) {
+      delay(1000) // Just in case the system would rerun this immediately because it hasn't noticed yet
+      return null
+    } catch (e : Exception) {
+      log("Couldn't create folder", e)
+      if (tryCount > 2) return CommandResult(seq, null)
+      delay(5000)
+      return createFolder(seq, root, parentFolderId, folderName, tryCount + 1)
     }
   }
-}
 
-class RenameFolderCommand(oldFolderName : String, newFolderName : String) : RESTCommand() {
-  init { log("Rename folder command, ${oldFolderName}/${newFolderName}") }
-  override val workerClass = W::class.java
-  override val inputData = workDataOf("oldFolderName" to oldFolderName, "newFolderName" to newFolderName)
-  class W(private val context : Context, private val params : WorkerParameters) : CoroutineWorker(context, params) {
-    override suspend fun doWork() : Result = withContext(Dispatchers.IO) {
-      log("Rename folder command, doWork with ${params} :: ${params.inputData}")
-      try {
-        val root = LiveCache.getRoot { FDrive.Root(context) }
-        val oldFolderName = params.inputData.getString("oldFolderName") ?: throw IllegalArgumentException("No old folder name")
-        val newFolderName = params.inputData.getString("newFolderName") ?: throw IllegalArgumentException("No new folder name")
-        val existingFolder = FDrive.fetchDriveFolder(root.drive, oldFolderName, root.root)
-        if (null != existingFolder) {
-          finish(FDrive.renameFolder(root.drive, existingFolder, newFolderName))
-        } else {
-          logAlways("Folder doesn't exist ${oldFolderName}")
-          Result.success() // Don't retry and don't cancel subsequent work
-        }
-      } catch (e : Exception) {
-        logAlways("Couldn't rename folder", e)
-        Result.retry()
-      }
+  suspend fun renameFile(seq : Long, root : FDrive.Root, fileId : String?, newName : String?, tryCount : Int = 0) : CommandResult? {
+    log("Rename folder command, ${fileId} -> ${newName}")
+    if (null == fileId) throw IllegalArgumentException("File ID can't be null in renameFile")
+    if (null == newName) throw IllegalArgumentException("New name can't be null in renameFile")
+    try {
+      val file = DriveFile().also { it.id = fileId }
+      val renamedFile = FDrive.renameFile(root.drive, file, newName) ?: throw IllegalStateException("File with id ${fileId} doesn't exist")
+      return CommandResult(seq, renamedFile)
+    } catch (_ : ConnectException) {
+      delay(1000) // Just in case the system would rerun this immediately because it hasn't noticed yet
+      return null
+    } catch (e : IllegalStateException) {
+      log ("Couldn't rename file", e)
+      if (tryCount > 2) return CommandResult(seq, null)
+      delay(5000)
+      return renameFile(seq, root, fileId, newName, tryCount + 1)
     }
   }
+
+  private suspend fun runCommands() : Result {
+    val drive = LiveCache.getRoot { FDrive.Root(context) }
+    while (true) {
+      val command = SaveQueue.get(context).getNext() ?: break
+      val result = when (command.type) {
+        Type.CREATE_FOLDER -> createFolder(command.seq, drive, command.fileId, command.name)
+        Type.RENAME_FILE   -> renameFile(command.seq, drive, command.fileId, command.name)
+        Type.PUT_FILE      -> TODO()
+      }
+      when {
+        result == null -> return Result.retry()
+        result.driveFile == null -> log("Command ${command} failed ; continuing")
+        else -> log("Executed ${command} successfully")
+      }
+      // Trigger all the listeners and unblock code waiting on this command to be processed. See the setter for lastExecutedCommand.
+      // Note that if result is null the control doesn't even come here (the compiler checks this)
+      CommandStatus.lastExecutedCommand = result
+    }
+    return Result.success();
+  }
+
+  override suspend fun doWork() = withContext(Dispatchers.IO) { runCommands() }
 }
 
 class RESTManager(context : Context) {
@@ -105,36 +110,11 @@ class RESTManager(context : Context) {
   private val workManager = WorkManager.getInstance(context)
   private val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
 
-  fun exec(command : RESTCommand) : Deferred<DriveFile> {
-    log("Exec ${command::class}")
-    val request = OneTimeWorkRequest.Builder(command.workerClass)
+  fun tickle() {
+    val request = OneTimeWorkRequest.Builder(Worker::class.java)
      .setConstraints(constraints)
      .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.SECONDS)
-     .setInputData(command.inputData)
      .build()
-    workManager.enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.APPEND, request)
-    val liveData = workManager.getWorkInfosForUniqueWorkLiveData(WORK_NAME)
-    // This is terrible. I want to write liveData.observeForever { workInfos -> ... }, but that won't work because Kotlin doesn't like
-    // to provide a `this` pointer in a lambda. https://discuss.kotlinlang.org/t/is-this-accessible-in-sams/1477
-    // Further, I can't just call it here because "you can't call liveData.observeForever on a background thread" because reasons.
-    // I wonder if I'm not better off just polling the frigging workInfo.
-    return GlobalScope.async(Dispatchers.Main) {
-      val result = CompletableDeferred<DriveFile>()
-      log("Waiting for result")
-      liveData.observeForever(object : Observer<List<WorkInfo>> {
-        override fun onChanged(workInfos : List<WorkInfo>) {
-          val workInfo = workInfos.last()
-          log("WorkInfos changed ${workInfos.size} " + workInfo.state)
-          if (workInfo.state != WorkInfo.State.SUCCEEDED) return
-          // This is awful, but that's because the Drive REST API is awful to work with
-          when (val output = workInfo.outputData.getString(JSON_OUT)?.parseJson<DriveFile>()) {
-            null -> result.completeExceptionally(RuntimeException("Yeah well ${output} ; ${command}"))
-            else -> result.complete(output)
-          }
-          liveData.removeObserver(this)
-        }
-      })
-      result.await().also { log("Finished waiting ${it.id} ${it.name}") }
-    }
+    workManager.enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
   }
 }
