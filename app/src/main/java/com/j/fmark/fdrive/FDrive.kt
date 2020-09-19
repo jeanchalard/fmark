@@ -36,7 +36,8 @@ const val NECESSARY_FIELDS = "id,name,parents,createdTime,modifiedTime"
 const val NECESSARY_FIELDS_EXPRESSION = "files(${NECESSARY_FIELDS})"
 
 object FDrive {
-  data class Root(val context : Context, val account : Account, val drive : Drive, val root : DriveFile, val cache : File, val saveQueue : SaveQueue, val rest : RESTManager)
+  data class Root(val context : Context, val account : Account, val drive : Drive, val path : String, val root : DriveFile, val cache : File,
+                  val saveQueue : SaveQueue, val rest : RESTManager)
   private fun String.escape() = replace("'", "\\'")
 
   fun encodeClientFolderName(name : String, reading : String, comment : String) = if (comment.isEmpty()) "${name} -- ${reading}" else "${name} -- ${reading} -- ${comment}"
@@ -57,11 +58,12 @@ object FDrive {
     val drive = Drive.Builder(NetHttpTransport(), GsonFactory(), credential)
      .setApplicationName(context.getString(R.string.gservices_app_name))
      .build()
-    val folder = createDriveFolder(drive, name = context.getString(R.string.fmark_root_directory), parentFolder = DriveFile().also { it.id = "root" })
+    val rootDirPath = context.getString(R.string.fmark_root_directory)
+    val folder = createDriveFolder(drive, name = rootDirPath, parentFolder = DriveFile().also { it.id = "root" })
     val cache = context.cacheDir.resolve(CACHE_DIR).mkdir_p()
     val saveQueue = SaveQueue.get(context)
     log("Drive folder ${folder}, cache dir ${cache}, save queue ${saveQueue}")
-    return Root(context, account, drive, folder, cache, saveQueue, RESTManager(context))
+    return Root(context, account, drive, rootDirPath, folder, cache, saveQueue, RESTManager(context))
   }
 
   private suspend fun fetchAccount(context : Context, resultCode : Int) : GoogleSignInAccount? {
@@ -136,7 +138,7 @@ object FDrive {
 
   private tailrec suspend fun List<String>.fetchChildren(index : Int, drive : Drive, parentFolder : DriveFile, isFolder : Boolean, create : Boolean) : DriveFile? {
     val name = this[index]
-    log("Fetch children ${parentFolder.name}/${name}, isFolder = ${isFolder}, create = ${create}")
+    log("Fetch children ${parentFolder.name ?: parentFolder.id}/${name}, isFolder = ${isFolder}, create = ${create}")
     return if (index == size - 1) fetchLeaf(drive, parentFolder, name, isFolder, create)
     else fetchChildren(index + 1, drive, fetchLeaf(drive, parentFolder, name, true, create) ?: return null, isFolder, create)
   }

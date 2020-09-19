@@ -32,7 +32,8 @@ class Worker(private val context : Context, params : WorkerParameters) : Corouti
     try {
       val parent = DriveFile().also { it.id = parentFolderId }
       return CommandResult(seq, FDrive.createDriveFolder(root.drive, parent, folderName))
-    } catch (_ : ConnectException) {
+    } catch (e : ConnectException) {
+      log("Connection exception while creating folder", e)
       delay(1000) // Just in case the system would rerun this immediately because it hasn't noticed yet
       return null
     } catch (e : Exception) {

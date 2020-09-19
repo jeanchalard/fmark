@@ -46,23 +46,3 @@ class RESTFMarkRoot internal constructor(private val root : FDrive.Root) : FMark
     root.cache.deleteRecursively()
   }
 }
-
-suspend fun LocalDiskFMarkRoot(context : Context) : LocalDiskFMarkRoot = LocalDiskFMarkRoot.make(context)
-class LocalDiskFMarkRoot private constructor (private val context : Context, private val root : File) : FMarkRoot {
-  companion object {
-    suspend fun make(context : Context) : LocalDiskFMarkRoot = LocalDiskFMarkRoot(context, context.cacheDir.resolve(context.getString(R.string.fmark_root_directory)))
-  }
-
-  init {
-    if (!root.exists()) root.mkdir()
-  }
-
-  override suspend fun clearCache() = Unit // No cache for local files
-  override suspend fun clientList(searchString : String?, exactMatch : Boolean) : LocalDiskClientFolderList =
-   LocalDiskClientFolderList(if (searchString == null)
-     root.listFiles().toList()
-   else
-     root.listFiles().filter { if (exactMatch) it.name == searchString else it.name.contains(searchString) })
-  override suspend fun createClient(name : String, reading : String, comment : String) : LocalDiskClientFolder =
-   LocalDiskClientFolder(root.resolve(encodeClientFolderName(name, reading, comment)))
-}
