@@ -9,6 +9,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.google.api.client.http.InputStreamContent
 import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.LiveCache
 import com.j.fmark.fdrive.CommandStatus.CommandResult
@@ -31,6 +32,7 @@ class Worker(private val context : Context, params : WorkerParameters) : Corouti
     if (null == folderName) throw IllegalArgumentException("Folder name can't be null in createFolder")
     try {
       val parent = DriveFile().also { it.id = parentFolderId }
+      log("Create folder command succeeded")
       return CommandResult(seq, FDrive.createDriveFolder(root.drive, parent, folderName))
     } catch (e : ConnectException) {
       log("Connection exception while creating folder", e)
@@ -45,21 +47,49 @@ class Worker(private val context : Context, params : WorkerParameters) : Corouti
   }
 
   private suspend fun renameFile(seq : Long, root : FDrive.Root, fileId : String?, newName : String?, tryCount : Int = 0) : CommandResult? {
-    log("Rename folder command, ${fileId} -> ${newName}")
+    log("Rename file command, ${fileId} -> ${newName}")
     if (null == fileId) throw IllegalArgumentException("File ID can't be null in renameFile")
     if (null == newName) throw IllegalArgumentException("New name can't be null in renameFile")
     try {
       val file = DriveFile().also { it.id = fileId }
       val renamedFile = FDrive.renameFile(root.drive, file, newName) ?: throw IllegalStateException("File with id ${fileId} doesn't exist")
+      log("Rename file command succeeded")
       return CommandResult(seq, renamedFile)
-    } catch (_ : ConnectException) {
+    } catch (e : ConnectException) {
+      log("Connection exception while renaming file", e)
       delay(1000) // Just in case the system would rerun this immediately because it hasn't noticed yet
       return null
-    } catch (e : IllegalStateException) {
+    } catch (e : Exception) {
       log ("Couldn't rename file", e)
       if (tryCount > 2) return CommandResult(seq, null)
       delay(5000)
       return renameFile(seq, root, fileId, newName, tryCount + 1)
+    }
+  }
+
+  private suspend fun putFile(seq : Long, root : FDrive.Root, fileId : String?, fileName : String?, data : ByteArray?, mimeType : String?, tryCount : Int = 0) : CommandResult? {
+    log("Put file command, fileId = \"${fileId}\" or fileName = \"${fileName}\", data with length ${data?.size}, type = ${mimeType}, tryCount = ${tryCount}")
+    if (null == data) throw IllegalArgumentException("Data can't be null in putFile")
+    if (null == mimeType) throw IllegalArgumentException("mimeType can't be null in putFile")
+    try {
+      val id = when {
+        null != fileId   -> fileId
+        null != fileName -> FDrive.createDriveFile(root.drive, root.root, fileName).id
+        else             -> throw IllegalArgumentException("Either fileId or fileName must be non-null in putFile")
+      }
+      val file = DriveFile().apply { this.mimeType = mimeType }
+      root.drive.files().update(id, file, InputStreamContent(mimeType, data.inputStream())).execute()
+      log("Put file command succeeded")
+      return CommandResult(seq, file)
+    } catch (e : ConnectException) {
+      log("Connection exception while putting file", e)
+      delay(1000) // Just in case the system would rerun this immediately because it hasn't noticed yet
+      return null
+    } catch (e : Exception) {
+      log ("Couldn't put file", e)
+      if (tryCount > 2) return CommandResult(seq, null)
+      delay(5000)
+      return putFile(seq, root, fileId, fileName, data, mimeType, tryCount + 1)
     }
   }
 
@@ -71,7 +101,7 @@ class Worker(private val context : Context, params : WorkerParameters) : Corouti
       val result = when (command.type) {
         Type.CREATE_FOLDER -> createFolder(command.seq, drive, command.fileId, command.name)
         Type.RENAME_FILE   -> renameFile(command.seq, drive, command.fileId, command.name)
-        Type.PUT_FILE      -> TODO()
+        Type.PUT_FILE      -> putFile(command.seq, drive, command.fileId, command.name, command.binData, command.metadata)
       }
       when {
         result == null -> return Result.retry()

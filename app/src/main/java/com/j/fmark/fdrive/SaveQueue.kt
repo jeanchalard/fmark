@@ -14,6 +14,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import com.j.fmark.fdrive.CommandStatus.CommandResult
+import java.nio.ByteBuffer
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlin.coroutines.Continuation
@@ -34,8 +35,10 @@ private class Converters {
 
 // TODO : override equals/hashcode
 @Entity
-public data class SaveItem(val type : Type, val fileId : String?, val name : String?, val binData : ByteArray? = null,
-                           @PrimaryKey(autoGenerate = true) val seq : Long = 0)
+public data class SaveItem(val type : Type, val fileId : String?, val name : String?, val binData : ByteArray? = null, val metadata : String? = null,
+                           @PrimaryKey(autoGenerate = true) val seq : Long = 0) {
+  override fun toString() = "seq = ${seq}, type = ${type}, fileId = ${fileId}, name = ${name}, binData size = ${binData?.size}, metadata = ${metadata}"
+}
 
 @Dao
 private interface SaveQueueDao {
@@ -110,6 +113,6 @@ public class SaveQueue private constructor(private val restManager : RESTManager
   public suspend fun renameFile(fileId : String, newName : String) =
    CommandId(dao.insert(SaveItem(Type.RENAME_FILE, fileId = fileId, name = newName))).also { restManager.tickle() }
 
-  public suspend fun putFile(fileId : String?, name : String?, data : ByteArray) =
-   CommandId(dao.insert(SaveItem(Type.PUT_FILE, fileId = fileId, name = name, binData = data))).also { restManager.tickle() }
+  public suspend fun putFile(fileId : String?, name : String?, data : ByteArray, mimeType : String) =
+   CommandId(dao.insert(SaveItem(Type.PUT_FILE, fileId = fileId, name = name, binData = data, metadata = mimeType))).also { restManager.tickle() }
 }

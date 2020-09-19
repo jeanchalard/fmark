@@ -16,6 +16,7 @@ import com.j.fmark.fdrive.FDrive.Root
 import com.j.fmark.fdrive.FDrive.decodeSessionFolderName
 import com.j.fmark.fdrive.FDrive.fetchDriveFile
 import com.j.fmark.logAlways
+import com.j.fmark.mkdir_p
 import com.j.fmark.save
 import com.j.fmark.unit
 import kotlinx.coroutines.CompletableDeferred
@@ -27,6 +28,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
+import java.nio.ByteBuffer
 import java.util.concurrent.CopyOnWriteArrayList
 import com.google.api.services.drive.model.File as DriveFile
 
@@ -65,6 +67,8 @@ class RESTSessionFolder(private val root : Root, override val path : String,
     else
       LocalSecond(cacheDir.lastModified())
 
+  init { cacheDir.mkdir_p() }
+
   override suspend fun openData() : SessionData = withContext(Dispatchers.IO) {
     log("openData : start, creating Drive file...")
     val f = FDrive.createDriveFile(root.drive, sessionFolder.await(), DATA_FILE_NAME)
@@ -76,38 +80,34 @@ class RESTSessionFolder(private val root : Root, override val path : String,
     data
   }
 
-  private suspend fun saveToDriveFile(fileName : String, inputStream : InputStream, dataType : String) = withContext(Dispatchers.IO) {
-    log("saveToDriveFile : start, creating Drive file...")
-    FDrive.createDriveFile(root.drive, sessionFolder.await(), fileName).let { file ->
-      log("saveToDriveFile : created Drive file : ${file.id} ${path}/${file.name}, updating...")
-      val f = DriveFile().apply { mimeType = dataType }
-      root.drive.files().update(file.id, f, InputStreamContent(dataType, inputStream)).execute()
-    }.also { log("saveToDriveFile : done") }
+  private suspend fun saveToDriveFile(fileName : String, data : ByteArray, dataType : String) = withContext(Dispatchers.IO) {
+    log("saveToDriveFile : enqueuing putFile command")
+    root.saveQueue.putFile(null, fileName, data, dataType)
   }
 
   override suspend fun saveData(data : SessionData) {
     log("saveData : start with ${data.face.data.size} data points for face, saving cache...")
     cacheDir.resolve(DATA_FILE_NAME).outputStream().buffered().use { data.save(it) }
-    log("saveData : cache saved, saving to Drive...")
+    log("saveData : cache saved, enqueuing save to Drive...")
     val s = ByteArrayOutputStream()
     data.save(s)
-    saveToDriveFile(DATA_FILE_NAME, s.toByteArray().inputStream(), BINDATA_MIME_TYPE)
+    saveToDriveFile("${path}/${DATA_FILE_NAME}", s.toByteArray(), BINDATA_MIME_TYPE)
     log("saveData : done")
   }
 
   override suspend fun saveComment(comment : String) {
     log("saveComment : start with comment = ${comment}, saving cache...")
     cacheDir.resolve(DATA_FILE_NAME).bufferedWriter().use { it.write(comment) }
-    log("saveComment : cache saved, saving to Drive...")
-    saveToDriveFile(COMMENT_FILE_NAME, comment.toByteArray().inputStream(), TEXT_MIME_TYPE)
+    log("saveComment : cache saved, enqueuing to Drive...")
+    saveToDriveFile("${path}/${COMMENT_FILE_NAME}", comment.toByteArray(), TEXT_MIME_TYPE)
     log("saveComment : done")
   }
 
   override suspend fun saveImage(image : Bitmap, fileName : String) {
-    log("saveImage : start with ${fileName}, saving to Drive (since images are not saved to cache)...")
+    log("saveImage : start with ${fileName}, enqueuing to Drive (since images are not saved to cache)...")
     ByteArrayOutputStream().use { s ->
       image.savePng(s)
-      saveToDriveFile(fileName, s.toByteArray().inputStream(), PNG_MIME_TYPE)
+      saveToDriveFile("${path}/${fileName}", s.toByteArray(), PNG_MIME_TYPE)
     }
     log("saveImage : done")
   }

@@ -86,7 +86,7 @@ class RESTClientFolder(private val root : Root, override val path : String,
 
 suspend fun RESTClientFolderList(root : Root, name : String? = null, exactMatch : Boolean = false) =
   RESTClientFolderList(root, CopyOnWriteArrayList(FDrive.getFolderList(root.drive, root.root, name, exactMatch).map {
-    RESTClientFolder(root, "${root.path}/${it.name}", decodeName(it.name), decodeReading(it.name), decodeComment(it.name), CompletableDeferred(it), root.cache.resolve(it.name))
+    RESTClientFolder(root, "${it.name}", decodeName(it.name), decodeReading(it.name), decodeComment(it.name), CompletableDeferred(it), root.cache.resolve(it.name))
   }))
 class RESTClientFolderList internal constructor(private val root : Root, private val folders : CopyOnWriteArrayList<RESTClientFolder>) : ClientFolderList {
   override val count = folders.size
@@ -97,6 +97,6 @@ class RESTClientFolderList internal constructor(private val root : Root, private
     log("Create client ${root.path}/${folderName}")
     val cacheDir = root.cache.resolve(folderName).mkdir_p()
     val createdFolder = root.saveQueue.createFolder(root.root, folderName).await().driveFile!!
-    return RESTClientFolder(root, "${root.path}/${folderName}", name, reading, comment, CompletableDeferred(createdFolder), cacheDir)
+    return RESTClientFolder(root, "${folderName}", name, reading, comment, CompletableDeferred(createdFolder), cacheDir)
   }
 }
