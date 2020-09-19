@@ -4,15 +4,11 @@ import android.content.Context
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
-import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
-import androidx.work.ListenableWorker
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.google.api.client.json.GenericJson
-import com.google.api.client.json.gson.GsonFactory
 import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.LiveCache
 import com.j.fmark.fdrive.CommandStatus.CommandResult
@@ -27,22 +23,9 @@ import com.google.api.services.drive.model.File as DriveFile
 private const val DBG = false
 @Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("RESTCommands", s, e) }
 
-const val JSON_OUT = "json"
-
-sealed class RESTCommand {
-  abstract val workerClass : Class<out ListenableWorker>
-  abstract val inputData : Data
-}
-
-// This is terrible, awful, abject, but it's by a mile the simplest way to deal with serialization of drive files
-// and at least it's fairly likely to be stable and give me the exact same object without having to list myself
-// all the fields I care about + whatever is internally needed and their associated type and some custom parsing thereof.
-inline fun <reified T> String.parseJson() : T = GsonFactory().createJsonParser(this).parse(T::class.java)
-inline fun GenericJson.toJson() = GsonFactory().toString(this)
-
 class Worker(private val context : Context, params : WorkerParameters) : CoroutineWorker(context, params) {
   // Returns null if this has to be retried later. Returns a CommandResult with a null DriveFile if it failed.
-  suspend fun createFolder(seq : Long, root : FDrive.Root, parentFolderId : String?, folderName : String?, tryCount : Int = 0) : CommandResult? {
+  private suspend fun createFolder(seq : Long, root : FDrive.Root, parentFolderId : String?, folderName : String?, tryCount : Int = 0) : CommandResult? {
     log("Create folder command : ${parentFolderId}/${folderName}")
     if (null == parentFolderId) throw IllegalArgumentException("Parent folder ID can't be null in createFolder")
     if (null == folderName) throw IllegalArgumentException("Folder name can't be null in createFolder")
@@ -60,7 +43,7 @@ class Worker(private val context : Context, params : WorkerParameters) : Corouti
     }
   }
 
-  suspend fun renameFile(seq : Long, root : FDrive.Root, fileId : String?, newName : String?, tryCount : Int = 0) : CommandResult? {
+  private suspend fun renameFile(seq : Long, root : FDrive.Root, fileId : String?, newName : String?, tryCount : Int = 0) : CommandResult? {
     log("Rename folder command, ${fileId} -> ${newName}")
     if (null == fileId) throw IllegalArgumentException("File ID can't be null in renameFile")
     if (null == newName) throw IllegalArgumentException("New name can't be null in renameFile")
