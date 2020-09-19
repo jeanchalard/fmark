@@ -22,10 +22,6 @@ interface FMarkRoot {
   suspend fun createClient(name : String, reading : String, comment : String) : ClientFolder
 }
 
-suspend fun RESTFMarkRoot(context : Context) : RESTFMarkRoot {
-  val root = FDrive.Root(context)
-  return RESTFMarkRoot(root)
-}
 class RESTFMarkRoot internal constructor(private val root : FDrive.Root) : FMarkRoot {
   private val clientList = CoroutineScope(Dispatchers.IO).async(start = CoroutineStart.LAZY) { RESTClientFolderList(root) }
 
