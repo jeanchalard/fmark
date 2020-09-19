@@ -1,6 +1,5 @@
 package com.j.fmark
 
-import android.app.Application
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -11,7 +10,6 @@ import android.net.ConnectivityManager.EXTRA_NETWORK
 import android.net.ConnectivityManager.NetworkCallback
 import android.net.Network
 import android.os.Build
-import android.os.ConditionVariable
 import androidx.annotation.GuardedBy
 import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CompletableDeferred
@@ -20,7 +18,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 private const val DBG = false
 @Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("Networking", s, e) }
 
-fun getNetworking(context : Context) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) Networking24(context) else NetworkingOld(context)
+fun getNetworking(context : Context) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) Networking24.get(context) else NetworkingOld.get(context)
 
 open class Networking {
   @GuardedBy("listeners")
@@ -52,6 +50,18 @@ open class Networking {
 
 @RequiresApi(Build.VERSION_CODES.N)
 class Networking24(context : Context) : Networking() {
+  companion object {
+    @Volatile private lateinit var INSTANCE : Networking24
+    public fun get(context : Context) : Networking24 {
+      if (this::INSTANCE.isInitialized) return INSTANCE
+      synchronized(this) {
+        if (this::INSTANCE.isInitialized) return INSTANCE
+        INSTANCE = Networking24(context)
+        return INSTANCE
+      }
+    }
+  }
+
   init {
     val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     cm.registerDefaultNetworkCallback(object : NetworkCallback() {
@@ -62,6 +72,18 @@ class Networking24(context : Context) : Networking() {
 }
 
 class NetworkingOld(context : Context) : Networking() {
+  companion object {
+    @Volatile private lateinit var INSTANCE : NetworkingOld
+    public fun get(context : Context) : NetworkingOld {
+      if (this::INSTANCE.isInitialized) return INSTANCE
+      synchronized(this) {
+        if (this::INSTANCE.isInitialized) return INSTANCE
+        INSTANCE = NetworkingOld(context)
+        return INSTANCE
+      }
+    }
+  }
+
   init {
     val filter = IntentFilter(CONNECTIVITY_ACTION)
     context.registerReceiver(object : BroadcastReceiver() {
@@ -71,5 +93,4 @@ class NetworkingOld(context : Context) : Networking() {
       }
     }, filter)
   }
-
 }
