@@ -3,6 +3,7 @@ package com.j.fmark.fdrive
 import android.content.Context
 import androidx.room.Dao
 import androidx.room.Database
+import androidx.room.Delete
 import androidx.room.Entity
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -40,6 +41,10 @@ public data class SaveItem(val type : Type, val fileId : String?, val name : Str
 private interface SaveQueueDao {
   @Query("SELECT * FROM SaveItem ORDER BY seq LIMIT 1")
   suspend fun getNext() : SaveItem?
+
+  @Query("DELETE FROM SaveItem WHERE seq = :seq")
+  suspend fun markDone(seq : Long)
+  suspend fun markDone(item : SaveItem) = delete(item.seq)
 
   @Insert(onConflict = OnConflictStrategy.REPLACE)
   suspend fun insert(item : SaveItem) : Long
@@ -94,6 +99,8 @@ public class SaveQueue private constructor(private val restManager : RESTManager
   }
 
   public suspend fun getNext() = dao.getNext()
+  public suspend fun markDone(seq : Long) = dao.markDone(seq)
+  public suspend fun markDone(s : SaveItem) = dao.markDone(s)
 
   public suspend fun createFolder(parentFolder : DriveFile, name : String) = createFolder(parentFolder.id, name)
   public suspend fun createFolder(parentFolderId : String, name : String) =

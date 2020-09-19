@@ -64,8 +64,9 @@ class Worker(private val context : Context, params : WorkerParameters) : Corouti
 
   private suspend fun runCommands() : Result {
     val drive = LiveCache.getRoot { FDrive.Root(context) }
+    val saveQueue = SaveQueue.get(context)
     while (true) {
-      val command = SaveQueue.get(context).getNext() ?: break
+      val command = saveQueue.getNext() ?: break
       val result = when (command.type) {
         Type.CREATE_FOLDER -> createFolder(command.seq, drive, command.fileId, command.name)
         Type.RENAME_FILE   -> renameFile(command.seq, drive, command.fileId, command.name)
@@ -76,6 +77,7 @@ class Worker(private val context : Context, params : WorkerParameters) : Corouti
         result.driveFile == null -> log("Command ${command} failed ; continuing")
         else -> log("Executed ${command} successfully")
       }
+      saveQueue.markDone(command)
       // Trigger all the listeners and unblock code waiting on this command to be processed. See the setter for lastExecutedCommand.
       // Note that if result is null the control doesn't even come here (the compiler checks this)
       CommandStatus.lastExecutedCommand = result
