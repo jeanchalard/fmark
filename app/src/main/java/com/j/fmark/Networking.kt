@@ -15,16 +15,19 @@ import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CompletableDeferred
 import java.util.concurrent.CopyOnWriteArrayList
 
+val PROBABLY_FRESH_DELAY_MS = 86_400_000L
+val WAIT_FOR_NETWORK = 500L
+
 private const val DBG = false
 @Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("Networking", s, e) }
 
-fun getNetworking(context : Context) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) Networking24.get(context) else NetworkingOld.get(context)
+fun getNetworking(context : Context) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) Networking24.get(context.applicationContext) else NetworkingOld.get(context.applicationContext)
 
 open class Networking {
   @GuardedBy("listeners")
   @Volatile public var network : Network? = null
     get() = synchronized(listeners) { field }
-    protected set(n : Network?) {
+    protected set(n) {
       synchronized(listeners) {
         field = n
         if (null == n) return
@@ -36,12 +39,12 @@ open class Networking {
   @GuardedBy("listeners")
   private val listeners = CopyOnWriteArrayList<CompletableDeferred<Network>>()
 
-  suspend fun wait() : Network {
+  suspend fun waitForNetwork() : Network {
     val deferred : CompletableDeferred<Network>
     synchronized(listeners) {
       val net = network
       if (null != net) return net
-      deferred = CompletableDeferred<Network>()
+      deferred = CompletableDeferred()
       listeners.add(deferred)
     }
     return deferred.await()

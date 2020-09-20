@@ -78,6 +78,7 @@ class FMark : AppCompatActivity() {
       invalidateOptionsMenu()
     }
     startSignIn()
+    getNetworking(this) // Prime the singleton
   }
 
   private fun createSaveIndicator(parent : ViewGroup) : SaveIndicator {
@@ -113,6 +114,7 @@ class FMark : AppCompatActivity() {
     else
       transaction.commit()
   }
+
   override fun onPostResume() {
     super.onPostResume()
     log("onPostResume")
@@ -126,7 +128,7 @@ class FMark : AppCompatActivity() {
   }
 
   private suspend fun startClientList(root : FDrive.Root) {
-    log("startClientListe")
+    log("startClientList")
     val froot = RESTFMarkRoot(root)
     insertSpinnerVisible = false
     replaceFragment(ClientListFragment(this@FMark, froot))

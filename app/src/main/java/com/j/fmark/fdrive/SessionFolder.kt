@@ -1,8 +1,6 @@
 package com.j.fmark.fdrive
 
 import android.graphics.Bitmap
-import android.util.Log
-import com.google.api.client.http.InputStreamContent
 import com.j.fmark.BACK_IMAGE_NAME
 import com.j.fmark.COMMENT_FILE_NAME
 import com.j.fmark.DATA_FILE_NAME
@@ -11,25 +9,28 @@ import com.j.fmark.FRONT_IMAGE_NAME
 import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.LiveCache
 import com.j.fmark.LocalSecond
+import com.j.fmark.PROBABLY_FRESH_DELAY_MS
 import com.j.fmark.SessionData
+import com.j.fmark.WAIT_FOR_NETWORK
 import com.j.fmark.fdrive.FDrive.Root
 import com.j.fmark.fdrive.FDrive.decodeSessionFolderName
 import com.j.fmark.fdrive.FDrive.fetchDriveFile
+import com.j.fmark.getNetworking
 import com.j.fmark.logAlways
 import com.j.fmark.mkdir_p
 import com.j.fmark.save
-import com.j.fmark.unit
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.InputStream
 import java.io.OutputStream
-import java.nio.ByteBuffer
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.time.measureTime
 import com.google.api.services.drive.model.File as DriveFile
 
 private const val DBG = false
@@ -56,6 +57,7 @@ const val TEXT_MIME_TYPE = "text/plain"
 
 class RESTSessionFolder(private val root : Root, override val path : String,
                         private val sessionFolder : Deferred<DriveFile>, private val cacheDir : File) : SessionFolder {
+  val networking = getNetworking(root.context)
   override val date
     get() = if (sessionFolder.isCompleted)
      LocalSecond(sessionFolder.getCompleted().createdTime)
@@ -69,15 +71,60 @@ class RESTSessionFolder(private val root : Root, override val path : String,
 
   init { cacheDir.mkdir_p() }
 
-  override suspend fun openData() : SessionData = withContext(Dispatchers.IO) {
-    log("openData : start, creating Drive file...")
+  suspend fun openDataFromDrive() : SessionData = withContext(Dispatchers.IO) {
+    log("openDataFromDrive")
     val f = FDrive.createDriveFile(root.drive, sessionFolder.await(), DATA_FILE_NAME)
-    log("openData : created Drive file ${f.id} ${path}/${f.name}, reading data...")
+    log("openDataFromDrive : created Drive file ${f.id} ${path}/${f.name}, reading data...")
     val data = LiveCache.getSession(f) { SessionData(root.drive.files().get(f.id).executeMediaAsInputStream()) }
-    log("openData : read data, comment = ${data.comment}, face has ${data.face.data.size} data points, starting priming tasks...")
+    log("openDataFromDrive : read data, comment = ${data.comment}, face has ${data.face.data.size} data points, starting priming tasks...")
     listOf(FACE_IMAGE_NAME, FRONT_IMAGE_NAME, BACK_IMAGE_NAME).forEach { async { fetchDriveFile(root.drive, it, sessionFolder.await()) } }
-    log("openData : done")
+    log("openDataFromDrive : done")
+    if (!cacheDir.resolve(DATA_FILE_NAME).exists()) {
+      log("openDataFromDrive : opened data from network, cache absent, writing to cache")
+      saveToCache(data)
+    }
     data
+  }
+
+  override suspend fun openData() : SessionData = withContext(Dispatchers.IO) {
+    val session = this@RESTSessionFolder
+    log("openData : start")
+    val dataFile = cacheDir.resolve(DATA_FILE_NAME)
+    if (!dataFile.exists()) {
+      log("Cache absent for ${session}, waiting for network")
+      val start = System.currentTimeMillis()
+      // TODO : timeout
+      networking.waitForNetwork()
+      openDataFromDrive().also { log("Read from network in ${System.currentTimeMillis() - start}ms") }
+    } else {
+      if (null == networking.network) {
+        // TODO : Register to listen for network presence
+        log("Network absent, reading ${session} from cache")
+        SessionData(dataFile.inputStream())
+      } else {
+        if (dataFile.lastModified() > System.currentTimeMillis() - PROBABLY_FRESH_DELAY_MS) {
+          // TODO : load from network and register to listen
+          log("Cache fresh for ${session}, reading from cache")
+          SessionData(dataFile.inputStream())
+        } else {
+          log("Data old for ${session} : trying to fetch from network with ${WAIT_FOR_NETWORK}ms grace")
+          val dataFromDrive = async { openDataFromDrive() }
+          val start = System.currentTimeMillis()
+          val obtained = withTimeoutOrNull(WAIT_FOR_NETWORK) { dataFromDrive.await() }
+          if (null != obtained) {
+            log("Read data for ${session} from Drive in ${System.currentTimeMillis() - start}ms")
+            // TODO : Register to listen on dataFromDrive
+            obtained
+          } else
+            log("Network timeout for ${session}, reading from cache")
+            SessionData(dataFile.inputStream())
+        }
+      }
+    }
+  }
+
+  private suspend fun saveToCache(data : SessionData) {
+    cacheDir.resolve(DATA_FILE_NAME).outputStream().buffered().use { data.save(it) }
   }
 
   private suspend fun saveToDriveFile(fileName : String, data : ByteArray, dataType : String) = withContext(Dispatchers.IO) {
@@ -87,7 +134,7 @@ class RESTSessionFolder(private val root : Root, override val path : String,
 
   override suspend fun saveData(data : SessionData) {
     log("saveData : start with ${data.face.data.size} data points for face, saving cache...")
-    cacheDir.resolve(DATA_FILE_NAME).outputStream().buffered().use { data.save(it) }
+    saveToCache(data)
     log("saveData : cache saved, enqueuing save to Drive...")
     val s = ByteArrayOutputStream()
     data.save(s)
