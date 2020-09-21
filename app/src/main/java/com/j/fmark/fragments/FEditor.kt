@@ -220,7 +220,7 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     *   ✓ les ids des DriveFile ne sont pas cachés, ce qui fait qu'il faut 800ms pour choper l'ID avant de pouvoir uploader le fichier
     *   ✓ les images sont uploadées séquentiellement au lieu de parallèlement
     *   ✗ par défaut l'upload est multipart au lieu de media, ce qui fait 2 requêtes au lieu d'une... pas pris en charge par l'API
-    * ④ Les thumbnails et les previews ne marchent pas sur drive, parce qu'apparemment ce connard de drive se repère uniquement à l'extension et pas au type mime
+    * ✓ Les thumbnails et les previews ne marchent pas sur drive, parce qu'apparemment ce connard de drive se repère uniquement à l'extension et pas au type mime
     * ⑤ Si tu coupes le réseau pendant que ça rame, ça plante parce que filelist().execute (ou autre) throw ConnectException
     * ⑥ Il semblerait que dans certains cas la session est vide (et écrase la bonne session) mais je ne sais pas quand
     * ✓ L'icône de save reste affichée quand un dessin est dirty
