@@ -13,9 +13,9 @@ import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
-import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.CACHE_DIR
 import com.j.fmark.GOOGLE_SIGN_IN_CODE
+import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.LiveCache
 import com.j.fmark.LocalSecond
 import com.j.fmark.R

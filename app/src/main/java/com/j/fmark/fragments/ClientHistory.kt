@@ -22,7 +22,6 @@ import com.j.fmark.codeToResource
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.SessionFolder
 import com.j.fmark.logAlways
-import com.j.fmark.now
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -32,7 +31,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.lang.IllegalStateException
 import java.util.Locale
 
 private const val DBG = false
