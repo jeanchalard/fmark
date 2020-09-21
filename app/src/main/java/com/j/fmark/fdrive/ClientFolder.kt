@@ -3,19 +3,24 @@ package com.j.fmark.fdrive
 import com.j.fmark.CREATION_DATE_FILE_NAME
 import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.LocalSecond
+import com.j.fmark.PROBABLY_FRESH_DELAY_MS
 import com.j.fmark.fdrive.FDrive.Root
 import com.j.fmark.fdrive.FDrive.decodeComment
 import com.j.fmark.fdrive.FDrive.decodeName
 import com.j.fmark.fdrive.FDrive.decodeReading
 import com.j.fmark.fdrive.FDrive.encodeClientFolderName
 import com.j.fmark.fdrive.FDrive.encodeSessionFolderName
+import com.j.fmark.fromCacheOrNetwork
 import com.j.fmark.logAlways
 import com.j.fmark.mkdir_p
 import com.j.fmark.now
 import com.j.fmark.toLong
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
@@ -82,11 +87,36 @@ class RESTClientFolder(private val root : Root, override val path : String,
   }
 }
 
-suspend fun RESTClientFolderList(root : Root, name : String? = null, exactMatch : Boolean = false) =
-  RESTClientFolderList(root, CopyOnWriteArrayList(FDrive.getFolderList(root.drive, root.root, name, exactMatch).map {
-    RESTClientFolder(root, "${it.name}", decodeName(it.name), decodeReading(it.name), decodeComment(it.name), CompletableDeferred(it), root.cache.resolve(it.name))
-  }))
-class RESTClientFolderList internal constructor(private val root : Root, private val folders : CopyOnWriteArrayList<RESTClientFolder>) : ClientFolderList {
+private suspend fun readClientsFromDrive(root : Root, name : String? = null, exactMatch : Boolean = false) : List<RESTClientFolder> {
+  return FDrive.getFolderList(root.drive, root.root, name, exactMatch).map {
+    val cacheDir = root.cache.resolve(it.name).mkdir_p()
+    RESTClientFolder(root, it.name, decodeName(it.name), decodeReading(it.name), decodeComment(it.name), CompletableDeferred(it), cacheDir)
+  }
+}
+
+private suspend fun readClientsFromCache(root : Root, cacheDir : File, name : String? = null, exactMatch : Boolean = false) : List<RESTClientFolder> {
+  val scope = CoroutineScope(Dispatchers.IO)
+  val fileList = cacheDir.listFiles()?.toList() ?: emptyList()
+  val filteredList = when {
+    null == name -> fileList
+    exactMatch   -> fileList.filter { it.name == name }
+    else         -> fileList.filter { it.name.contains(name) }
+  }
+  return filteredList.map {
+    val driveFile = scope.async(start = CoroutineStart.LAZY) { FDrive.createDriveFolder(root.drive, root.root, it.name) }
+    RESTClientFolder(root, it.name, decodeName(it.name), decodeReading(it.name), decodeComment(it.name), driveFile, it)
+  }
+}
+
+suspend fun RESTClientFolderList(root : Root, name : String? = null, exactMatch : Boolean = false) : RESTClientFolderList {
+  log("RESTClientFolderList : getting client list for ${name} (exact match = ${exactMatch})")
+  val cachedClients = readClientsFromCache(root, root.cache)
+  suspend fun fromDrive() = RESTClientFolderList(root, readClientsFromDrive(root))
+  suspend fun fromCache() = RESTClientFolderList(root, cachedClients)
+  suspend fun isCacheFresh() = if (cachedClients.isEmpty()) null else root.cache.lastModified() > now() - PROBABLY_FRESH_DELAY_MS
+  return fromCacheOrNetwork(root.context, ::fromDrive, ::fromCache, ::isCacheFresh)
+}
+class RESTClientFolderList internal constructor(private val root : Root, private val folders : List<RESTClientFolder>) : ClientFolderList {
   override val count = folders.size
   override fun get(i : Int) = folders[i]
   override fun indexOfFirst(folder : ClientFolder) = folders.indexOfFirst { it.id == folder.id }

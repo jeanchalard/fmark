@@ -132,15 +132,16 @@ class RESTSessionFolder(private val root : Root, override val path : String,
   }
 }
 
-private suspend fun readSessionsFromDrive(root : Root, path : String, clientFolder : Deferred<DriveFile>, cacheDir : File) : Deferred<List<RESTSessionFolder>> = withContext(Dispatchers.IO) {
-  async { FDrive.getFolderList(root.drive, clientFolder.await()).map { RESTSessionFolder(root, "${path}/${it.name}", CompletableDeferred(it), cacheDir.resolve(it.name)) } }
+private suspend fun readSessionsFromDrive(root : Root, path : String, clientFolder : Deferred<DriveFile>, cacheDir : File) : List<RESTSessionFolder> = withContext(Dispatchers.IO) {
+  FDrive.getFolderList(root.drive, clientFolder.await()).map { RESTSessionFolder(root, "${path}/${it.name}", CompletableDeferred(it), cacheDir.resolve(it.name)) }
 }
 private suspend fun readSessionsFromCache(root : Root, path : String, cacheDir : File) : List<RESTSessionFolder> {
+  val scope = CoroutineScope(Dispatchers.IO)
   return (cacheDir.listFiles()?.toList() ?: emptyList()).map {
     val p = "${path}/${it.name}"
     // Calling async on the context of the parent will add this lazily started coroutine to that context, which means the next thread jump (in this case, return from
     // withContext(Dispatchers.IO) will wait for it to be completed and therefore suspend forever as nobody starts these coroutines. https://github.com/Kotlin/kotlinx.coroutines/issues/745
-    val driveFile = CoroutineScope(Dispatchers.IO).async(start = CoroutineStart.LAZY) { FDrive.createDriveFolder(root.drive, root.root, p) }
+    val driveFile = scope.async(start = CoroutineStart.LAZY) { FDrive.createDriveFolder(root.drive, root.root, p) }
     RESTSessionFolder(root, p, driveFile, it)
   }
 }
@@ -148,7 +149,7 @@ private suspend fun readSessionsFromCache(root : Root, path : String, cacheDir :
 suspend fun RESTSessionFolderList(root : Root, path : String, clientFolder : Deferred<DriveFile>, cacheDir : File) : RESTSessionFolderList = withContext(Dispatchers.IO) {
   log("RESTSessionFolderList : getting session list for ${path} from cache or network")
   val cachedSessions = readSessionsFromCache(root, path, cacheDir)
-  suspend fun fromDrive() = RESTSessionFolderList(readSessionsFromDrive(root, path, clientFolder, cacheDir).await())
+  suspend fun fromDrive() = RESTSessionFolderList(readSessionsFromDrive(root, path, clientFolder, cacheDir))
   suspend fun fromCache() = RESTSessionFolderList(cachedSessions)
   suspend fun isCacheFresh() = if (cachedSessions.isEmpty()) null else cacheDir.lastModified() > now() - PROBABLY_FRESH_DELAY_MS
   fromCacheOrNetwork(root.context, ::fromDrive, ::fromCache, ::isCacheFresh)

@@ -102,7 +102,7 @@ object FDrive {
   }
   suspend fun getFolderList(drive : Drive, parentFolder : DriveFile, name : String? = null, exactMatch : Boolean = false) : List<DriveFile> =
    if (null == name)
-     LiveCache.getFileList(parentFolder) { fetchFolderList(drive, parentFolder) }.also { log("Folder list fetched from livecache with ${it.size} items") }
+     LiveCache.getFileList(parentFolder) { fetchFolderList(drive, parentFolder, name, exactMatch) }.also { log("Folder list fetched from livecache with ${it.size} items") }
    else
      fetchFolderList(drive, parentFolder, name, exactMatch).also { log("Folder list fetched from Drive with ${it.size} items") }
 
