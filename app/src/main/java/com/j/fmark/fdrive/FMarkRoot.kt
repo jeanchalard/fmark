@@ -1,17 +1,12 @@
 package com.j.fmark.fdrive
 
-import android.content.Context
 import com.j.fmark.LOGEVERYTHING
-import com.j.fmark.R
-import com.j.fmark.fdrive.FDrive.encodeClientFolderName
 import com.j.fmark.logAlways
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.lang.Exception
 
 private const val DBG = false
 @Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("FMarkRoot", s, e) }

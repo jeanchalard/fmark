@@ -6,7 +6,6 @@ import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.logAlways
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.lang.Exception
 
 private const val DBG = false
 @Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("DriveUtils", s, e) }

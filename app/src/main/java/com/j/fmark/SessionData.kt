@@ -1,6 +1,5 @@
 package com.j.fmark
 
-import android.util.Log
 import android.util.SparseArray
 import java.io.BufferedInputStream
 import java.io.EOFException
