@@ -22,6 +22,7 @@ import com.j.fmark.codeToResource
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.SessionFolder
 import com.j.fmark.logAlways
+import com.j.fmark.now
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
@@ -31,6 +32,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.lang.IllegalStateException
 import java.util.Locale
 
 private const val DBG = false
@@ -39,8 +41,9 @@ private const val DBG = false
 private data class LoadSession(val session : SessionFolder, val data : Deferred<SessionData>)
 
 val EMPTY_SESSION = object : SessionFolder {
-  override val date : LocalSecond get() = LocalSecond(System.currentTimeMillis())
-  override val lastUpdateDate : LocalSecond get() = LocalSecond(System.currentTimeMillis())
+  override val date : LocalSecond get() = throw IllegalStateException("Must not call EMPTY_SESSION#date")
+  override val lastUpdateDate : LocalSecond get() = throw IllegalStateException("Must not call EMPTY_SESSION#lastUpdateDate")
+  override val path : String get() = throw IllegalStateException("Must not call EMPTY_SESSION#path")
   override suspend fun openData() : SessionData = SessionData()
   override suspend fun saveData(data : SessionData) {}
   override suspend fun saveComment(comment : String) {}
@@ -83,7 +86,9 @@ class ClientHistory(private val fmarkHost : FMark, private val clientFolder : Cl
       if (null == currentJob) {
         fmarkHost.insertSpinnerVisible = true
         currentJob = launch {
+          log("populateClientHistory job getting sessions")
           val sessions = clientFolder.getSessions()
+          log("populateClientHistory job obtained sessions with count ${sessions.count}")
           val inProgress = sessions.map { session -> LoadSession(session, async(start = CoroutineStart.LAZY) { session.openData() }) }
           if (inProgress.isNotEmpty()) inProgress.first().data.start()
           withContext(Dispatchers.Main) {

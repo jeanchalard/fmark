@@ -20,6 +20,7 @@ import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.FMarkRoot
 import com.j.fmark.formatDate
 import com.j.fmark.logAlways
+import com.j.fmark.now
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.MainScope
@@ -50,7 +51,7 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
       view.findViewById<TextView>(R.id.client_details_creation_date_value)?.text = formatDate(clientFolder.createdDate)
       view.findViewById<TextView>(R.id.client_details_last_update_date_value)?.text = formatDate(clientFolder.modifiedDate)
     } else {
-      val now = System.currentTimeMillis()
+      val now = now()
       view.findViewById<TextView>(R.id.client_details_creation_date_value)?.text = formatDate(now)
       view.findViewById<TextView>(R.id.client_details_last_update_date_value)?.text = formatDate(now)
     }

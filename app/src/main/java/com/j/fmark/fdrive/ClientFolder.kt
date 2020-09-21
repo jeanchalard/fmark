@@ -1,8 +1,7 @@
 package com.j.fmark.fdrive
 
-import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.CREATION_DATE_FILE_NAME
-import com.j.fmark.ErrorHandling
+import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.LocalSecond
 import com.j.fmark.fdrive.FDrive.Root
 import com.j.fmark.fdrive.FDrive.decodeComment
@@ -12,14 +11,13 @@ import com.j.fmark.fdrive.FDrive.encodeClientFolderName
 import com.j.fmark.fdrive.FDrive.encodeSessionFolderName
 import com.j.fmark.logAlways
 import com.j.fmark.mkdir_p
-import com.j.fmark.toBytes
+import com.j.fmark.now
 import com.j.fmark.toLong
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.lang.Exception
 import java.util.concurrent.CopyOnWriteArrayList
 import com.google.api.services.drive.model.File as DriveFile
 
@@ -66,7 +64,7 @@ class RESTClientFolder(private val root : Root, override val path : String,
   }
 
   override suspend fun newSession() : RESTSessionFolder = withContext(Dispatchers.IO) {
-    val sessionName = encodeSessionFolderName(LocalSecond(System.currentTimeMillis()))
+    val sessionName = encodeSessionFolderName(LocalSecond(now()))
     log("New session${path}/${sessionName}")
     val sessionCacheDir = cacheDir.resolve(sessionName).mkdir_p()
     val newSession = root.saveQueue.createFolder(clientFolder.await(), sessionName).await().driveFile!!

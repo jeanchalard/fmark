@@ -21,6 +21,7 @@ import com.j.fmark.LocalSecond
 import com.j.fmark.R
 import com.j.fmark.logAlways
 import com.j.fmark.mkdir_p
+import com.j.fmark.now
 import com.j.fmark.parseLocalSecond
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
@@ -107,7 +108,7 @@ object FDrive {
 
   private suspend fun createDriveLeaf(drive : Drive, parentFolder : DriveFile, name : String, mimeType : String) : DriveFile {
     log("Create Drive leaf ${parentFolder.name}/${name} with type ${mimeType}")
-    val now = com.google.api.client.util.DateTime(System.currentTimeMillis())
+    val now = com.google.api.client.util.DateTime(now())
     val newFile = DriveFile().apply {
       this.name = name
       this.mimeType = mimeType
@@ -146,7 +147,7 @@ object FDrive {
   private suspend fun fetchDriveItem(drive : Drive, parentFolder : DriveFile, name : String, isFolder : Boolean, create : Boolean) = withContext(Dispatchers.IO) {
     name.split("/").fetchChildren(0, drive, parentFolder, isFolder, create)
   }
-  suspend fun fetchDriveFolder(drive : Drive, name : String, parentFolder : DriveFile) =
+  suspend fun fetchDriveFolder(drive : Drive, parentFolder : DriveFile, name : String) =
    fetchDriveItem(drive, parentFolder, name, isFolder = true, create = false)
   suspend fun fetchDriveFile(drive : Drive, name : String, parentFolder : DriveFile) =
    fetchDriveItem(drive, parentFolder, name, isFolder = false, create = false)

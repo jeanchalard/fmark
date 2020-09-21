@@ -64,3 +64,5 @@ fun File.mkdir_p() : File {
   if (!exists() && !mkdirs()) ErrorHandling.fileSystemIsNotWritable()
   return this
 }
+
+fun now() = System.currentTimeMillis()

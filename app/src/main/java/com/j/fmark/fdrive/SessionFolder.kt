@@ -18,19 +18,19 @@ import com.j.fmark.fdrive.FDrive.fetchDriveFile
 import com.j.fmark.getNetworking
 import com.j.fmark.logAlways
 import com.j.fmark.mkdir_p
+import com.j.fmark.now
 import com.j.fmark.save
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.OutputStream
-import java.util.concurrent.CopyOnWriteArrayList
-import kotlin.time.measureTime
 import com.google.api.services.drive.model.File as DriveFile
 
 private const val DBG = false
@@ -47,6 +47,7 @@ interface SessionFolder {
 }
 
 interface SessionFolderList : Iterable<SessionFolder> {
+  // TODO : add a way to signal an update
   val count : Int
   fun get(i : Int) : SessionFolder
 }
@@ -71,7 +72,7 @@ class RESTSessionFolder(private val root : Root, override val path : String,
 
   init { cacheDir.mkdir_p() }
 
-  suspend fun openDataFromDrive() : SessionData = withContext(Dispatchers.IO) {
+  private suspend fun openDataFromDrive() : SessionData = withContext(Dispatchers.IO) {
     log("openDataFromDrive")
     val f = FDrive.createDriveFile(root.drive, sessionFolder.await(), DATA_FILE_NAME)
     log("openDataFromDrive : created Drive file ${f.id} ${path}/${f.name}, reading data...")
@@ -92,32 +93,33 @@ class RESTSessionFolder(private val root : Root, override val path : String,
     val dataFile = cacheDir.resolve(DATA_FILE_NAME)
     if (!dataFile.exists()) {
       log("Cache absent for ${session}, waiting for network")
-      val start = System.currentTimeMillis()
+      val start = now()
       // TODO : timeout
       networking.waitForNetwork()
-      openDataFromDrive().also { log("Read from network in ${System.currentTimeMillis() - start}ms") }
+      openDataFromDrive().also { log("Read from network in ${now() - start}ms") }
     } else {
       if (null == networking.network) {
         // TODO : Register to listen for network presence
         log("Network absent, reading ${session} from cache")
         SessionData(dataFile.inputStream())
       } else {
-        if (dataFile.lastModified() > System.currentTimeMillis() - PROBABLY_FRESH_DELAY_MS) {
+        if (dataFile.lastModified() > now() - PROBABLY_FRESH_DELAY_MS) {
           // TODO : load from network and register to listen
           log("Cache fresh for ${session}, reading from cache")
           SessionData(dataFile.inputStream())
         } else {
           log("Data old for ${session} : trying to fetch from network with ${WAIT_FOR_NETWORK}ms grace")
           val dataFromDrive = async { openDataFromDrive() }
-          val start = System.currentTimeMillis()
+          val start = now()
           val obtained = withTimeoutOrNull(WAIT_FOR_NETWORK) { dataFromDrive.await() }
           if (null != obtained) {
-            log("Read data for ${session} from Drive in ${System.currentTimeMillis() - start}ms")
-            // TODO : Register to listen on dataFromDrive
+            log("Read data for ${session} from Drive in ${now() - start}ms")
             obtained
-          } else
+          } else {
             log("Network timeout for ${session}, reading from cache")
+            // TODO : Register to listen on dataFromDrive
             SessionData(dataFile.inputStream())
+          }
         }
       }
     }
@@ -160,11 +162,56 @@ class RESTSessionFolder(private val root : Root, override val path : String,
   }
 }
 
-suspend fun RESTSessionFolderList(root : Root, path : String, clientFolder : Deferred<DriveFile>, cacheDir : File) =
- RESTSessionFolderList(root, CopyOnWriteArrayList(FDrive.getFolderList(root.drive, clientFolder.await()).map {
-   RESTSessionFolder(root, "${path}/${it.name}", CompletableDeferred(it), cacheDir.resolve(it.name))
- }))
-class RESTSessionFolderList internal constructor(private val root : Root, private val sessions : List<RESTSessionFolder>) : SessionFolderList {
+private suspend fun readSessionsFromDrive(root : Root, path : String, clientFolder : Deferred<DriveFile>, cacheDir : File) : Deferred<List<RESTSessionFolder>> = withContext(Dispatchers.IO) {
+  async { FDrive.getFolderList(root.drive, clientFolder.await()).map { RESTSessionFolder(root, "${path}/${it.name}", CompletableDeferred(it), cacheDir.resolve(it.name)) } }
+}
+private suspend fun readSessionsFromCache(root : Root, path : String, cacheDir : File) : List<RESTSessionFolder> {
+  return (cacheDir.listFiles()?.toList() ?: emptyList()).map {
+    val p = "${path}/${it.name}"
+    // Calling async on the context of the parent will add this lazily started coroutine to that context, which means the next thread jump (in this case, return from
+    // withContext(Dispatchers.IO) will wait for it to be completed and therefore suspend forever as nobody starts these coroutines. https://github.com/Kotlin/kotlinx.coroutines/issues/745
+    val driveFile = CoroutineScope(Dispatchers.IO).async(start = CoroutineStart.LAZY) { FDrive.createDriveFolder(root.drive, root.root, p) }
+    RESTSessionFolder(root, p, driveFile, it)
+  }
+}
+
+suspend fun RESTSessionFolderList(root : Root, path : String, clientFolder : Deferred<DriveFile>, cacheDir : File) : RESTSessionFolderList = withContext(Dispatchers.IO) {
+  suspend fun fromDrive() = RESTSessionFolderList(readSessionsFromDrive(root, path, clientFolder, cacheDir).await())
+  val networking = getNetworking(root.context)
+  val cachedSessions = readSessionsFromCache(root, path, cacheDir)
+  if (cachedSessions.isEmpty()) {
+    log("Cache absent for session list of ${path}}, waiting for network")
+    val start = now()
+    // TODO : timeout
+    networking.waitForNetwork()
+    fromDrive().also { log("Retrieved session list from Drive for ${path} in ${now() - start}ms") }
+  } else {
+    if (null == networking.network) {
+      log("No network, returning cache for session list of ${path}")
+      RESTSessionFolderList(cachedSessions)
+    } else {
+      if (cacheDir.lastModified() > now() - PROBABLY_FRESH_DELAY_MS) {
+        // TODO : Load from network and register to listen
+        log("Cache fresh for session list of ${path}, reading from cache")
+        RESTSessionFolderList(cachedSessions)
+      } else {
+        log("Data old for session list of ${path} : trying to fetch from network with ${WAIT_FOR_NETWORK}ms grace")
+        val dataFromDrive = async { fromDrive() }
+        val start = now()
+        val obtained = withTimeoutOrNull(WAIT_FOR_NETWORK) { dataFromDrive.await() }
+        if (null != obtained) {
+          log("Read data for session list of ${path} from Drive in ${now() - start}ms")
+          obtained
+        } else {
+          log("Network timeout for session list of ${path}, returning from cache")
+          // TODO : Register to listen on dataFromDrive
+          RESTSessionFolderList(cachedSessions)
+        }
+      }
+    }
+  }
+}
+class RESTSessionFolderList internal constructor(private val sessions : List<RESTSessionFolder>) : SessionFolderList {
   override val count = sessions.size
   override fun get(i : Int) : RESTSessionFolder = sessions[i]
   override fun iterator() = sessions.iterator()
