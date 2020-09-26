@@ -31,25 +31,33 @@ open class Networking {
   @GuardedBy("listeners")
   @Volatile public var network : Network? = null
     get() = synchronized(listeners) { field }
-    protected set(n) {
-      synchronized(listeners) {
-        field = n
-        if (null == n) return
-        listeners.forEach { it.complete(n) }
-        listeners.clear()
-      }
+    protected set(n) = synchronized(listeners) {
+      field = n
+      listeners.forEach { it(n) }
     }
 
   @GuardedBy("listeners")
-  private val listeners = CopyOnWriteArrayList<CompletableDeferred<Network>>()
+  private val listeners = CopyOnWriteArrayList<(Network?) -> Unit>()
+
+  // Careful, the listener is called locked. It's bad practice but this is a small app with very contained code, not a lib
+  fun addListener(l : (Network?) -> Unit) = synchronized(listeners) {
+    listeners.add(l)
+    l(network)
+  }
 
   suspend fun waitForNetwork() : Network {
-    val deferred : CompletableDeferred<Network>
+    val deferred : CompletableDeferred<Network> = CompletableDeferred()
+    val listener = object : (Network?) -> Unit {
+      override fun invoke(n : Network?) {
+        if (null == n) return
+        listeners.remove(this)
+        deferred.complete(n)
+      }
+    }
     synchronized(listeners) {
       val net = network
       if (null != net) return net
-      deferred = CompletableDeferred()
-      listeners.add(deferred)
+      addListener(listener)
     }
     return deferred.await()
   }
@@ -72,8 +80,8 @@ class Networking24(context : Context) : Networking() {
   init {
     val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     cm.registerDefaultNetworkCallback(object : NetworkCallback() {
-      override fun onAvailable(n : Network?) { network = n }
-      override fun onLost(n : Network?) { network = null }
+      override fun onAvailable(n : Network?) { log("Available ${n}"); network = n }
+      override fun onLost(n : Network?) { log("Lost ${n}"); network = null }
     })
   }
 }

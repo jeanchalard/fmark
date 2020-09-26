@@ -22,8 +22,10 @@
 
   <item
     android:id="@+id/action_button_save"
-    android:icon="@drawable/save"
+    android:icon="@drawable/cloud"
     android:title="@string/label_save"
-    app:showAsAction="always" />
+    app:showAsAction="always"
+    app:actionViewClass="com.j.fmark.CloudButton"
+   />
 
 </menu>

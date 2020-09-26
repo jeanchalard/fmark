@@ -86,7 +86,6 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     init {
       log("Starting editor for ${session}")
       fmarkHost.topSpinnerVisible = true
-      fmarkHost.saveIndicator.hideOk()
 
       view.findViewById<AppCompatImageButton>(R.id.feditor_comment)?.setOnClickListener { switchToComment() }
       view.findViewById<AppCompatImageButton>(R.id.feditor_face).setOnClickListener { switchDrawing(faceCanvas) }
@@ -132,7 +131,7 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
       }
     }
 
-    override fun onCanvasChanged() = fmarkHost.saveIndicator.hideOk()
+    override fun onCanvasChanged() = fmarkHost.cloudButton.signalDirty()
 
     fun onBackPressed() {
       log("Back pressed, quitting")
@@ -176,7 +175,6 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     // Only saves dirty data, though the data file contains the comment and all drawing data and has to be saved together anyway
     private fun save() : Job {
       log("Saving data...")
-      fmarkHost.saveIndicator.showInProgress()
 
       val comment = commentData
       commentData = SaveString(comment.string, dirty = false)
@@ -191,7 +189,7 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
       // This is pretty bad when the home button is pressed. It also means the save indicator can't be set
       // to showOk() because that message has to be thrown on the main thread and by the time it would be
       // processed when exiting this editor this fragment has been terminated.
-      log("Launching save job on IO pool, comment = ${if (comment.dirty) comment else "//not dirty//"}, face = ${faceBitmap}, front = ${frontBitmap}, back = ${backBitmap}")
+      log("Launching save job on IO pool, comment = ${if (comment.dirty) comment.string else "//not dirty//"}, face = ${faceBitmap}, front = ${frontBitmap}, back = ${backBitmap}")
       return GlobalScope.launch(Dispatchers.IO) {
         try {
           val tasks = mutableListOf<Deferred<Unit>>()
@@ -204,11 +202,9 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
           if (backBitmap != null) tasks.add(async { session.saveImage(backBitmap, backCanvas.fileName) }).also { log("Saving back") }
           log("Waiting for ${tasks.size} to finish")
           tasks.forEach { it.await() }
-          withContext(Dispatchers.Main) { fmarkHost.saveIndicator.showOk() }
           log("Data saved successfully.")
         } catch (e : ApiException) {
           log("Error saving data", e)
-          withContext(Dispatchers.Main) { fmarkHost.saveIndicator.showError() }
         }
       }
     }

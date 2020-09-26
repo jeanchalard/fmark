@@ -113,7 +113,8 @@ class Worker(private val context : Context, params : WorkerParameters) : Corouti
       // Note that if result is null the control doesn't even come here (the compiler checks this)
       CommandStatus.lastExecutedCommand = result
     }
-    return Result.success();
+    CommandStatus.working = false
+    return Result.success()
   }
 
   override suspend fun doWork() = withContext(Dispatchers.IO) { runCommands() }
@@ -127,6 +128,7 @@ class RESTManager(context : Context) {
   private val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
 
   fun tickle() {
+    CommandStatus.working = true
     val request = OneTimeWorkRequest.Builder(Worker::class.java)
      .setConstraints(constraints)
      .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.SECONDS)

@@ -56,7 +56,7 @@ fun SessionData(inputStream : InputStream) : SessionData {
 }
 
 fun SessionData.save(outputStream : OutputStream) {
-  log("Saving session data to output stream ${outputStream}")
+  log("Saving session data to output stream \"${outputStream}\"")
   ObjectOutputStream(outputStream).use { os ->
     log("Writing comment ${comment}")
     os.writeObject(comment)

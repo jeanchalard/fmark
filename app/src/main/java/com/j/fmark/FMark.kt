@@ -7,8 +7,7 @@ import android.os.PersistableBundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.view.ViewGroup
-import android.widget.FrameLayout
+import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentTransaction
@@ -52,7 +51,7 @@ class FMark : AppCompatActivity() {
   var insertSpinnerVisible : Boolean
     get() = insertSpinner.visibility == View.VISIBLE
     set(v) { insertSpinner.visibility = if (v) View.VISIBLE else View.GONE }
-  lateinit var saveIndicator : SaveIndicator
+  lateinit var cloudButton : CloudButton
   // Yeah Android fragment lifecycle is still horrendous
   private val pendingFragmentTransactions = ConcurrentLinkedQueue<FragmentTransaction>()
 
@@ -67,7 +66,6 @@ class FMark : AppCompatActivity() {
     findViewById<View>(R.id.list_fragment).clipToOutline = true // This should be set in XML but a bug in the resource parser makes it impossible
     insertSpinner = findViewById(R.id.insert_loading)
     topSpinner = findViewById(R.id.top_loading) ?: insertSpinner
-    saveIndicator = createSaveIndicator(findViewById<FrameLayout>(R.id.action_bar_container))
     supportFragmentManager.addOnBackStackChangedListener {
       val actionBar = supportActionBar ?: return@addOnBackStackChangedListener
       when (val fragment = lastFragment) {
@@ -79,13 +77,6 @@ class FMark : AppCompatActivity() {
     }
     startSignIn()
     getNetworking(this) // Prime the singleton
-  }
-
-  private fun createSaveIndicator(parent : ViewGroup) : SaveIndicator {
-    val indicator = layoutInflater.inflate(R.layout.save_indicator, parent, false) as SaveIndicator
-    log("Created save indicator ${indicator}")
-    parent.addView(indicator)
-    return indicator
   }
 
   private fun startSignIn() {
@@ -158,20 +149,19 @@ class FMark : AppCompatActivity() {
     menu.findItem(R.id.action_button_refresh).isVisible = isHome
     menu.findItem(R.id.action_button_clear).isVisible = !isHome
     menu.findItem(R.id.action_button_undo).isVisible = !isHome
-    menu.findItem(R.id.action_button_save).isVisible = !isHome
     return super.onPrepareOptionsMenu(menu)
   }
 
   override fun onCreateOptionsMenu(menu : Menu) : Boolean {
     log("onCreateOptionsMenu")
     menuInflater.inflate(R.menu.menu_feditor, menu)
+    cloudButton = menu.findItem(R.id.action_button_save).actionView as CloudButton
     return super.onCreateOptionsMenu(menu)
   }
 
   override fun onOptionsItemSelected(item : MenuItem) : Boolean {
     log("onOptionsItemSelected : ${item}")
-    val fragment = lastFragment
-    when (fragment) {
+    when (val fragment = lastFragment) {
       is FEditor            -> return fragment.onOptionsItemSelected(item)
       is ClientListFragment -> fragment.refresh()
     }

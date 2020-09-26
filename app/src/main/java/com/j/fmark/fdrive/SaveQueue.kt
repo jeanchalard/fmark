@@ -12,13 +12,18 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.fdrive.CommandStatus.CommandResult
+import com.j.fmark.logAlways
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import com.google.api.services.drive.model.File as DriveFile
+
+private const val DBG = false
+@Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("SaveQueue", s, e) }
 
 public enum class Type(val value : Int) {
   CREATE_FOLDER(1),
@@ -66,6 +71,7 @@ object CommandStatus {
   public data class CommandResult(val seq : Long, val driveFile : DriveFile?)
   private val lock = ReentrantLock()
   var lastExecutedCommand = CommandResult(0L, null)
+    get() = lock.withLock { field }
     set(l) = lock.withLock {
       field = l
       listeners.forEach { it.invoke(l) }
@@ -73,6 +79,17 @@ object CommandStatus {
   private val listeners = ArrayList<(CommandResult) -> Unit>()
   public fun addListener(listener : (CommandResult) -> Unit) = lock.withLock { listeners.add(listener) }
   public fun removeListener(listener : (CommandResult) -> Unit) = lock.withLock { listeners.remove(listener) }
+
+  var working : Boolean = false
+    get() = lock.withLock { field }
+    set(b) = lock.withLock {
+      log("Working is ${b}")
+      field = b
+      workingListeners.forEach { it.invoke(b) }
+    }
+  private val workingListeners = ArrayList<(Boolean) -> Unit>()
+  public fun addWorkingListener(listener : (Boolean) -> Unit) = lock.withLock { workingListeners.add(listener) }
+  public fun removeWorkingListener(listener : (Boolean) -> Unit) = lock.withLock { workingListeners.remove(listener) }
 }
 
 public inline class CommandId(private val id : Long) {
