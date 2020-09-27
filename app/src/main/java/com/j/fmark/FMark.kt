@@ -156,16 +156,21 @@ class FMark : AppCompatActivity() {
     log("onCreateOptionsMenu")
     menuInflater.inflate(R.menu.menu_feditor, menu)
     cloudButton = menu.findItem(R.id.action_button_save).actionView as CloudButton
+    cloudButton.host = this
     return super.onCreateOptionsMenu(menu)
   }
 
   override fun onOptionsItemSelected(item : MenuItem) : Boolean {
     log("onOptionsItemSelected : ${item}")
+    return onOptionsItemSelected(item.itemId) ?: super.onOptionsItemSelected(item)
+  }
+
+  fun onOptionsItemSelected(itemId : Int) : Boolean? {
     when (val fragment = lastFragment) {
-      is FEditor            -> return fragment.onOptionsItemSelected(item)
+      is FEditor            -> return fragment.onOptionsItemSelected(itemId)
       is ClientListFragment -> fragment.refresh()
     }
-    return super.onOptionsItemSelected(item)
+    return null
   }
 
   override fun onActivityResult(requestCode : Int, resultCode : Int, data : Intent?) {

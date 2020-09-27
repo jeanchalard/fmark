@@ -9,7 +9,9 @@ import android.os.Bundle
 import android.os.Parcel
 import android.os.Parcelable
 import android.util.AttributeSet
+import android.view.MenuItem
 import android.view.View
+import androidx.appcompat.view.menu.MenuItemImpl
 import androidx.appcompat.widget.AppCompatImageButton
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
 import com.j.fmark.fdrive.CommandStatus
@@ -25,16 +27,23 @@ class CloudButton @JvmOverloads constructor(context : Context, attrs : Attribute
   private val UPLOADING = 2
   private val DIRTY = 3
 
-  val animation = ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
+  private val animation = ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
     duration = 750
     interpolator = FastOutSlowInInterpolator()
     repeatCount = ValueAnimator.INFINITE
     repeatMode = ValueAnimator.REVERSE
   }
 
-  var network : Network? = null
-  var clean = true
-  var uploading = false
+  private var network : Network? = null
+  private var clean = true
+  private var uploading = false
+
+  var host : FMark? = null
+
+  override fun onClick(v : View?) {
+    log("onClick")
+    host?.onOptionsItemSelected(R.id.action_button_save)
+  }
 
   init {
     setImageResource(R.drawable.cloud)
@@ -113,9 +122,5 @@ class CloudButton @JvmOverloads constructor(context : Context, attrs : Attribute
       alpha = 1.0f
     }
     isClickable = (DIRTY == level)
-  }
-
-  override fun onClick(v : View?) {
-    log("Click cloud")
   }
 }

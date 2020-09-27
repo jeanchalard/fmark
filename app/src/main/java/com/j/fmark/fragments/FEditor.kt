@@ -66,7 +66,7 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
   // Return the regular LayoutInflater so that this fragment can be put fullscreen on top of the existing interface.
   override fun onGetLayoutInflater(savedFragmentState : Bundle?) = fmarkHost.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
   fun onBackPressed() = impl.onBackPressed()
-  override fun onOptionsItemSelected(item : MenuItem) : Boolean = impl.onOptionsItemSelected(item)
+  fun onOptionsItemSelected(itemId : Int) : Boolean = impl.onOptionsItemSelected(itemId)
   override fun onPause() { super.onPause(); impl.onPause() }
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View? {
     impl = Impl(fmarkHost, session, inflater, container)
@@ -164,12 +164,12 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
       canvasFlipper.flipTo(canvas)
     }
 
-    fun onOptionsItemSelected(item : MenuItem) : Boolean {
+    fun onOptionsItemSelected(itemId : Int) : Boolean {
       if (fmarkHost.topSpinnerVisible) {
         log("Option tapped but spinner visible, ignoring")
         return false
       }
-      when (item.itemId) {
+      when (itemId) {
         R.id.action_button_save  -> save().also { log("Option save tapped") }
         R.id.action_button_undo  -> (view.findViewById<ViewFlipper>(R.id.feditor_canvas_flipper)?.shownView as CanvasView).undo().also { log("Option undo tapped") }
         R.id.action_button_clear -> (view.findViewById<ViewFlipper>(R.id.feditor_canvas_flipper)?.shownView as CanvasView).clear().also { log("Option clear tapped") }

@@ -5,6 +5,7 @@ import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
+import androidx.work.ListenableWorker.Result
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
@@ -19,12 +20,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.net.ConnectException
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
 import com.google.api.services.drive.model.File as DriveFile
 
 private const val DBG = false
 @Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("RESTCommands", s, e) }
 
 class Worker(private val context : Context, params : WorkerParameters) : CoroutineWorker(context, params) {
+  override suspend fun doWork() = withContext(Dispatchers.IO) { CommandRunner(context).runCommands() }
+}
+
+class CommandRunner(private val context : Context) {
   // Returns null if this has to be retried later. Returns a CommandResult with a null DriveFile if it failed.
   private suspend fun createFolder(seq : Long, root : FDrive.Root, parentFolderId : String?, folderName : String?, tryCount : Int = 0) : CommandResult? {
     log("Create folder command : ${parentFolderId}/${folderName}")
@@ -93,7 +99,8 @@ class Worker(private val context : Context, params : WorkerParameters) : Corouti
     }
   }
 
-  private suspend fun runCommands() : Result {
+  public suspend fun runCommands() : Result {
+    CommandStatus.working = true
     val drive = LiveCache.getRoot { FDrive.Root(context) }
     val saveQueue = SaveQueue.get(context)
     while (true) {
@@ -116,8 +123,6 @@ class Worker(private val context : Context, params : WorkerParameters) : Corouti
     CommandStatus.working = false
     return Result.success()
   }
-
-  override suspend fun doWork() = withContext(Dispatchers.IO) { runCommands() }
 }
 
 class RESTManager(context : Context) {
@@ -128,7 +133,6 @@ class RESTManager(context : Context) {
   private val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
 
   fun tickle() {
-    CommandStatus.working = true
     val request = OneTimeWorkRequest.Builder(Worker::class.java)
      .setConstraints(constraints)
      .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.SECONDS)
