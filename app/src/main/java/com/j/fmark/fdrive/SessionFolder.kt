@@ -79,8 +79,9 @@ class RESTSessionFolder(private val root : Root, override val path : String,
     log("openDataFromDrive : read data, comment = ${data.comment}, face has ${data.face.data.size} data points, starting priming tasks...")
     listOf(FACE_IMAGE_NAME, FRONT_IMAGE_NAME, BACK_IMAGE_NAME).forEach { async { fetchDriveFile(root.drive, it, sessionFolder.await()) } }
     log("openDataFromDrive : done")
-    if (!cacheDir.resolve(DATA_FILE_NAME).exists()) {
-      log("openDataFromDrive : opened data from network, cache absent, writing to cache")
+    val cache = cacheDir.resolve(DATA_FILE_NAME)
+    if (!cache.exists() || cache.lastModified() < now() - PROBABLY_FRESH_DELAY_MS) {
+      log("openDataFromDrive : opened data from network, cache absent or old, writing to cache")
       saveToCache(data)
     }
     data

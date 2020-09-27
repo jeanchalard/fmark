@@ -14,6 +14,7 @@ import androidx.annotation.GuardedBy
 import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -136,8 +137,9 @@ suspend fun <T> fromCacheOrNetwork(context : Context,
           fromCache()
         } else {
           log("Data old : trying to fetch from network with ${WAIT_FOR_NETWORK}ms grace")
-          val dataFromDrive = async { fromDrive() }
+          val dataFromDrive = GlobalScope.async { fromDrive() }
           val start = now()
+          // Run to completion even if time out
           val obtained = withTimeoutOrNull(WAIT_FOR_NETWORK) { dataFromDrive.await() }
           if (null != obtained) {
             log("Read data from Drive in ${now() - start}ms")
