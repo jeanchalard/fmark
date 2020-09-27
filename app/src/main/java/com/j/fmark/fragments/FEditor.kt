@@ -28,6 +28,8 @@ import com.j.fmark.R
 import com.j.fmark.SessionData
 import com.j.fmark.fdrive.SessionFolder
 import com.j.fmark.logAlways
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -94,7 +96,10 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
 
       view.findViewById<TextView>(R.id.feditor_date).text = session.date.toShortString()
       view.findViewById<EditText>(R.id.feditor_comment_text).addAfterTextChangedListener { text ->
-        commentData = SaveString(text, dirty = true)
+        if (text != commentData.string) {
+          fmarkHost.cloudButton.signalDirty()
+          commentData = SaveString(text, dirty = true)
+        }
       }
 
       val palette = view.findViewById<LinearLayout>(R.id.feditor_palette)
@@ -119,8 +124,8 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
         val data = loadedData.await()
         log("Session loaded, comment = ${data.comment}, face data has ${data[FACE_CODE].data.size} data points")
         val commentView = view.findViewById<EditText>(R.id.feditor_comment_text)
-        commentView.setText(data.comment)
         commentData = SaveString(data.comment, dirty = false)
+        commentView.setText(data.comment)
         faceCanvas.readData(data[FACE_CODE].data)
         frontCanvas.readData(data[FRONT_CODE].data)
         backCanvas.readData(data[BACK_CODE].data)
@@ -137,7 +142,7 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
       log("Back pressed, quitting")
       fmarkHost.topSpinnerVisible = true
       lifecycleScope.launch(Dispatchers.Main) {
-        save().join()
+        save()?.join()
         log("Data saved, exiting")
         if (isVisible) {
           fmarkHost.supportFragmentManager.popBackStack()
@@ -173,7 +178,7 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     }
 
     // Only saves dirty data, though the data file contains the comment and all drawing data and has to be saved together anyway
-    private fun save() : Job {
+    private fun save() : Job? {
       log("Saving data...")
 
       val comment = commentData
@@ -190,13 +195,14 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
       // to showOk() because that message has to be thrown on the main thread and by the time it would be
       // processed when exiting this editor this fragment has been terminated.
       log("Launching save job on IO pool, comment = ${if (comment.dirty) comment.string else "//not dirty//"}, face = ${faceBitmap}, front = ${frontBitmap}, back = ${backBitmap}")
+      if (!comment.dirty && faceBitmap == null && frontBitmap == null && backBitmap == null)
+        return null
       return GlobalScope.launch(Dispatchers.IO) {
         try {
           val tasks = mutableListOf<Deferred<Unit>>()
-          if (commentData.dirty || faceBitmap != null || frontBitmap != null || backBitmap != null)
-            tasks.add(async { session.saveData(SessionData(commentData.string, faceData, frontData, backData))}).also { log("Saving data") }
-          if (commentData.dirty)
-            tasks.add(async { session.saveComment(commentData.string) }).also { log("Saving comment") }
+          tasks.add(async { session.saveData(SessionData(comment.string, faceData, frontData, backData))}).also { log("Saving data") }
+          if (comment.dirty)
+            tasks.add(async { session.saveComment(comment.string) }).also { log("Saving comment") }
           if (faceBitmap != null) tasks.add(async { session.saveImage(faceBitmap, faceCanvas.fileName) }).also { log("Saving face") }
           if (frontBitmap != null) tasks.add(async { session.saveImage(frontBitmap, frontCanvas.fileName) }).also { log("Saving front") }
           if (backBitmap != null) tasks.add(async { session.saveImage(backBitmap, backCanvas.fileName) }).also { log("Saving back") }

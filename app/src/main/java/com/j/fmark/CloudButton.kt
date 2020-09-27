@@ -1,6 +1,9 @@
 package com.j.fmark
 
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Interpolator
 import android.net.Network
 import android.os.Bundle
 import android.os.Parcel
@@ -8,6 +11,7 @@ import android.os.Parcelable
 import android.util.AttributeSet
 import android.view.View
 import androidx.appcompat.widget.AppCompatImageButton
+import androidx.interpolator.view.animation.FastOutSlowInInterpolator
 import com.j.fmark.fdrive.CommandStatus
 import java.util.UUID
 
@@ -20,6 +24,13 @@ class CloudButton @JvmOverloads constructor(context : Context, attrs : Attribute
   private val NO_NETWORK = 1
   private val UPLOADING = 2
   private val DIRTY = 3
+
+  val animation = ObjectAnimator.ofFloat(this, "alpha", 0f, 1f).apply {
+    duration = 750
+    interpolator = FastOutSlowInInterpolator()
+    repeatCount = ValueAnimator.INFINITE
+    repeatMode = ValueAnimator.REVERSE
+  }
 
   var network : Network? = null
   var clean = true
@@ -97,6 +108,10 @@ class CloudButton @JvmOverloads constructor(context : Context, attrs : Attribute
     }
     log("Update icon level to ${level} (clean = ${clean} ; network = ${network} ; uploading = ${uploading})")
     setImageLevel(level)
+    if (UPLOADING == level) animation.start() else {
+      animation.cancel()
+      alpha = 1.0f
+    }
     isClickable = (DIRTY == level)
   }
 
