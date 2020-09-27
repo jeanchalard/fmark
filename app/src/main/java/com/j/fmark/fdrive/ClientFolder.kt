@@ -5,15 +5,19 @@ import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.LocalSecond
 import com.j.fmark.PROBABLY_FRESH_DELAY_MS
 import com.j.fmark.fdrive.FDrive.Root
+import com.j.fmark.fdrive.FDrive.decodeCacheName
 import com.j.fmark.fdrive.FDrive.decodeComment
 import com.j.fmark.fdrive.FDrive.decodeName
 import com.j.fmark.fdrive.FDrive.decodeReading
 import com.j.fmark.fdrive.FDrive.encodeClientFolderName
 import com.j.fmark.fdrive.FDrive.encodeSessionFolderName
+import com.j.fmark.fdrive.FDrive.resolveCache
+import com.j.fmark.fdrive.FDrive.resolveSiblingCache
 import com.j.fmark.fromCacheOrNetwork
 import com.j.fmark.logAlways
 import com.j.fmark.mkdir_p
 import com.j.fmark.now
+import com.j.fmark.toBytes
 import com.j.fmark.toLong
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -55,7 +59,7 @@ class RESTClientFolder(private val root : Root, override val path : String,
    get() = if (clientFolder.isCompleted)
      clientFolder.getCompleted().createdTime?.value ?: throw IllegalArgumentException("Created date not present in loaded folder")
    else
-     cacheDir.resolve(CREATION_DATE_FILE_NAME).readBytes().toLong()
+     cacheDir.resolveCache(CREATION_DATE_FILE_NAME).readBytes().toLong()
   override val modifiedDate : Long
    get() = if (clientFolder.isCompleted)
      clientFolder.getCompleted().modifiedTime?.value ?: throw IllegalArgumentException("Modified date not present in loaded folder")
@@ -71,7 +75,7 @@ class RESTClientFolder(private val root : Root, override val path : String,
   override suspend fun newSession() : RESTSessionFolder = withContext(Dispatchers.IO) {
     val sessionName = encodeSessionFolderName(LocalSecond(now()))
     log("New session${path}/${sessionName}")
-    val sessionCacheDir = cacheDir.resolve(sessionName).mkdir_p()
+    val sessionCacheDir = cacheDir.resolveCache(sessionName).mkdir_p()
     val newSession = root.saveQueue.createFolder(clientFolder.await(), sessionName).await().driveFile!!
     RESTSessionFolder(root, "${path}/${sessionName}", CompletableDeferred(newSession), sessionCacheDir)
   }
@@ -79,7 +83,7 @@ class RESTClientFolder(private val root : Root, override val path : String,
   override suspend fun rename(name : String, reading : String, comment : String) : RESTClientFolder = withContext(Dispatchers.IO) {
     val newDirName = encodeClientFolderName(name, reading, comment)
     log("Rename session ${path}/${newDirName}")
-    val newDir = cacheDir.resolveSibling(newDirName)
+    val newDir = cacheDir.resolveSiblingCache(newDirName)
     cacheDir.renameTo(newDir)
     val newPath = path.replaceAfterLast('/', newDirName)
     val newFolder = root.saveQueue.renameFile(clientFolder.await(), newDirName).await().driveFile!!
@@ -89,7 +93,9 @@ class RESTClientFolder(private val root : Root, override val path : String,
 
 private suspend fun readClientsFromDrive(root : Root, name : String? = null, exactMatch : Boolean = false) : List<RESTClientFolder> {
   return FDrive.getFolderList(root.drive, root.root, name, exactMatch).map {
-    val cacheDir = root.cache.resolve(it.name).mkdir_p()
+    val cacheDir = root.cache.resolveCache(it.name).mkdir_p()
+    val date = it.createdTime.value
+    cacheDir.resolve(CREATION_DATE_FILE_NAME).writeBytes(date.toBytes())
     RESTClientFolder(root, it.name, decodeName(it.name), decodeReading(it.name), decodeComment(it.name), CompletableDeferred(it), cacheDir)
   }
 }
@@ -99,12 +105,13 @@ private suspend fun readClientsFromCache(root : Root, cacheDir : File, name : St
   val fileList = cacheDir.listFiles()?.toList() ?: emptyList()
   val filteredList = when {
     null == name -> fileList
-    exactMatch   -> fileList.filter { it.name == name }
-    else         -> fileList.filter { it.name.contains(name) }
+    exactMatch   -> fileList.filter { decodeCacheName(it.name) == name }
+    else         -> fileList.filter { decodeCacheName(it.name).contains(name) }
   }
   return filteredList.map {
-    val driveFile = scope.async(start = CoroutineStart.LAZY) { FDrive.createDriveFolder(root.drive, root.root, it.name) }
-    RESTClientFolder(root, it.name, decodeName(it.name), decodeReading(it.name), decodeComment(it.name), driveFile, it)
+    val name = decodeCacheName(it.name)
+    val driveFile = scope.async(start = CoroutineStart.LAZY) { FDrive.createDriveFolder(root.drive, root.root, name) }
+    RESTClientFolder(root, name, decodeName(name), decodeReading(name), decodeComment(name), driveFile, it)
   }
 }
 
@@ -123,8 +130,9 @@ class RESTClientFolderList internal constructor(private val root : Root, private
   suspend fun createClient(name : String, reading : String, comment : String) : ClientFolder {
     val folderName = encodeClientFolderName(name, reading, comment)
     log("Create client ${root.path}/${folderName}")
-    val cacheDir = root.cache.resolve(folderName).mkdir_p()
+    val cacheDir = root.cache.resolveCache(folderName).mkdir_p()
+    cacheDir.resolveCache(CREATION_DATE_FILE_NAME).writeBytes(System.currentTimeMillis().toBytes())
     val createdFolder = root.saveQueue.createFolder(root.root, folderName).await().driveFile!!
-    return RESTClientFolder(root, "${folderName}", name, reading, comment, CompletableDeferred(createdFolder), cacheDir)
+    return RESTClientFolder(root, folderName, name, reading, comment, CompletableDeferred(createdFolder), cacheDir)
   }
 }

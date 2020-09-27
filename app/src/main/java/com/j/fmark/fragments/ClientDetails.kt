@@ -18,6 +18,7 @@ import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.R
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.FMarkRoot
+import com.j.fmark.fdrive.SEPARATOR
 import com.j.fmark.formatDate
 import com.j.fmark.logAlways
 import com.j.fmark.now
@@ -31,10 +32,6 @@ private const val DBG = false
 @Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("ClientDetails", s, e) }
 
 class ClientDetails(private val fmarkHost : FMark, private val clientFolder : ClientFolder?, private val root : FMarkRoot) : DialogFragment() {
-  // - is allowed in a file name but I'm using it as a separator. It's a bit shitty but that's simplest
-  // TODO : remove this limitation. Drive doesn't have it, and it can be removed by storing the metadata in a file in the directory instead of in the file name
-  private val filenameForbiddenCharacters = arrayOf('?', ':', '\"', '*', '|', '/', '\\', '<', '>', '-')
-
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View? {
     log("onCreateView ${savedInstanceState}")
     val view = inflater.inflate(R.layout.fragment_client_details, container, false)
@@ -48,6 +45,7 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
     if (null != clientFolder) {
       inputName.setText(clientFolder.name)
       inputReading.setText(clientFolder.reading)
+      inputComment.setText(clientFolder.comment)
       view.findViewById<TextView>(R.id.client_details_creation_date_value)?.text = formatDate(clientFolder.createdDate)
       view.findViewById<TextView>(R.id.client_details_last_update_date_value)?.text = formatDate(clientFolder.modifiedDate)
     } else {
@@ -61,7 +59,7 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
       override fun onTextChanged(s : CharSequence?, start : Int, before : Int, count : Int) {}
       override fun afterTextChanged(s : Editable?) {
         view.findViewById<TextView>(R.id.client_details_character_error).visibility =
-         if (filenameForbiddenCharacters.any { c -> inputName.text.contains(c) || inputReading.text.contains(c) || inputComment.text.contains(c) })
+         if (inputName.text.contains(SEPARATOR) || inputReading.text.contains(SEPARATOR) || inputComment.text.contains(SEPARATOR))
            View.VISIBLE
          else
            View.INVISIBLE

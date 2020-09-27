@@ -21,7 +21,7 @@ class RESTFMarkRoot internal constructor(private val root : FDrive.Root) : FMark
   private val clientList = CoroutineScope(Dispatchers.IO).async(start = CoroutineStart.LAZY) { RESTClientFolderList(root) }
 
   override suspend fun createClient(name : String, reading : String, comment : String) : ClientFolder = withContext(Dispatchers.IO) {
-    log("Create client ${name} -- ${reading} (${comment})")
+    log("Create client ${name} - ${reading} (${comment})")
     clientList.await().createClient(name, reading, comment)
   }
 

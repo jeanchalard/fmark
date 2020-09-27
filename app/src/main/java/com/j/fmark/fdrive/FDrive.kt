@@ -35,20 +35,34 @@ private const val DBG = false
 
 const val NECESSARY_FIELDS = "id,name,parents,createdTime,modifiedTime"
 const val NECESSARY_FIELDS_EXPRESSION = "files(${NECESSARY_FIELDS})"
+val SEPARATOR = " -- "
 
 object FDrive {
   data class Root(val context : Context, val account : Account, val drive : Drive, val path : String, val root : DriveFile, val cache : File,
                   val saveQueue : SaveQueue, val rest : RESTManager)
   private fun String.escape() = replace("'", "\\'")
 
-  fun encodeClientFolderName(name : String, reading : String, comment : String) = if (comment.isEmpty()) "${name} -- ${reading}" else "${name} -- ${reading} -- ${comment}"
+  fun encodeClientFolderName(name : String, reading : String, comment : String) = if (comment.isEmpty()) "${name}${SEPARATOR}${reading}" else "${name}${SEPARATOR}${reading}${SEPARATOR}${comment}"
   fun encodeSessionFolderName(date : LocalSecond) = date.toString()
   fun encodeIndexableText(name : String, reading : String, comment : String) = "${name} ${reading} ${comment}"
 
-  fun decodeName(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[0] else folderName
-  fun decodeReading(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ")[1] else folderName
-  fun decodeComment(folderName : String) = if (folderName.indexOf("--") != -1) folderName.split(" -- ").getOrNull(2) ?: "" else folderName
+  fun decodeName(folderName : String) = if (folderName.indexOf(SEPARATOR) != -1) folderName.split(SEPARATOR)[0] else folderName
+  fun decodeReading(folderName : String) = if (folderName.indexOf(SEPARATOR) != -1) folderName.split(SEPARATOR)[1] else folderName
+  fun decodeComment(folderName : String) = if (folderName.indexOf(SEPARATOR) != -1) folderName.split(SEPARATOR).getOrNull(2) ?: "" else folderName
   fun decodeSessionFolderName(name : String) = parseLocalSecond(name)
+
+  fun encodeCacheName(name : String) : String {
+    val sb = StringBuilder()
+    name.forEach { c -> if (Character.isLetterOrDigit(c) || c == ' ' || c == ':' || c == '-') sb.append(c) else sb.append(String.format("%%%04X", c.toInt())) }
+    return sb.toString()
+  }
+  val encoded = Regex("%([0-9A-F]{4})")
+  fun decodeCacheName(cacheName : String) : String = cacheName.replace(encoded) {
+    Character.toString(it.groupValues[1].toInt(16).toChar())
+  }
+
+  fun File.resolveCache(name : String) = resolve(encodeCacheName(name))
+  fun File.resolveSiblingCache(name : String) = resolveSibling(encodeCacheName(name))
 
   suspend fun Root(context : Context) : Root = Root(context, fetchAccount(context, GOOGLE_SIGN_IN_CODE)?.account ?: throw SignInException(context.getString(R.string.sign_in_fail_cant_get_account)))
 
