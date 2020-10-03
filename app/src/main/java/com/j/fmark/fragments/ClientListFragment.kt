@@ -86,7 +86,7 @@ class ClientListFragment(private val fmarkHost : FMark, private val root : FMark
           root.clearCache()
           refreshRequested = false
         }
-        readClients(if (searchString.isEmpty() or searchString.isBlank()) null else searchString)
+        readClients(if (searchString.isBlank()) null else searchString)
       } catch (e : ApiException) { // TODO : is this still useful ?
         // Can't reach Google servers
         log("Can't read clients.")
