@@ -9,6 +9,7 @@
   <string name="sign_in_fail_eventual">サインインはできませんでした。接続環境を確認してください。</string>
   <string name="label_name">氏名 :</string>
   <string name="label_reading">読み :</string>
+  <string name="label_comment">コメント :</string>
   <string name="client_details_title">お客様詳細</string>
   <string name="cancel">キャンセル</string>
   <plurals name="client_already_exists">

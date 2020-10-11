@@ -13,6 +13,7 @@
 
   <string name="label_name">Name :</string>
   <string name="label_reading">Reading :</string>
+  <string name="label_comment">Comment :</string>
   <string name="client_details_title">Client details</string>
   <string name="cancel">Cancel</string>
 
