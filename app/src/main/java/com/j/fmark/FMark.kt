@@ -10,6 +10,7 @@ import android.view.View
 import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.FragmentTransaction
 import androidx.work.Configuration
 import com.google.android.gms.auth.api.Auth
@@ -127,6 +128,7 @@ class FMark : AppCompatActivity() {
 
   fun offlineError(msgId : Int) = offlineError(resources.getString(msgId))
   private fun offlineError(msg : String?) {
+    insertSpinnerVisible = false
     replaceFragment(SignInErrorFragment(msg, ::startSignIn))
   }
 
@@ -207,9 +209,12 @@ class FMark : AppCompatActivity() {
      .commit()
   }
 
-  fun startSessionEditor(sessionFolder : SessionFolder) {
+  fun startSessionEditor(sessionFolder : SessionFolder, sessionData : SessionData? = null) {
     log("Starting session editor ${sessionFolder}")
-    val fEditor = FEditor(this, sessionFolder)
+    val fEditor = FEditor(this, sessionFolder, sessionData)
+    if (supportFragmentManager.findFragmentByTag("editor") != null) {
+      supportFragmentManager.popBackStack("editor", FragmentManager.POP_BACK_STACK_INCLUSIVE)
+    }
     supportFragmentManager.beginTransaction().apply {
       addToBackStack("editor")
       replace(R.id.top_fragment, fEditor, "editor")

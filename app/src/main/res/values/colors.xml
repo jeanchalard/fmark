@@ -10,4 +10,6 @@
   <color name="textBackgroundLight">#FF6F6F6F</color>
 
   <color name="defaultBrushColor">#FFE53935</color>
+
+  <color name="darken_for_unavailable">#9F000000</color>
 </resources>

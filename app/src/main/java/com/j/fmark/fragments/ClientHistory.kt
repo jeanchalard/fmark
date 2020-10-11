@@ -22,13 +22,14 @@ import com.j.fmark.codeToResource
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.SessionFolder
 import com.j.fmark.logAlways
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -36,13 +37,13 @@ import java.util.Locale
 private const val DBG = false
 @Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("ClientHistory", s, e) }
 
-private data class LoadSession(val session : SessionFolder, val data : Deferred<SessionData>)
+private data class LoadSession(val session : SessionFolder, val data : Flow<SessionData>)
 
 val EMPTY_SESSION = object : SessionFolder {
   override val date : LocalSecond get() = throw IllegalStateException("Must not call EMPTY_SESSION#date")
   override val lastUpdateDate : LocalSecond get() = throw IllegalStateException("Must not call EMPTY_SESSION#lastUpdateDate")
   override val path : String get() = throw IllegalStateException("Must not call EMPTY_SESSION#path")
-  override suspend fun openData() : SessionData = SessionData()
+  override suspend fun openData() = emptyFlow<SessionData>()
   override suspend fun saveData(data : SessionData) {}
   override suspend fun saveComment(comment : String) {}
   override suspend fun saveImage(image : Bitmap, fileName : String) {}
@@ -87,8 +88,7 @@ class ClientHistory(private val fmarkHost : FMark, private val clientFolder : Cl
           log("populateClientHistory job getting sessions")
           val sessions = clientFolder.getSessions()
           log("populateClientHistory job obtained sessions with count ${sessions.count}")
-          val inProgress = sessions.map { session -> LoadSession(session, async(start = CoroutineStart.LAZY) { session.openData() }) }
-          if (inProgress.isNotEmpty()) inProgress.first().data.start()
+          val inProgress = sessions.map { session -> LoadSession(session, session.openData()) }
           withContext(Dispatchers.Main) {
             val list = view.findViewById<RecyclerView>(R.id.client_history)
             log("Adding adapter")
@@ -120,32 +120,36 @@ private class ClientHistoryAdapter(private val parent : ClientHistory, private v
     private val frontImage : CanvasView = view.findViewById<CanvasView>(R.id.client_history_front).also { it.setImageResource(R.drawable.front) }
     private val backImage : CanvasView = view.findViewById<CanvasView>(R.id.client_history_back).also { it.setImageResource(R.drawable.back) }
 
-    var session : LoadSession = LoadSession(EMPTY_SESSION, CompletableDeferred())
+    var sessionField = LoadSession(EMPTY_SESSION, emptyFlow()) to SupervisorJob()
+    var session : LoadSession
       set(session) {
-        field = session
-        log("Setting session ${session.session.date} in ${this}")
-        session.data.invokeOnCompletion { populate(session) }
-        if (!session.data.isActive) session.data.start().also { logAlways("Start loading ${session.session.date} now") }
+        sessionField.second.cancel()
+        sessionField = session to SupervisorJob()
+        CoroutineScope(Dispatchers.Main + sessionField.second).launch {
+          dateLabel.text = ""
+          loadingView.visibility = View.VISIBLE
+          session.data.collect {
+            populate(session.session, it) // Whether this is from cache or network or network after cache, just update.
+          }
+        }
       }
+      get() = sessionField.first
 
-    private fun populate(session : LoadSession) {
-      log("Populating with ${session.session.date} ${if (session.data.isCompleted) session.data.getCompleted().comment else session.data.toString()}")
-      dateLabel.text = if (session.session !== EMPTY_SESSION) session.session.date.toShortString() else ""
-      val lastUpdateDateString = if (session.session !== EMPTY_SESSION) session.session.lastUpdateDate.toShortString() else ""
+    private fun populate(session : SessionFolder, data : SessionData) {
+      log("Populating with ${session.date} ${data.comment}")
+      dateLabel.text = session.date.toShortString()
+      val lastUpdateDateString = if (session !== EMPTY_SESSION) session.lastUpdateDate.toShortString() else ""
       lastUpdateLabel.text = String.format(Locale.getDefault(), lastUpdateLabel.context.getString(R.string.update_time_with_placeholder), lastUpdateDateString)
-      if (session.data.isCompleted) {
-        val completedData = session.data.getCompleted()
-        log("Populated, comment = ${completedData.comment}")
-        commentTextView.text = completedData.comment
-        faceImage.setImageResource(codeToResource(completedData.face.code))
-        faceImage.readData(completedData.face.data)
-        frontImage.setImageResource(codeToResource(completedData.front.code))
-        frontImage.readData(completedData.front.data)
-        backImage.setImageResource(codeToResource(completedData.back.code))
-        backImage.readData(completedData.back.data)
-        commentTextView.visibility = View.VISIBLE
-        loadingView.visibility = View.INVISIBLE
-      } else loadingView.visibility = View.VISIBLE
+      log("Populated, comment = ${data.comment}")
+      commentTextView.text = data.comment
+      faceImage.setImageResource(codeToResource(data.face.code))
+      faceImage.readData(data.face.data)
+      frontImage.setImageResource(codeToResource(data.front.code))
+      frontImage.readData(data.front.data)
+      backImage.setImageResource(codeToResource(data.back.code))
+      backImage.readData(data.back.data)
+      commentTextView.visibility = View.VISIBLE
+      loadingView.visibility = View.INVISIBLE
     }
 
     override fun onClick(v : View?) {

@@ -37,4 +37,8 @@
   <string name="accessibility_description_save_done">保存済み</string>
   <string name="accessibility_description_save_error">保存エラー</string>
   <string name="contains_filename_forbidden_chars">ファイル名に入れる為、次の文字を使えません / \ ? : " * | &gt; &lt;</string>
+  <string name="conflicting_data_dialog_message">このデータは他の端末で既に%1$sに更新されました。</string>
+  <string name="conflicting_data_dialog_reload">更新したデータを表示する</string>
+  <string name="conflicting_data_dialog_reload_with_changes">更新したデータを表示して、現在の編集をやめる</string>
+  <string name="conflicting_data_dialog_ignore">現在の編集を使って、更新されたデータを上書きする</string>
 </resources>

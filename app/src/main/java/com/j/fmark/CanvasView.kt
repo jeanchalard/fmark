@@ -89,6 +89,7 @@ class CanvasView @JvmOverloads constructor(context : Context, attrs : AttributeS
   private var eraserY = -1.0f
   private var dirty = false
     set(b) { field = b; if (dirty) changeListeners.forEach { it.onCanvasChanged() } }
+  public fun hasDirtyData() = dirty // isDirty is a method in View used by the framework, must not override
   var brush : Brush = Brush(PorterDuff.Mode.SRC_OVER, defaultColor, defaultWidth)
 
   interface OnChangeListener { fun onCanvasChanged() }

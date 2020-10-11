@@ -15,7 +15,7 @@ private const val DBG = false
 typealias FEditorDataType = Double
 
 data class Drawing(val code : Int, val data : List<FEditorDataType>)
-data class SessionData(var comment : String, val face : Drawing, val front : Drawing, val back : Drawing) {
+data class SessionData(var comment : String, val face : Drawing, val front : Drawing, val back : Drawing, val modifiedTime : Long) {
   operator fun get(code : Int) = when (code) {
     FACE_CODE  -> face
     FRONT_CODE -> front
@@ -28,10 +28,29 @@ data class SessionData(var comment : String, val face : Drawing, val front : Dra
     f(front)
     f(back)
   }
+
+  // modifiedDate is different between the cache and the server and it's fairly annoying to fix (not too much on the down path where it's
+  // easy to set the local modified date to what the server said, but more on the up path where the app doesn't have the timestamp of
+  // the server), so have equals() ignore it. It does make sense in usage and it's used in Networking as == to tell if the data is the
+  // same when the server load finishes after the data has been opened from cache to tell whether to re-show, so the alternative would be
+  // that all users of Networking.load() need to pass yet an additional lambda to compare.
+  override fun equals(other : Any?) : Boolean {
+    if (this === other) return true
+    if (javaClass != other?.javaClass) return false
+    other as SessionData
+    return (comment == other.comment && face == other.face && front == other.front && back == other.back)
+  }
+
+  override fun hashCode() : Int {
+    var result = comment.hashCode()
+    result = 31 * result + face.hashCode()
+    result = 31 * result + front.hashCode()
+    result = 31 * result + back.hashCode()
+    return result
+  }
 }
 
-fun SessionData() = SessionData("", face = Drawing(FACE_CODE, ArrayList()), front = Drawing(FRONT_CODE, ArrayList()), back = Drawing(BACK_CODE, ArrayList()))
-fun SessionData(inputStream : InputStream) : SessionData {
+fun SessionData(modifiedTime : Long, inputStream : InputStream) : SessionData {
   log("Creating SessionData from input stream ${inputStream}")
   fun SparseArray<Drawing>.getOrEmpty(code : Int) = this[code] ?: Drawing(code, ArrayList())
   var comment : String? = null
@@ -52,7 +71,8 @@ fun SessionData(inputStream : InputStream) : SessionData {
   } catch (e : StreamCorruptedException) {
     log("Stream corrupted :/")
   }
-  return SessionData(comment = comment ?: "", face = drawings.getOrEmpty(FACE_CODE), front = drawings.getOrEmpty(FRONT_CODE), back = drawings.getOrEmpty(BACK_CODE))
+  return SessionData(comment = comment ?: "", face = drawings.getOrEmpty(FACE_CODE), front = drawings.getOrEmpty(FRONT_CODE), back = drawings.getOrEmpty(BACK_CODE),
+   modifiedTime = modifiedTime)
 }
 
 fun SessionData.save(outputStream : OutputStream) {

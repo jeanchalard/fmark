@@ -44,4 +44,9 @@
   <string name="accessibility_description_save_done">Saved</string>
   <string name="accessibility_description_save_error">Save error</string>
   <string name="contains_filename_forbidden_chars">Illegal character</string>
+
+  <string name="conflicting_data_dialog_message">This data has been updated from another device on %1$s.</string>
+  <string name="conflicting_data_dialog_reload">Reload this page</string>
+  <string name="conflicting_data_dialog_reload_with_changes">Reload this page and lose changes made since opening this data</string>
+  <string name="conflicting_data_dialog_ignore">Keep current changes and overwrite the updated data</string>
 </resources>

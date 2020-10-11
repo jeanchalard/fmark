@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
-import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
@@ -28,15 +27,15 @@ import com.j.fmark.R
 import com.j.fmark.SessionData
 import com.j.fmark.fdrive.SessionFolder
 import com.j.fmark.logAlways
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CompletableJob
+import com.j.fmark.now
+import com.j.fmark.stackTrace
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.collect
 
 private const val DBG = false
 @Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("FEditor", s, e) }
@@ -60,8 +59,12 @@ private val ViewFlipper.shownView get() = getChildAt(displayedChild)
 
 private data class SaveString(val string : String, val dirty : Boolean)
 
-class FEditor(private val fmarkHost : FMark, private val session : SessionFolder) : Fragment() {
+class FEditor(private val fmarkHost : FMark, private val session : SessionFolder, private val startSessionData : SessionData?) : Fragment() {
   private lateinit var impl : Impl // Limit the horror of the no-arg constructor to this member
+
+  init {
+    log("FEditor fragment created")
+  }
 
   // Return the regular LayoutInflater so that this fragment can be put fullscreen on top of the existing interface.
   override fun onGetLayoutInflater(savedFragmentState : Bundle?) = fmarkHost.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
@@ -69,11 +72,16 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
   fun onOptionsItemSelected(itemId : Int) : Boolean = impl.onOptionsItemSelected(itemId)
   override fun onPause() { super.onPause(); impl.onPause() }
   override fun onCreateView(inflater : LayoutInflater, container : ViewGroup?, savedInstanceState : Bundle?) : View? {
-    impl = Impl(fmarkHost, session, inflater, container)
+    impl = Impl(fmarkHost, session, startSessionData, inflater, container)
     return impl.view
   }
 
-  private inner class Impl(private val fmarkHost : FMark, private val session : SessionFolder, inflater : LayoutInflater, container : ViewGroup?) : CanvasView.OnChangeListener {
+  interface Control {
+    val fmarkHost : FMark
+    fun setNotOutdated()
+  }
+
+  private inner class Impl(override val fmarkHost : FMark, private val session : SessionFolder, startSessionData : SessionData?, inflater : LayoutInflater, container : ViewGroup?) : CanvasView.OnChangeListener, Control {
     val view : View = inflater.inflate(R.layout.fragment_feditor, container, false)
     private val commentContainer = view.findViewById<View>(R.id.feditor_comment_container)
     private val canvasFlipper = view.findViewById<ViewFlipper>(R.id.feditor_canvas_flipper)!!
@@ -83,10 +91,12 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
 
     private var commentData = SaveString("", false)
     private val brushViews = ArrayList<BrushView>()
-    private val loadedData = lifecycle.coroutineScope.async(Dispatchers.IO) { session.openData() }
+
+    private var saveInhibited = false
+    override fun setNotOutdated() { saveInhibited = false }
 
     init {
-      log("Starting editor for ${session}")
+      log("Starting editor for ${session} ${this}")
       fmarkHost.topSpinnerVisible = true
 
       view.findViewById<AppCompatImageButton>(R.id.feditor_comment)?.setOnClickListener { switchToComment() }
@@ -119,21 +129,42 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
       canvasFlipper.flipTo(faceCanvas)
       brushViews.forEach { it.isActivated = it.isActive(faceCanvas.brush) }
 
-      lifecycle.coroutineScope.launch(Dispatchers.Main) {
-        log("Loading editor data for ${session}...")
-        val data = loadedData.await()
-        log("Session loaded, comment = ${data.comment}, face data has ${data[FACE_CODE].data.size} data points")
-        val commentView = view.findViewById<EditText>(R.id.feditor_comment_text)
-        commentData = SaveString(data.comment, dirty = false)
-        commentView.setText(data.comment)
-        faceCanvas.readData(data[FACE_CODE].data)
-        frontCanvas.readData(data[FRONT_CODE].data)
-        backCanvas.readData(data[BACK_CODE].data)
-        faceCanvas.addOnChangeListener(this@Impl)
-        frontCanvas.addOnChangeListener(this@Impl)
-        backCanvas.addOnChangeListener(this@Impl)
-        fmarkHost.topSpinnerVisible = false
+      if (startSessionData != null)
+        sessionLoaded(startSessionData)
+      else {
+        log("No initial session, open it from cache or network")
+        var oldSession : SessionData? = null
+        lifecycle.coroutineScope.launch(Dispatchers.Main) {
+          log("Loading editor data for ${session}...")
+          session.openData().collect { data ->
+            log("Obtained data \"${data.comment}\" for ${session}, old session was ${if (null == oldSession) "" else "not "}null")
+            val oldData = oldSession
+            if (null != oldData) {
+              val transaction = fmarkHost.supportFragmentManager.beginTransaction()
+               .addToBackStack(null)
+              saveInhibited = true
+              ConflictingDataDialog(this@Impl, session, oldData.modifiedTime, hasDirtyData(), data).show(transaction, "conflicting data")
+            } else {
+              sessionLoaded(data)
+              oldSession = data
+            }
+          }
+        }
       }
+    }
+
+    private fun sessionLoaded(data : SessionData) {
+      log("Session loaded, comment = ${data.comment}, face data has ${data[FACE_CODE].data.size} data points")
+      val commentView = view.findViewById<EditText>(R.id.feditor_comment_text)
+      commentData = SaveString(data.comment, dirty = false)
+      commentView.setText(data.comment)
+      faceCanvas.readData(data[FACE_CODE].data)
+      frontCanvas.readData(data[FRONT_CODE].data)
+      backCanvas.readData(data[BACK_CODE].data)
+      faceCanvas.addOnChangeListener(this@Impl)
+      frontCanvas.addOnChangeListener(this@Impl)
+      backCanvas.addOnChangeListener(this@Impl)
+      fmarkHost.topSpinnerVisible = false
     }
 
     override fun onCanvasChanged() = fmarkHost.cloudButton.signalDirty()
@@ -177,9 +208,12 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
       return true
     }
 
+    private fun hasDirtyData() = commentData.dirty || faceCanvas.hasDirtyData() || frontCanvas.hasDirtyData() || backCanvas.hasDirtyData()
+
     // Only saves dirty data, though the data file contains the comment and all drawing data and has to be saved together anyway
     private fun save() : Job? {
-      log("Saving data...")
+      log("Saving data... ${this@Impl} inhibited = ${saveInhibited}")
+      if (saveInhibited) return Job()
 
       val comment = commentData
       commentData = SaveString(comment.string, dirty = false)
@@ -200,7 +234,7 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
       return GlobalScope.launch(Dispatchers.IO) {
         try {
           val tasks = mutableListOf<Deferred<Unit>>()
-          tasks.add(async { session.saveData(SessionData(comment.string, faceData, frontData, backData))}).also { log("Saving data") }
+          tasks.add(async { session.saveData(SessionData(comment.string, faceData, frontData, backData, now()))}).also { log("Saving data") }
           if (comment.dirty)
             tasks.add(async { session.saveComment(comment.string) }).also { log("Saving comment") }
           if (faceBitmap != null) tasks.add(async { session.saveImage(faceBitmap, faceCanvas.fileName) }).also { log("Saving face") }

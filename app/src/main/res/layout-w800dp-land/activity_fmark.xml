@@ -24,7 +24,7 @@
     <FrameLayout
      android:id="@+id/insert_loading"
      android:clickable="true"
-     android:background="#9F000000"
+     android:background="@color/darken_for_unavailable"
      android:layout_width="match_parent"
      android:layout_height="match_parent"
      android:focusable="true">
@@ -45,7 +45,7 @@
    android:id="@+id/top_loading"
    android:visibility="gone"
    android:clickable="true"
-   android:background="#9F000000"
+   android:background="@color/darken_for_unavailable"
    android:layout_width="match_parent"
    android:layout_height="match_parent"
    android:elevation="15dp"

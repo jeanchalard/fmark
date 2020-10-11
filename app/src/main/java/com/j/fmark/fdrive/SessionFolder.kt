@@ -19,6 +19,7 @@ import com.j.fmark.fdrive.FDrive.fetchDriveFile
 import com.j.fmark.fdrive.FDrive.resolveCache
 import com.j.fmark.fromCacheOrNetwork
 import com.j.fmark.getNetworking
+import com.j.fmark.load
 import com.j.fmark.logAlways
 import com.j.fmark.mkdir_p
 import com.j.fmark.now
@@ -29,6 +30,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -42,7 +44,7 @@ interface SessionFolder {
   val date : LocalSecond
   val lastUpdateDate : LocalSecond
   val path : String
-  suspend fun openData() : SessionData
+  suspend fun openData() : Flow<SessionData>
   suspend fun saveData(data : SessionData)
   suspend fun saveComment(comment : String)
   suspend fun saveImage(image : Bitmap, fileName : String)
@@ -78,7 +80,7 @@ class RESTSessionFolder(private val root : Root, override val path : String,
     log("openDataFromDrive")
     val f = FDrive.createDriveFile(root.drive, sessionFolder.await(), DATA_FILE_NAME)
     log("openDataFromDrive : created Drive file ${f.id} ${path}/${f.name}, reading data...")
-    val data = LiveCache.getSession(f) { SessionData(root.drive.files().get(f.id).executeMediaAsInputStream()) }
+    val data = LiveCache.getSession(f) { SessionData(f.modifiedTime.value, root.drive.files().get(f.id).executeMediaAsInputStream()) }
     log("openDataFromDrive : read data, comment = ${data.comment}, face has ${data.face.data.size} data points, starting priming tasks...")
     listOf(FACE_IMAGE_NAME, FRONT_IMAGE_NAME, BACK_IMAGE_NAME).forEach { async { fetchDriveFile(root.drive, it, sessionFolder.await()) } }
     log("openDataFromDrive : done")
@@ -90,13 +92,13 @@ class RESTSessionFolder(private val root : Root, override val path : String,
     data
   }
 
-  override suspend fun openData() : SessionData = withContext(Dispatchers.IO) {
+  override suspend fun openData() = withContext(Dispatchers.IO) {
     log("openData : getting session ${this@RESTSessionFolder} from cache or network")
     val dataFile = cacheDir.resolveCache(DATA_FILE_NAME)
     suspend fun fromDrive() = openDataFromDrive()
-    suspend fun fromCache() = SessionData(dataFile.inputStream())
+    suspend fun fromCache() = SessionData(dataFile.lastModified(), dataFile.inputStream())
     suspend fun isCacheFresh() = if (!dataFile.exists()) null else dataFile.lastModified() > now() - PROBABLY_FRESH_DELAY_MS
-    fromCacheOrNetwork(root.context, ::fromDrive, ::fromCache, ::isCacheFresh)
+    load(root.context, ::fromDrive, ::fromCache, ::isCacheFresh)
   }
 
   private suspend fun saveToCache(data : SessionData) {

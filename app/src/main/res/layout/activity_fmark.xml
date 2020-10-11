@@ -14,7 +14,7 @@
    android:id="@+id/insert_loading"
    android:clickable="true"
    android:focusable="true"
-   android:background="#9F000000"
+   android:background="@color/darken_for_unavailable"
    android:layout_width="match_parent"
    android:layout_height="match_parent">
     <ProgressBar

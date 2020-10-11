@@ -25,6 +25,7 @@ fun color(l : Long) : Int = (l and -1L).toInt()
 fun formatDate(date : Date?) : String = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date ?: Date())
 fun formatDate(date : DateTime) : String = LocalSecond(date).toDateString()
 fun formatDate(date : Long) : String = LocalSecond(date).toDateString()
+fun formatTime(date : Long) : String = LocalSecond(date).toShortString()
 
 private fun roundTo(v : Long, granularity : Long) = (v % granularity).let { mod -> if (mod * 2 > granularity) v + granularity - mod else v - mod }
 
