@@ -25,6 +25,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
@@ -43,7 +44,7 @@ interface ClientFolder {
   val modifiedDate : Long
   suspend fun rename(name : String, reading : String, comment : String) : ClientFolder
   suspend fun newSession() : SessionFolder
-  suspend fun getSessions() : SessionFolderList
+  suspend fun getSessions() : Flow<SessionFolderList>
 }
 
 interface ClientFolderList {
@@ -68,9 +69,7 @@ class RESTClientFolder(private val root : Root, override val path : String,
   override val id : String
    get() = if (clientFolder.isCompleted) clientFolder.getCompleted().id else cacheDir.absolutePath
 
-  override suspend fun getSessions() : RESTSessionFolderList = withContext(Dispatchers.IO) {
-    RESTSessionFolderList(root, path, clientFolder, cacheDir)
-  }
+  override suspend fun getSessions() = RESTSessionFolderList(root, path, clientFolder, cacheDir)
 
   override suspend fun newSession() : RESTSessionFolder = withContext(Dispatchers.IO) {
     val sessionName = encodeSessionFolderName(LocalSecond(now()))

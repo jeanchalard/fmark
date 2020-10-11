@@ -86,19 +86,20 @@ class ClientHistory(private val fmarkHost : FMark, private val clientFolder : Cl
         fmarkHost.insertSpinnerVisible = true
         currentJob = launch {
           log("populateClientHistory job getting sessions")
-          val sessions = clientFolder.getSessions()
-          log("populateClientHistory job obtained sessions with count ${sessions.count}")
-          val inProgress = sessions.map { session -> LoadSession(session, session.openData()) }
-          withContext(Dispatchers.Main) {
-            val list = view.findViewById<RecyclerView>(R.id.client_history)
-            log("Adding adapter")
-            if (null == list.adapter) {
-              list.addItemDecoration(DividerItemDecoration(context, (list.layoutManager as LinearLayoutManager).orientation))
-              list.adapter = ClientHistoryAdapter(this@ClientHistory, inProgress)
-            } else (list.adapter as ClientHistoryAdapter).setSource(inProgress)
-            fmarkHost.insertSpinnerVisible = false
-            currentJob = null
-            log("Client history populated")
+          clientFolder.getSessions().collect { sessions ->
+            log("populateClientHistory job obtained sessions with count ${sessions.count}")
+            val inProgress = sessions.map { session -> LoadSession(session, session.openData()) }
+            withContext(Dispatchers.Main) {
+              val list = view.findViewById<RecyclerView>(R.id.client_history)
+              log("Adding adapter")
+              if (null == list.adapter) {
+                list.addItemDecoration(DividerItemDecoration(context, (list.layoutManager as LinearLayoutManager).orientation))
+                list.adapter = ClientHistoryAdapter(this@ClientHistory, inProgress)
+              } else (list.adapter as ClientHistoryAdapter).setSource(inProgress)
+              fmarkHost.insertSpinnerVisible = false
+              currentJob = null
+              log("Client history populated")
+            }
           }
         }
       }

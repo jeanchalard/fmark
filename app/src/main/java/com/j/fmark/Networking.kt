@@ -26,8 +26,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.CopyOnWriteArrayList
 
-val PROBABLY_FRESH_DELAY_MS = 86_400_000L
-val WAIT_FOR_NETWORK = 500L
+const val PROBABLY_FRESH_DELAY_MS = 86_400_000L
+const val WAIT_FOR_NETWORK = 500L
 
 private const val DBG = false
 @Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("Networking", s, e) }

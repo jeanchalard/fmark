@@ -35,6 +35,7 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.OutputStream
+import java.nio.file.Files
 import com.google.api.services.drive.model.File as DriveFile
 
 private const val DBG = false
@@ -62,7 +63,6 @@ const val TEXT_MIME_TYPE = "text/plain"
 
 class RESTSessionFolder(private val root : Root, override val path : String,
                         private val sessionFolder : Deferred<DriveFile>, private val cacheDir : File) : SessionFolder {
-  val networking = getNetworking(root.context)
   override val date
     get() = if (sessionFolder.isCompleted)
      LocalSecond(sessionFolder.getCompleted().createdTime)
@@ -136,10 +136,23 @@ class RESTSessionFolder(private val root : Root, override val path : String,
     }
     log("saveImage : done")
   }
+
+  override fun equals(other : Any?) : Boolean {
+    if (this === other) return true
+    if (javaClass != other?.javaClass) return false
+    other as RESTSessionFolder
+    return (path == other.path)
+  }
+
+  override fun hashCode() : Int {
+    return path.hashCode() + 1
+  }
 }
 
 private suspend fun readSessionsFromDrive(root : Root, path : String, clientFolder : Deferred<DriveFile>, cacheDir : File) : List<RESTSessionFolder> = withContext(Dispatchers.IO) {
-  FDrive.getFolderList(root.drive, clientFolder.await()).map { RESTSessionFolder(root, "${path}/${it.name}", CompletableDeferred(it), cacheDir.resolveCache(it.name)) }
+  FDrive.getFolderList(root.drive, clientFolder.await()).map {
+    RESTSessionFolder(root, "${path}/${it.name}", CompletableDeferred(it), cacheDir.resolveCache(it.name))
+  }.also { cacheDir.setLastModified(now()) }
 }
 private suspend fun readSessionsFromCache(root : Root, path : String, cacheDir : File) : List<RESTSessionFolder> {
   val scope = CoroutineScope(Dispatchers.IO)
@@ -153,18 +166,30 @@ private suspend fun readSessionsFromCache(root : Root, path : String, cacheDir :
   }
 }
 
-suspend fun RESTSessionFolderList(root : Root, path : String, clientFolder : Deferred<DriveFile>, cacheDir : File) : RESTSessionFolderList = withContext(Dispatchers.IO) {
+suspend fun RESTSessionFolderList(root : Root, path : String, clientFolder : Deferred<DriveFile>, cacheDir : File) : Flow<RESTSessionFolderList> = withContext(Dispatchers.IO) {
   log("RESTSessionFolderList : getting session list for ${path} from cache or network")
   val cachedSessions = readSessionsFromCache(root, path, cacheDir)
   suspend fun fromDrive() = RESTSessionFolderList(readSessionsFromDrive(root, path, clientFolder, cacheDir))
   suspend fun fromCache() = RESTSessionFolderList(cachedSessions)
   suspend fun isCacheFresh() = if (cachedSessions.isEmpty()) null else cacheDir.lastModified() > now() - PROBABLY_FRESH_DELAY_MS
-  fromCacheOrNetwork(root.context, ::fromDrive, ::fromCache, ::isCacheFresh)
+  load(root.context, ::fromDrive, ::fromCache, ::isCacheFresh)
 }
 class RESTSessionFolderList internal constructor(private val sessions : List<RESTSessionFolder>) : SessionFolderList {
   override val count = sessions.size
-  override fun get(i : Int) : RESTSessionFolder = sessions[i]
+  override operator fun get(i : Int) : RESTSessionFolder = sessions[i]
   override fun iterator() = sessions.iterator()
+
+  override fun equals(other : Any?) : Boolean {
+    return false
+    if (this === other) return true
+    if (javaClass != other?.javaClass) return false
+    other as RESTSessionFolderList
+    if (count != other.count) return false
+    forEachIndexed { i, item -> if (item != other[i]) return false }
+    return true
+  }
+
+  override fun hashCode() = fold(0) { acc, sessionFolder -> 31 * acc + sessionFolder.hashCode() }
 }
 
 fun Bitmap.savePng(s : OutputStream) = compress(Bitmap.CompressFormat.PNG, 85, s)
