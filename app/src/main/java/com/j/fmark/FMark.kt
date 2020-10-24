@@ -7,7 +7,7 @@ import android.os.PersistableBundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.widget.Button
+import android.view.animation.AccelerateInterpolator
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
@@ -48,16 +48,37 @@ class FMark : AppCompatActivity() {
   private lateinit var insertSpinner : View
   var topSpinnerVisible : Boolean
     get() = topSpinner.visibility == View.VISIBLE
-    set(v) { topSpinner.visibility = if (v) View.VISIBLE else View.GONE }
+    set(v) = setSpinnerVisible(topSpinner, v)
   var insertSpinnerVisible : Boolean
     get() = insertSpinner.visibility == View.VISIBLE
-    set(v) { insertSpinner.visibility = if (v) View.VISIBLE else View.GONE }
+    set(v) = setSpinnerVisible(insertSpinner, v)
   lateinit var cloudButton : CloudButton
   // Yeah Android fragment lifecycle is still horrendous
   private val pendingFragmentTransactions = ConcurrentLinkedQueue<FragmentTransaction>()
 
   init {
     log("FMark activity created")
+  }
+
+  // A function to make a view appear over a short lapse of time. This is useful for spinners, first because having them appear smoothly
+  // is nicer, and also because when they only last one or two frames it makes them a lot less glaring. This takes the alpha wherever it
+  // used to stand.
+  private val appearInterpolator = AccelerateInterpolator()
+  private fun setSpinnerVisible(v : View, visible : Boolean) {
+    log("Appear ${v} from alpha ${v.alpha}")
+    if (visible) {
+      v.visibility = View.VISIBLE
+      v.animate().apply {
+        interpolator = appearInterpolator
+        duration = 500
+        alpha(1f)
+        start()
+      }
+    } else {
+      v.animate().cancel()
+      v.visibility = View.GONE
+      v.alpha = 0f
+    }
   }
 
   override fun onCreate(icicle : Bundle?) {
