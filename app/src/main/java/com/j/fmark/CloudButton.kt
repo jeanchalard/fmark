@@ -63,45 +63,6 @@ class CloudButton @JvmOverloads constructor(context : Context, attrs : Attribute
     setOnClickListener(this)
   }
 
-  // Kind of crappy honestly. Whenever the fragment changes, Android will recreate the menu from scratch.
-  override fun onRestoreInstanceState(state : Parcelable) {
-    super.onRestoreInstanceState(state)
-    if (state !is SaveState) return
-    clean = state.clean
-    uploading = state.uploading
-  }
-
-  private class SaveState : BaseSavedState {
-    val clean : Boolean
-    val uploading : Boolean
-    constructor(p : Parcelable?, clean : Boolean, uploading : Boolean) : super(p) {
-      this.clean = clean
-      this.uploading = uploading
-    }
-    constructor(p : Parcel) : super(p) {
-      val v = p.readInt() // readBoolean is API 29
-      clean = 0 != v and 1
-      uploading = 0 != v and 2
-    }
-
-    override fun writeToParcel(out : Parcel?, flags : Int) {
-      super.writeToParcel(out, flags)
-      if (null == out) return
-      out.writeInt(if (clean) 1 else 0 + if (uploading) 2 else 0)
-    }
-
-    companion object {
-      @JvmStatic val CREATOR = object : Parcelable.Creator<SaveState> {
-        override fun createFromParcel(p : Parcel) : SaveState = SaveState(p)
-        override fun newArray(size : Int) : Array<SaveState> = newArray(size)
-      }
-    }
-  }
-
-  override fun onSaveInstanceState() : Parcelable? {
-    return SaveState(super.onSaveInstanceState(), clean, uploading)
-  }
-
   fun signalDirty() {
     log("signalDirty")
     clean = false

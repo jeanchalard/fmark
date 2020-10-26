@@ -7,8 +7,11 @@ import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.ConnectivityManager.CONNECTIVITY_ACTION
 import android.net.ConnectivityManager.EXTRA_NETWORK
+import android.net.ConnectivityManager.EXTRA_NETWORK_INFO
+import android.net.ConnectivityManager.EXTRA_NETWORK_TYPE
 import android.net.ConnectivityManager.NetworkCallback
 import android.net.Network
+import android.net.NetworkInfo
 import android.os.Build
 import androidx.annotation.GuardedBy
 import androidx.annotation.RequiresApi
@@ -107,11 +110,24 @@ class NetworkingOld(context : Context) : Networking() {
   }
 
   init {
+    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     val filter = IntentFilter(CONNECTIVITY_ACTION)
+    log("Register CONNECTIVITY_ACTION listener")
     context.registerReceiver(object : BroadcastReceiver() {
       override fun onReceive(context : Context?, intent : Intent?) {
+        log("Received CONNECTIVITY_ACTION ${intent}")
         if (null == intent) return
-        network = intent.getParcelableExtra(EXTRA_NETWORK) as? Network
+        val info = intent.getParcelableExtra<NetworkInfo>(EXTRA_NETWORK_INFO)
+        log("Default network ${info}")
+        cm.allNetworks.forEach {
+          val iinfo = cm.getNetworkInfo(it)
+          log("Available network ${it} ${iinfo}")
+          if (iinfo.type == info.type) { // NetworkInfo#equals doesn't even work >.>
+            log("It's the default")
+            network = it
+            return
+          }
+        }
       }
     }, filter)
   }

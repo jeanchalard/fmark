@@ -1,5 +1,6 @@
 package com.j.fmark
 
+import android.os.Bundle
 import android.util.Log
 import com.google.api.client.util.DateTime
 import java.io.File
@@ -67,3 +68,5 @@ fun File.mkdir_p() : File {
 }
 
 fun now() = System.currentTimeMillis()
+
+fun Bundle.forEach(f : (String, Any?) -> Unit) { for (k in this.keySet()) f(k, this[k]) }

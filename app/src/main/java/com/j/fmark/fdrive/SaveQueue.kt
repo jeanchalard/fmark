@@ -88,7 +88,7 @@ object CommandStatus {
       workingListeners.forEach { it.invoke(b) }
     }
   private val workingListeners = ArrayList<(Boolean) -> Unit>()
-  public fun addWorkingListener(listener : (Boolean) -> Unit) = lock.withLock { workingListeners.add(listener) }
+  public fun addWorkingListener(listener : (Boolean) -> Unit) = lock.withLock { workingListeners.add(listener); listener(working) }
   public fun removeWorkingListener(listener : (Boolean) -> Unit) = lock.withLock { workingListeners.remove(listener) }
 }
 
