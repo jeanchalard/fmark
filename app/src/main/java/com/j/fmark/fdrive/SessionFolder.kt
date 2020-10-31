@@ -17,8 +17,6 @@ import com.j.fmark.fdrive.FDrive.decodeCacheName
 import com.j.fmark.fdrive.FDrive.decodeSessionFolderName
 import com.j.fmark.fdrive.FDrive.fetchDriveFile
 import com.j.fmark.fdrive.FDrive.resolveCache
-import com.j.fmark.fromCacheOrNetwork
-import com.j.fmark.getNetworking
 import com.j.fmark.load
 import com.j.fmark.logAlways
 import com.j.fmark.mkdir_p
@@ -35,7 +33,6 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.OutputStream
-import java.nio.file.Files
 import com.google.api.services.drive.model.File as DriveFile
 
 private const val DBG = false
@@ -80,7 +77,7 @@ class RESTSessionFolder(private val root : Root, override val path : String,
     log("openDataFromDrive")
     val f = FDrive.createDriveFile(root.drive, sessionFolder.await(), DATA_FILE_NAME)
     log("openDataFromDrive : created Drive file ${f.id} ${path}/${f.name}, reading data...")
-    val data = LiveCache.getSession(f) { SessionData(f.modifiedTime.value, root.drive.files().get(f.id).executeMediaAsInputStream()) }
+    val data = LiveCache.getSession("${path}/${f.name}") { SessionData(f.modifiedTime.value, root.drive.files().get(f.id).executeMediaAsInputStream()) }
     log("openDataFromDrive : read data, comment = ${data.comment}, face has ${data.face.data.size} data points, starting priming tasks...")
     listOf(FACE_IMAGE_NAME, FRONT_IMAGE_NAME, BACK_IMAGE_NAME).forEach { async { fetchDriveFile(root.drive, it, sessionFolder.await()) } }
     log("openDataFromDrive : done")
@@ -114,9 +111,11 @@ class RESTSessionFolder(private val root : Root, override val path : String,
     log("saveData : start with ${data.face.data.size} data points for face, saving cache...")
     saveToCache(data)
     log("saveData : cache saved, enqueuing save to Drive...")
+    val dataPath = "${path}/${DATA_FILE_NAME}"
+    LiveCache.overrideSession(dataPath, data)
     val s = ByteArrayOutputStream()
     data.save(s)
-    saveToDriveFile("${path}/${DATA_FILE_NAME}", s.toByteArray(), BINDATA_MIME_TYPE)
+    saveToDriveFile(dataPath, s.toByteArray(), BINDATA_MIME_TYPE)
     log("saveData : done")
   }
 

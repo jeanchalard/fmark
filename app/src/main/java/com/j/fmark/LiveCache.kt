@@ -1,6 +1,7 @@
 package com.j.fmark
 
 import com.j.fmark.fdrive.FDrive.Root
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
@@ -76,8 +77,12 @@ object LiveCache {
    }.await()
 
   private val sessions : HashMap<String, Deferred<SessionData>> = HashMap()
-  suspend fun getSession(file : DriveFile, read : suspend () -> SessionData) = synchronized(sessions) {
-    log("getSession, ${file.id} : ${sessions[file.id]}")
-    sessions.getOrPut(file.id) { GlobalScope.async { read() } }
+  suspend fun getSession(path : String, read : suspend () -> SessionData) = synchronized(sessions) {
+    log("getSession, ${path} : ${sessions[path]}")
+    sessions.getOrPut(path) { GlobalScope.async { read() } }
   }.await()
+  suspend fun overrideSession(path : String, data : SessionData) = synchronized(sessions) {
+    log("overrideSession, ${path}")
+    sessions.put(path, CompletableDeferred(data))
+  }
 }
