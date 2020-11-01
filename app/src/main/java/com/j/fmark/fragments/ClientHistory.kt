@@ -21,6 +21,7 @@ import com.j.fmark.SessionData
 import com.j.fmark.codeToResource
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.SessionFolder
+import com.j.fmark.fdrive.SessionFolderList
 import com.j.fmark.logAlways
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -86,7 +87,7 @@ class ClientHistory(private val fmarkHost : FMark, private val clientFolder : Cl
         fmarkHost.insertSpinnerVisible = true
         currentJob = launch {
           log("populateClientHistory job getting sessions")
-          clientFolder.getSessions().collect { sessions ->
+          clientFolder.getSessions().collect { sessions : SessionFolderList ->
             log("populateClientHistory job obtained sessions with count ${sessions.count}")
             val inProgress = sessions.map { session -> LoadSession(session, session.openData()) }
             withContext(Dispatchers.Main) {

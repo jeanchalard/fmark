@@ -81,7 +81,7 @@ class ClientDetails(private val fmarkHost : FMark, private val clientFolder : Cl
     log("Finishing with ${name} -- ${reading} (${comment})")
     if (null == name || null == reading || null == comment) throw NullPointerException("Name, reading and comment can't be null when validating the dialog")
     MainScope().launch {
-      root.clientList(searchString = name, exactMatch = true).count.let { count ->
+      root.clientList(searchString = name, exactMatch = true).value.count.let { count ->
         log("Existing client count named ${name} : ${count}")
         if (count == 0)
           validateDetails(clientFolder, name, reading, comment)

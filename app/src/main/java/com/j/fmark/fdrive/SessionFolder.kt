@@ -179,7 +179,6 @@ class RESTSessionFolderList internal constructor(private val sessions : List<RES
   override fun iterator() = sessions.iterator()
 
   override fun equals(other : Any?) : Boolean {
-    return false
     if (this === other) return true
     if (javaClass != other?.javaClass) return false
     other as RESTSessionFolderList

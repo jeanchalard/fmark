@@ -14,6 +14,7 @@ import com.j.fmark.fdrive.FDrive.encodeSessionFolderName
 import com.j.fmark.fdrive.FDrive.resolveCache
 import com.j.fmark.fdrive.FDrive.resolveSiblingCache
 import com.j.fmark.fromCacheOrNetwork
+import com.j.fmark.load
 import com.j.fmark.logAlways
 import com.j.fmark.mkdir_p
 import com.j.fmark.now
@@ -114,13 +115,13 @@ private suspend fun readClientsFromCache(root : Root, cacheDir : File, name : St
   }
 }
 
-suspend fun RESTClientFolderList(root : Root, name : String? = null, exactMatch : Boolean = false) : RESTClientFolderList {
+suspend fun RESTClientFolderList(root : Root, name : String? = null, exactMatch : Boolean = false) : Flow<RESTClientFolderList> {
   log("RESTClientFolderList : getting client list for ${name} (exact match = ${exactMatch})")
-  val cachedClients = readClientsFromCache(root, root.cache)
-  suspend fun fromDrive() = RESTClientFolderList(root, readClientsFromDrive(root))
+  val cachedClients = readClientsFromCache(root, root.cache, name, exactMatch)
+  suspend fun fromDrive() = RESTClientFolderList(root, readClientsFromDrive(root, name, exactMatch))
   suspend fun fromCache() = RESTClientFolderList(root, cachedClients)
   suspend fun isCacheFresh() = if (cachedClients.isEmpty()) null else root.cache.lastModified() > now() - PROBABLY_FRESH_DELAY_MS
-  return fromCacheOrNetwork(root.context, ::fromDrive, ::fromCache, ::isCacheFresh)
+  return load(root.context, ::fromDrive, ::fromCache, ::isCacheFresh)
 }
 class RESTClientFolderList internal constructor(private val root : Root, private val folders : List<RESTClientFolder>) : ClientFolderList {
   override val count = folders.size
