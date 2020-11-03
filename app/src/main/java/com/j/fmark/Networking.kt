@@ -133,50 +133,6 @@ class NetworkingOld(context : Context) : Networking() {
   }
 }
 
-suspend fun <T> fromCacheOrNetwork(context : Context,
- fromDrive : suspend () -> T,
- fromCache : suspend () -> T,
- isCacheFresh : suspend () -> Boolean? // Boolean.TRUE if the cache is fresh, Boolean.FALSE if the cache is not fresh, null if the cache is absent
-) : T {
-  log("fromCacheOrNetwork...")
-  return withContext(Dispatchers.IO) {
-    val networking = getNetworking(context)
-    val isCacheFresh = isCacheFresh()
-    if (null == isCacheFresh) {
-      log("Cache absent, waiting for network")
-      val start = now()
-      // TODO : timeout
-      networking.waitForNetwork()
-      fromDrive().also { log("Retrieved data from Drive in ${now() - start}ms") }
-    } else {
-      if (null == networking.network) {
-        log("No network, returning cache")
-        fromCache()
-      } else {
-        if (isCacheFresh) {
-          // TODO : Load from network and register to listen
-          log("Cache fresh, reading from cache")
-          fromCache()
-        } else {
-          log("Data old : trying to fetch from network with ${WAIT_FOR_NETWORK}ms grace")
-          val dataFromDrive = GlobalScope.async { fromDrive() }
-          val start = now()
-          // Run to completion even if time out
-          val obtained = withTimeoutOrNull(WAIT_FOR_NETWORK) { dataFromDrive.await() }
-          if (null != obtained) {
-            log("Read data from Drive in ${now() - start}ms")
-            obtained
-          } else {
-            log("Network timeout, returning from cache")
-            // TODO : Register to listen on dataFromDrive
-            fromCache()
-          }
-        }
-      }
-    }
-  }
-}
-
 fun <T> load(context : Context,
  fromDrive : suspend () -> T,
  fromCache : suspend () -> T,
