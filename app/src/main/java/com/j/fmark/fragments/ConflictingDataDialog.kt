@@ -8,7 +8,6 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.TextView
 import androidx.fragment.app.DialogFragment
-import com.j.fmark.FMark
 import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.R
 import com.j.fmark.SessionData

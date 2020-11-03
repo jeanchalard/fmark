@@ -28,7 +28,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.concurrent.CopyOnWriteArrayList
 import com.google.api.services.drive.model.File as DriveFile
 
 private const val DBG = false

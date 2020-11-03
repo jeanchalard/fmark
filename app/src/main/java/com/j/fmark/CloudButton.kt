@@ -3,19 +3,12 @@ package com.j.fmark
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.content.Context
-import android.graphics.Interpolator
 import android.net.Network
-import android.os.Bundle
-import android.os.Parcel
-import android.os.Parcelable
 import android.util.AttributeSet
-import android.view.MenuItem
 import android.view.View
-import androidx.appcompat.view.menu.MenuItemImpl
 import androidx.appcompat.widget.AppCompatImageButton
 import androidx.interpolator.view.animation.FastOutSlowInInterpolator
 import com.j.fmark.fdrive.CommandStatus
-import java.util.UUID
 
 private const val DBG = false
 @Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("CloudButton", s, e) }

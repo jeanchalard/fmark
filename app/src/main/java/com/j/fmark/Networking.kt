@@ -6,9 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.ConnectivityManager.CONNECTIVITY_ACTION
-import android.net.ConnectivityManager.EXTRA_NETWORK
 import android.net.ConnectivityManager.EXTRA_NETWORK_INFO
-import android.net.ConnectivityManager.EXTRA_NETWORK_TYPE
 import android.net.ConnectivityManager.NetworkCallback
 import android.net.Network
 import android.net.NetworkInfo
@@ -19,13 +17,11 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.CopyOnWriteArrayList
 

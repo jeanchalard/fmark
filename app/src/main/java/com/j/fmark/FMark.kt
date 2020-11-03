@@ -25,7 +25,6 @@ import com.j.fmark.fragments.ClientHistory
 import com.j.fmark.fragments.ClientListFragment
 import com.j.fmark.fragments.FEditor
 import com.j.fmark.fragments.SignInErrorFragment
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.MainScope

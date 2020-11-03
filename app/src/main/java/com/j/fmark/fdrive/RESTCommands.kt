@@ -20,7 +20,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.net.ConnectException
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.locks.ReentrantLock
 import com.google.api.services.drive.model.File as DriveFile
 
 private const val DBG = false
