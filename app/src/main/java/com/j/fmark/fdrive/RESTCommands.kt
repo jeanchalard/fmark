@@ -37,8 +37,7 @@ class CommandRunner(private val context : Context) {
     if (null == folderName) throw IllegalArgumentException("Folder name can't be null in createFolder")
     try {
       val parent = DriveFile().also { it.id = parentFolderId }
-      log("Create folder command succeeded")
-      return CommandResult(seq, FDrive.createDriveFolder(root.drive, parent, folderName))
+      return CommandResult(seq, FDrive.createDriveFolder(root.drive, parent, folderName)).also { log("Create folder command succeeded") }
     } catch (e : ConnectException) {
       log("Connection exception while creating folder", e)
       delay(1000) // Just in case the system would rerun this immediately because it hasn't noticed yet

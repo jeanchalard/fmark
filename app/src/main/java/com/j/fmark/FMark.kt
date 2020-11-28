@@ -242,13 +242,20 @@ class FMark : AppCompatActivity() {
     }.commit()
   }
 
-  // TODO : remove this function and have listeners on the ClientFolder object
-  suspend fun renameClient(clientFolder : ClientFolder, name : String, reading : String, comment : String) {
-    log("Rename client ${clientFolder.name} → ${name} - ${reading} (${comment})")
-    clientFolder.rename(name, reading, comment)
-    withContext(Dispatchers.Main) {
-      supportFragmentManager.fragments.forEach {
-        if (it is ClientListFragment) it.notifyRenamed(clientFolder)
+  suspend fun createOrRenameClient(root : FMarkRoot, clientFolder : ClientFolder?, name : String, reading : String, comment : String) {
+    log("Create or rename client ${clientFolder?.name} → ${name} - ${reading} (${comment})")
+    if (null == clientFolder) { // It's a new client.
+      withContext(Dispatchers.Main) {
+        topSpinnerVisible = true
+        startSessionEditor(root.createClient(name, reading, comment).newSession())
+      }
+    } else {
+      clientFolder.rename(name, reading, comment)
+      // TODO : remove this part and have listeners on the ClientFolder object
+      withContext(Dispatchers.Main) {
+        supportFragmentManager.fragments.forEach {
+          if (it is ClientListFragment) it.notifyRenamed(clientFolder)
+        }
       }
     }
   }
