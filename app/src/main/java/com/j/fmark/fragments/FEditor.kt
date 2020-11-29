@@ -95,7 +95,7 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     override fun setNotOutdated() { saveInhibited = false }
 
     init {
-      log("Starting editor for ${session} ${this}")
+      log("Starting editor for ${session}")
       fmarkHost.topSpinnerVisible = true
 
       view.findViewById<AppCompatImageButton>(R.id.feditor_comment)?.setOnClickListener { switchToComment() }

@@ -24,10 +24,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.coroutines.coroutineContext
 import com.google.api.services.drive.model.File as DriveFile
 
 private const val DBG = false
@@ -74,8 +77,8 @@ class RESTClientFolder(private val root : Root, override val path : String,
     val sessionName = encodeSessionFolderName(LocalSecond(now()))
     log("New session${path}/${sessionName}")
     val sessionCacheDir = cacheDir.resolveCache(sessionName).mkdir_p()
-    val newSession = root.saveQueue.createFolder(clientFolder.await(), sessionName).await().driveFile!!
-    RESTSessionFolder(root, "${path}/${sessionName}", CompletableDeferred(newSession), sessionCacheDir)
+    val newSession = GlobalScope.async { root.saveQueue.createFolder(clientFolder.await(), sessionName).await().driveFile!! }
+    RESTSessionFolder(root, "${path}/${sessionName}", newSession, sessionCacheDir)
   }
 
   override suspend fun rename(name : String, reading : String, comment : String) : RESTClientFolder = withContext(Dispatchers.IO) {
@@ -84,8 +87,8 @@ class RESTClientFolder(private val root : Root, override val path : String,
     val newDir = cacheDir.resolveSiblingCache(newDirName)
     cacheDir.renameTo(newDir)
     val newPath = path.replaceAfterLast('/', newDirName)
-    val newFolder = root.saveQueue.renameFile(clientFolder.await(), newDirName).await().driveFile!!
-    RESTClientFolder(root, newPath, name, reading, comment, CompletableDeferred(newFolder), newDir)
+    val newFolder = GlobalScope.async { root.saveQueue.renameFile(clientFolder.await(), newDirName).await().driveFile!! }
+    RESTClientFolder(root, newPath, name, reading, comment, newFolder, newDir)
   }
 }
 
@@ -130,7 +133,7 @@ class RESTClientFolderList internal constructor(private val root : Root, private
     log("Create client ${root.path}/${folderName}")
     val cacheDir = root.cache.resolveCache(folderName).mkdir_p()
     cacheDir.resolveCache(CREATION_DATE_FILE_NAME).writeBytes(System.currentTimeMillis().toBytes())
-    val createdFolder = root.saveQueue.createFolder(root.root, folderName).await().driveFile!!
-    return RESTClientFolder(root, folderName, name, reading, comment, CompletableDeferred(createdFolder), cacheDir)
+    val createdFolder = GlobalScope.async { root.saveQueue.createFolder(root.root, folderName).await().driveFile!! }
+    return RESTClientFolder(root, folderName, name, reading, comment, createdFolder, cacheDir)
   }
 }

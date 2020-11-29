@@ -73,6 +73,8 @@ class RESTSessionFolder(private val root : Root, override val path : String,
 
   init { cacheDir.mkdir_p() }
 
+  override fun toString() : String = "RESTSessionFolder ${path} (cachedir = ${cacheDir}, sessionFolder ${if (sessionFolder.isCompleted) "completed" else "not completed"})"
+
   private suspend fun openDataFromDrive() : SessionData = withContext(Dispatchers.IO) {
     log("openDataFromDrive")
     val f = FDrive.createDriveFile(root.drive, sessionFolder.await(), DATA_FILE_NAME)
