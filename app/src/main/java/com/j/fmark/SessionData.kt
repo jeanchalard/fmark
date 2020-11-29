@@ -50,6 +50,8 @@ data class SessionData(var comment : String, val face : Drawing, val front : Dra
   }
 }
 
+fun newEmptySessionData() = SessionData("", Drawing(FACE_CODE, ArrayList()), Drawing(FRONT_CODE, ArrayList()), Drawing(BACK_CODE, ArrayList()), System.currentTimeMillis())
+
 fun SessionData(modifiedTime : Long, inputStream : InputStream) : SessionData {
   log("Creating SessionData from input stream ${inputStream}")
   fun SparseArray<Drawing>.getOrEmpty(code : Int) = this[code] ?: Drawing(code, ArrayList())

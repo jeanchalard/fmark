@@ -247,7 +247,7 @@ class FMark : AppCompatActivity() {
     if (null == clientFolder) { // It's a new client.
       withContext(Dispatchers.Main) {
         topSpinnerVisible = true
-        startSessionEditor(root.createClient(name, reading, comment).newSession())
+        startSessionEditor(root.createClient(name, reading, comment).newSession(), newEmptySessionData())
       }
     } else {
       clientFolder.rename(name, reading, comment)
