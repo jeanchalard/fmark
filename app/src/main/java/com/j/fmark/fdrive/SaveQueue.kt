@@ -90,6 +90,15 @@ object CommandStatus {
   private val workingListeners = ArrayList<(Boolean) -> Unit>()
   public fun addWorkingListener(listener : (Boolean) -> Unit) = lock.withLock { workingListeners.add(listener); listener(working) }
   public fun removeWorkingListener(listener : (Boolean) -> Unit) = lock.withLock { workingListeners.remove(listener) }
+
+  private class Blocker(private val continuation : Continuation<Unit>) : (Boolean) -> Unit {
+    override fun invoke(working : Boolean) {
+      if (working) return
+      removeWorkingListener(this)
+      continuation.resume(Unit)
+    }
+  }
+  suspend fun blockUntilQueueIdle() = suspendCoroutine<Unit> { continuation -> addWorkingListener(Blocker(continuation)) }
 }
 
 public inline class CommandId(private val id : Long) {

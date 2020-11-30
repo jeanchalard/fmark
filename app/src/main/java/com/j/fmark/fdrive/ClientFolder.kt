@@ -26,11 +26,14 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import java.io.File
-import kotlin.coroutines.coroutineContext
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 import com.google.api.services.drive.model.File as DriveFile
 
 private const val DBG = false
@@ -116,13 +119,30 @@ private suspend fun readClientsFromCache(root : Root, cacheDir : File, name : St
   }
 }
 
-suspend fun RESTClientFolderList(root : Root, name : String? = null, exactMatch : Boolean = false) : Flow<RESTClientFolderList> {
+class RESTClientFolderListHolder(root : Root, fromDrive : suspend () -> RESTClientFolderList, fromCache : suspend () -> RESTClientFolderList, isCacheFresh : suspend () -> Boolean?) {
+  private var continuation : Continuation<Unit>? = null
+    get() = synchronized(this) { field }
+    set(value) = synchronized(this) { field = value }
+
+  val flow = flow {
+    do {
+      load(root.context, fromDrive, fromCache, isCacheFresh).collect {
+        log("Loaded ${it}")
+        emit(it)
+      }
+      suspendCoroutine<Unit> { cont -> continuation = cont }
+    } while (true)
+  }
+  fun refresh() = continuation?.resume(Unit)
+}
+
+suspend fun RESTClientFolderList(root : Root, name : String? = null, exactMatch : Boolean = false) : RESTClientFolderListHolder {
   log("RESTClientFolderList : getting client list for ${name} (exact match = ${exactMatch})")
   val cachedClients = readClientsFromCache(root, root.cache, name, exactMatch)
   suspend fun fromDrive() = RESTClientFolderList(root, readClientsFromDrive(root, name, exactMatch))
   suspend fun fromCache() = RESTClientFolderList(root, cachedClients)
   suspend fun isCacheFresh() = if (cachedClients.isEmpty()) null else root.cache.lastModified() > now() - PROBABLY_FRESH_DELAY_MS
-  return load(root.context, ::fromDrive, ::fromCache, ::isCacheFresh)
+  return RESTClientFolderListHolder(root, ::fromDrive, ::fromCache, ::isCacheFresh)
 }
 class RESTClientFolderList internal constructor(private val root : Root, private val folders : List<RESTClientFolder>) : ClientFolderList {
   override val count = folders.size

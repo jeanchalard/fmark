@@ -17,7 +17,7 @@ interface FMarkRoot {
   suspend fun createClient(name : String, reading : String, comment : String) : ClientFolder
 }
 
-suspend fun RESTFMarkRoot(root : FDrive.Root) = RESTFMarkRoot(root, RESTClientFolderList(root).stateIn(CoroutineScope(Dispatchers.IO)))
+suspend fun RESTFMarkRoot(root : FDrive.Root) = RESTFMarkRoot(root, RESTClientFolderList(root).flow.stateIn(CoroutineScope(Dispatchers.IO)))
 
 class RESTFMarkRoot internal constructor(private val root : FDrive.Root, private val clientList : StateFlow<RESTClientFolderList>) : FMarkRoot {
   override suspend fun createClient(name : String, reading : String, comment : String) : ClientFolder = withContext(Dispatchers.IO) {
@@ -27,9 +27,9 @@ class RESTFMarkRoot internal constructor(private val root : FDrive.Root, private
 
   override suspend fun clientList(searchString : String?, exactMatch : Boolean) : StateFlow<ClientFolderList> = withContext(Dispatchers.IO) {
     log("Client list, search ${searchString}")
-    if (searchString != null)
-      RESTClientFolderList(root, searchString, exactMatch).stateIn(this)
-    else
+    if (searchString != null) {
+      RESTClientFolderList(root, searchString, exactMatch).flow.stateIn(this)
+    } else
       clientList
   }
 

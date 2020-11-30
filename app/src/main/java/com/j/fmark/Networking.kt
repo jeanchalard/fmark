@@ -13,6 +13,7 @@ import android.net.NetworkInfo
 import android.os.Build
 import androidx.annotation.GuardedBy
 import androidx.annotation.RequiresApi
+import com.j.fmark.fdrive.CommandStatus
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -138,8 +139,11 @@ fun <T> load(context : Context,
     log("loadFromNetworkAnyway")
     val start = now()
     networking.waitForNetwork()
-    log("Waited ${now() - start}ms for network")
-    val netData = fromDrive().also { log("Retrieved data from Drive in ${now() - start}ms") }
+    val networkAvailable = now()
+    log("Waited ${networkAvailable - start}ms for network")
+    CommandStatus.blockUntilQueueIdle()
+    log("Waited ${now() - networkAvailable}ms for queue to become idle")
+    val netData = fromDrive().also { log("Retrieved data from Drive in ${now() - start}ms including waiting time") }
     if (netData != compare) {
       log("Fetched different data from the network")
       this.emit(netData)
