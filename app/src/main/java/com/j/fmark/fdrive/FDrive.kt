@@ -23,7 +23,10 @@ import com.j.fmark.logAlways
 import com.j.fmark.mkdir_p
 import com.j.fmark.now
 import com.j.fmark.parseLocalSecond
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -38,7 +41,7 @@ const val NECESSARY_FIELDS_EXPRESSION = "files(${NECESSARY_FIELDS})"
 val SEPARATOR = " -- "
 
 object FDrive {
-  data class Root(val context : Context, val account : Account, val drive : Drive, val path : String, val root : DriveFile, val cache : File,
+  data class Root(val context : Context, val account : Account?, val drive : Drive, val path : String, val root : Deferred<DriveFile>, val cache : File,
                   val saveQueue : SaveQueue, val rest : RESTManager)
   private fun String.escape() = replace("'", "\\'")
 
@@ -64,19 +67,23 @@ object FDrive {
   fun File.resolveCache(name : String) = resolve(encodeCacheName(name))
   fun File.resolveSiblingCache(name : String) = resolveSibling(encodeCacheName(name))
 
-  suspend fun Root(context : Context) : Root = Root(context, fetchAccount(context, GOOGLE_SIGN_IN_CODE)?.account ?: throw SignInException(context.getString(R.string.sign_in_fail_cant_get_account)))
+  suspend fun Root(context : Context) : Root = Root(context, fetchAccount(context, GOOGLE_SIGN_IN_CODE)?.account)
+   //?: throw SignInException(context.getString(R.string.sign_in_fail_cant_get_account)))
 
-  suspend fun Root(context : Context, account : Account) : Root {
+  suspend fun Root(context : Context, account : Account?) : Root {
     log("Create root ${account}")
     val credential = GoogleAccountCredential.usingOAuth2(context, arrayListOf(DriveScopes.DRIVE_FILE))
     credential.selectedAccount = account
-    val drive = Drive.Builder(NetHttpTransport(), GsonFactory(), credential)
-     .setApplicationName(context.getString(R.string.gservices_app_name))
-     .build()
+    val drive = if (null != account) {
+      Drive.Builder(NetHttpTransport(), GsonFactory(), credential)
+       .setApplicationName(context.getString(R.string.gservices_app_name))
+       .build()
+    } else
+      NullDrive(NetHttpTransport(), GsonFactory(), credential)
     val rootDirPath = context.getString(R.string.fmark_root_directory)
-    val folder = createDriveFolder(drive, name = rootDirPath, parentFolder = DriveFile().also { it.id = "root" })
     val cache = context.cacheDir.resolve(CACHE_DIR).mkdir_p()
     val saveQueue = SaveQueue.get(context)
+    val folder = GlobalScope.async { saveQueue.createFolder(parentFolder = DriveFile().also { it.id = "root" }, name = rootDirPath).await().driveFile!! }
     log("Drive folder ${folder}, cache dir ${cache}, save queue ${saveQueue}")
     return Root(context, account, drive, rootDirPath, folder, cache, saveQueue, RESTManager(context))
   }
@@ -88,10 +95,18 @@ object FDrive {
      .build()
     val client = GoogleSignIn.getClient(context, options)
     val signInTask = client.silentSignIn()
+    log("Tried sign in")
     try {
-      if (signInTask.isSuccessful) return signInTask.result ?: throw SignInException(context.getString(R.string.sign_in_fail_instant))
-      return signInTask.await() ?: throw SignInException(context.getString(R.string.sign_in_fail_eventual))
+      if (signInTask.isSuccessful) {
+        log("Success ${signInTask.result}")
+        return signInTask.result ?: throw SignInException(context.getString(R.string.sign_in_fail_instant))
+      }
+      log("Waiting...")
+      val result = signInTask.await()
+      log("Done ${result}")
+      return result ?: throw SignInException(context.getString(R.string.sign_in_fail_eventual))
     } catch (e : Exception) {
+      log("Exception during signin", e)
       when (e) {
         is ExecutionException, is ApiException ->
           if (context is Activity) context.startActivityForResult(client.signInIntent, resultCode)

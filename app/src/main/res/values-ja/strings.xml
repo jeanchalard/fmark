@@ -24,6 +24,7 @@
   <string name="label_save">保存</string>
   <string name="label_clear">初期化</string>
   <string name="sign_in_fail_try_again">リトライ</string>
+  <string name="sign_in_fail_continue_without_drive">ドライブなしで続ける</string>
   <string name="label_refresh">更新</string>
   <string name="fail_data_fetch">データの取得に失敗しました。接続環境を確認してください。</string>
   <string name="new_session">新規作成</string>

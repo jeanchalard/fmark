@@ -78,7 +78,7 @@ class CommandRunner(private val context : Context) {
     try {
       val id = when {
         null != fileId   -> fileId
-        null != fileName -> FDrive.createDriveFile(root.drive, root.root, fileName).id
+        null != fileName -> FDrive.createDriveFile(root.drive, root.root.await(), fileName).id
         else             -> throw IllegalArgumentException("Either fileId or fileName must be non-null in putFile")
       }
       val file = DriveFile().apply { this.mimeType = mimeType }

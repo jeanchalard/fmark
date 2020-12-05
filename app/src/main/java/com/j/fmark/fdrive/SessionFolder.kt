@@ -162,7 +162,7 @@ private suspend fun readSessionsFromCache(root : Root, path : String, cacheDir :
     val p = "${path}/${name}"
     // Calling async on the context of the parent will add this lazily started coroutine to that context, which means the next thread jump (in this case, return from
     // withContext(Dispatchers.IO) will wait for it to be completed and therefore suspend forever as nobody starts these coroutines. https://github.com/Kotlin/kotlinx.coroutines/issues/745
-    val driveFile = scope.async(start = CoroutineStart.LAZY) { FDrive.createDriveFolder(root.drive, root.root, p) }
+    val driveFile = scope.async(start = CoroutineStart.LAZY) { FDrive.createDriveFolder(root.drive, root.root.await(), p) }
     RESTSessionFolder(root, p, driveFile, it)
   }
 }

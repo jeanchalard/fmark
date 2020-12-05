@@ -1,5 +1,6 @@
 package com.j.fmark
 
+import android.accounts.Account
 import android.app.Application
 import android.content.Intent
 import android.os.Bundle
@@ -148,9 +149,10 @@ class FMark : AppCompatActivity() {
   }
 
   fun offlineError(msgId : Int) = offlineError(resources.getString(msgId))
+  @Suppress("MoveLambdaOutsideParentheses") // expected here for readability of the call to SignInErrorFragment
   private fun offlineError(msg : String?) {
     insertSpinnerVisible = false
-    replaceFragment(SignInErrorFragment(msg, ::startSignIn))
+    replaceFragment(SignInErrorFragment(msg, ::startSignIn, { startClientList(null) }))
   }
 
   override fun onBackPressed() {
@@ -211,7 +213,7 @@ class FMark : AppCompatActivity() {
       findViewById<View>(R.id.insert_loading).visibility = View.GONE
       offlineError(R.string.sign_in_fail_eventual)
     } else
-      GlobalScope.launch(Dispatchers.Main) { startClientList(LiveCache.getRoot { FDrive.Root(this@FMark, account) }) }
+      startClientList(account)
   }
 
   fun showClientDetails(clientFolder : ClientFolder?, root : FMarkRoot) {
@@ -220,6 +222,10 @@ class FMark : AppCompatActivity() {
     val transaction = supportFragmentManager.beginTransaction()
      .addToBackStack(null)
     f.show(transaction, "details")
+  }
+
+  private fun startClientList(account : Account?) {
+    GlobalScope.launch(Dispatchers.Main) { startClientList(LiveCache.getRoot { FDrive.Root(this@FMark, account) }) }
   }
 
   fun startClientEditor(clientFolder : ClientFolder) : Int {

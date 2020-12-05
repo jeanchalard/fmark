@@ -21,4 +21,11 @@
    android:layout_height="wrap_content"
    android:text="@string/sign_in_fail_try_again"/>
 
+  <Button
+   android:id="@+id/error_sign_in_continue_without_drive"
+   android:gravity="center"
+   android:layout_width="wrap_content"
+   android:layout_height="wrap_content"
+   android:text="@string/sign_in_fail_continue_without_drive"/>
+
 </LinearLayout>

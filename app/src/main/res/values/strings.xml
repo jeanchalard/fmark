@@ -31,6 +31,7 @@
   <string name="label_save">Save</string>
   <string name="label_clear">Clear</string>
   <string name="sign_in_fail_try_again">Try again</string>
+  <string name="sign_in_fail_continue_without_drive">Continue without Google Drive support</string>
   <string name="label_refresh">Refresh</string>
   <string name="fail_data_fetch">Can\'t fetch data. Please check your data connection.</string>
   <string name="new_session">New session</string>
