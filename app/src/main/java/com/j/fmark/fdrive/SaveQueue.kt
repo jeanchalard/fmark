@@ -74,7 +74,8 @@ object CommandStatus {
     get() = lock.withLock { field }
     set(l) = lock.withLock {
       field = l
-      listeners.forEach { it.invoke(l) }
+      // See the comment below for an explanation of this bizarre loop style
+      for (i in listeners.size - 1..0) listeners[i].invoke(l)
     }
   private val listeners = ArrayList<(CommandResult) -> Unit>()
   public fun addListener(listener : (CommandResult) -> Unit) = lock.withLock { listeners.add(listener) }
@@ -85,7 +86,10 @@ object CommandStatus {
     set(b) = lock.withLock {
       log("Working is ${b}")
       field = b
-      workingListeners.forEach { it.invoke(b) }
+      // The following style of loop allows listeners to remove themselves in the listener (a very natural thing to do after all).
+      // Removing any *other* listener causes undefined behavior (obviously here it will cause the same listener to be called
+      // again if the removed listener happens to be earlier in the list, nothing otherwise, but no guarantees - don't remove others).
+      for (i in workingListeners.size - 1..0) workingListeners[i].invoke(b)
     }
   private val workingListeners = ArrayList<(Boolean) -> Unit>()
   public fun addWorkingListener(listener : (Boolean) -> Unit) = lock.withLock { workingListeners.add(listener); listener(working) }
