@@ -7,7 +7,9 @@ import android.util.Log
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.Scopes
 import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.Scope
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.json.gson.GsonFactory
@@ -42,7 +44,11 @@ val SEPARATOR = " -- "
 
 object FDrive {
   data class Root(val context : Context, val account : Account?, val drive : Drive, val path : String, val root : Deferred<DriveFile>, val cache : File,
-                  val saveQueue : SaveQueue, val rest : RESTManager)
+                  val saveQueue : SaveQueue, val rest : RESTManager) {
+    init {
+      log("Creating root ${this}")
+    }
+  }
   private fun String.escape() = replace("'", "\\'")
 
   fun encodeClientFolderName(name : String, reading : String, comment : String) = if (comment.isEmpty()) "${name}${SEPARATOR}${reading}" else "${name}${SEPARATOR}${reading}${SEPARATOR}${comment}"
@@ -83,7 +89,7 @@ object FDrive {
     val rootDirPath = context.getString(R.string.fmark_root_directory)
     val cache = context.cacheDir.resolve(CACHE_DIR).mkdir_p()
     val saveQueue = SaveQueue.get(context)
-    val folder = GlobalScope.async { saveQueue.createFolder(parentFolder = DriveFile().also { it.id = "root" }, name = rootDirPath).await().driveFile!! }
+    val folder = GlobalScope.async { createDriveFile(drive, parentFolder = DriveFile().also { it.id = "root" }, name = rootDirPath) }
     log("Drive folder ${folder}, cache dir ${cache}, save queue ${saveQueue}")
     return Root(context, account, drive, rootDirPath, folder, cache, saveQueue, RESTManager(context))
   }
@@ -92,6 +98,7 @@ object FDrive {
     log("Fetching account")
     val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
      .requestEmail()
+     .requestScopes(Scope(Scopes.DRIVE_FILE))
      .build()
     val client = GoogleSignIn.getClient(context, options)
     val signInTask = client.silentSignIn()
@@ -129,11 +136,13 @@ object FDrive {
       log("Fetched list with ${it.size} items")
     }
   }
-  suspend fun getFolderList(drive : Drive, parentFolder : DriveFile, name : String? = null, exactMatch : Boolean = false) : List<DriveFile> =
-   if (null == name)
-     LiveCache.getFileList(parentFolder) { fetchFolderList(drive, parentFolder, name, exactMatch) }.also { log("Folder list fetched from livecache with ${it.size} items") }
-   else
-     fetchFolderList(drive, parentFolder, name, exactMatch).also { log("Folder list fetched from Drive with ${it.size} items") }
+  suspend fun getFolderList(drive : Drive, parentFolder : DriveFile, name : String? = null, exactMatch : Boolean = false) : List<DriveFile> {
+    log("getFolderList ${name}")
+    return if (null == name)
+      LiveCache.getFileList(parentFolder) { fetchFolderList(drive, parentFolder, name, exactMatch) }.also { log("Folder list fetched from livecache with ${it.size} items") }
+    else
+      fetchFolderList(drive, parentFolder, name, exactMatch).also { log("Folder list fetched from Drive with ${it.size} items") }
+  }
 
   private suspend fun createDriveLeaf(drive : Drive, parentFolder : DriveFile, name : String, mimeType : String) : DriveFile {
     log("Create Drive leaf ${parentFolder.name}/${name} with type ${mimeType}")
@@ -182,8 +191,10 @@ object FDrive {
    fetchDriveItem(drive, parentFolder, name, isFolder = false, create = false)
   suspend fun createDriveFolder(drive : Drive, parentFolder : DriveFile, name : String) : DriveFile =
    fetchDriveItem(drive, parentFolder, name, isFolder = true, create = true)!! // If create, fetchDriveItem never returns null, but contracts{} are experimental and stupidly limited to top-level functions
-  suspend fun createDriveFile(drive : Drive, parentFolder : DriveFile, name : String) : DriveFile =
-   fetchDriveItem(drive, parentFolder, name, isFolder = false, create = true)!! // If create, fetchDriveItem never returns null, but contracts{} are experimental and stupidly limited to top-level functions
+  suspend fun createDriveFile(drive : Drive, parentFolder : DriveFile, name : String) : DriveFile {
+    log("createDriveFile")
+    return fetchDriveItem(drive, parentFolder, name, isFolder = false, create = true)!! // If create, fetchDriveItem never returns null, but contracts{} are experimental and stupidly limited to top-level functions
+  }
 
   suspend fun renameFile(drive : Drive, clientFolder : DriveFile, newName : String) : DriveFile? = withContext(Dispatchers.IO) {
     drive.files().update(clientFolder.id, clientFolder.apply { this.name = newName }).execute()

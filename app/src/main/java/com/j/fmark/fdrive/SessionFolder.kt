@@ -151,6 +151,7 @@ class RESTSessionFolder(private val root : Root, override val path : String,
 }
 
 private suspend fun readSessionsFromDrive(root : Root, path : String, clientFolder : Deferred<DriveFile>, cacheDir : File) : List<RESTSessionFolder> = withContext(Dispatchers.IO) {
+  log("readSessionsFromDrive ${path}")
   FDrive.getFolderList(root.drive, clientFolder.await()).map {
     RESTSessionFolder(root, "${path}/${it.name}", CompletableDeferred(it), cacheDir.resolveCache(it.name))
   }.also { cacheDir.setLastModified(now()) }

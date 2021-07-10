@@ -15,6 +15,7 @@ import androidx.room.TypeConverters
 import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.fdrive.CommandStatus.CommandResult
 import com.j.fmark.logAlways
+import kotlinx.coroutines.Deferred
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlin.coroutines.Continuation
@@ -75,7 +76,8 @@ object CommandStatus {
     set(l) = lock.withLock {
       field = l
       // See the comment below for an explanation of this bizarre loop style
-      for (i in listeners.size - 1..0) listeners[i].invoke(l)
+      var i = listeners.size - 1
+      while (i >= 0) { listeners[i].invoke(l); --i }
     }
   private val listeners = ArrayList<(CommandResult) -> Unit>()
   public fun addListener(listener : (CommandResult) -> Unit) = lock.withLock { listeners.add(listener) }
@@ -89,7 +91,9 @@ object CommandStatus {
       // The following style of loop allows listeners to remove themselves in the listener (a very natural thing to do after all).
       // Removing any *other* listener causes undefined behavior (obviously here it will cause the same listener to be called
       // again if the removed listener happens to be earlier in the list, nothing otherwise, but no guarantees - don't remove others).
-      for (i in workingListeners.size - 1..0) workingListeners[i].invoke(b)
+      // A for loop with `in` is also annoying because if there are no listeners, size - 1 is -1 and -1..0 is a valid range of invalid indices
+      var i = listeners.size - 1
+      while (i >= 0) { workingListeners[i].invoke(b); --i }
     }
   private val workingListeners = ArrayList<(Boolean) -> Unit>()
   public fun addWorkingListener(listener : (Boolean) -> Unit) = lock.withLock { workingListeners.add(listener); listener(working) }
@@ -134,8 +138,10 @@ public class SaveQueue private constructor(private val restManager : RESTManager
   public suspend fun markDone(s : SaveItem) = dao.markDone(s)
 
   public suspend fun createFolder(parentFolder : DriveFile, name : String) = createFolder(parentFolder.id, name)
-  public suspend fun createFolder(parentFolderId : String, name : String) =
-   CommandId(dao.insert(SaveItem(Type.CREATE_FOLDER, fileId = parentFolderId, name = name))).also { restManager.tickle() }
+  public suspend fun createFolder(parentFolderId : String, name : String) : CommandId {
+    log("createFolder")
+    return CommandId(dao.insert(SaveItem(Type.CREATE_FOLDER, fileId = parentFolderId, name = name))).also { restManager.tickle() }
+  }
 
   public suspend fun renameFile(file : DriveFile, name : String) = renameFile(file.id, name)
   public suspend fun renameFile(fileId : String, newName : String) =

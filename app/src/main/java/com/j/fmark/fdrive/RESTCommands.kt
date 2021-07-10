@@ -98,11 +98,14 @@ class CommandRunner(private val context : Context) {
   }
 
   public suspend fun runCommands() : Result {
+    log("Running commands...")
     CommandStatus.working = true
     val drive = LiveCache.getRoot { FDrive.Root(context) }
     val saveQueue = SaveQueue.get(context)
     while (true) {
+      log("Getting next command")
       val command = saveQueue.getNext() ?: break
+      log("Command is ${command.type}")
       val result = when (command.type) {
         Type.CREATE_FOLDER -> createFolder(command.seq, drive, command.fileId, command.name)
         Type.RENAME_FILE   -> renameFile(command.seq, drive, command.fileId, command.name)
@@ -118,6 +121,7 @@ class CommandRunner(private val context : Context) {
       // Note that if result is null the control doesn't even come here (the compiler checks this)
       CommandStatus.lastExecutedCommand = result
     }
+    log("Finished running commands")
     CommandStatus.working = false
     return Result.success()
   }

@@ -108,7 +108,7 @@ class FMark : AppCompatActivity() {
     MainScope().launch {
       try {
         log("Getting account...")
-        val root = FDrive.Root(this@FMark)
+        val root = LiveCache.getRoot { FDrive.Root(this@FMark) }
         log("Account : ${root.account}")
         startClientList(root)
         // else, wait for sign in activity → onActivityResult
