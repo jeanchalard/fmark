@@ -13,8 +13,10 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.FragmentTransaction
+import androidx.lifecycle.coroutineScope
 import androidx.work.Configuration
 import com.google.android.gms.auth.api.Auth
+import com.google.android.gms.common.api.ApiException
 import com.j.fmark.fdrive.ClientFolder
 import com.j.fmark.fdrive.FDrive
 import com.j.fmark.fdrive.FMarkRoot
@@ -26,13 +28,14 @@ import com.j.fmark.fragments.ClientHistory
 import com.j.fmark.fragments.ClientListFragment
 import com.j.fmark.fragments.FEditor
 import com.j.fmark.fragments.SignInErrorFragment
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ExecutionException
 
 private const val DBG = false
 @Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("FMark", s, e) }
@@ -54,11 +57,18 @@ class FMark : AppCompatActivity() {
     get() = insertSpinner.visibility == View.VISIBLE
     set(v) = setSpinnerVisible(insertSpinner, v)
   lateinit var cloudButton : CloudButton
+  var undoButtonEnabled = true
+    set(v) { field = v; invalidateOptionsMenu() }
   // Yeah Android fragment lifecycle is still horrendous
   private val pendingFragmentTransactions = ConcurrentLinkedQueue<FragmentTransaction>()
 
   init {
     log("FMark activity created")
+    Thread.setDefaultUncaughtExceptionHandler { _, throwable ->
+      log("exception ${throwable}")
+      throwable.stackTrace.forEach { log(it.toString()) }
+      throw throwable
+    }
   }
 
   // A function to make a view appear over a short lapse of time. This is useful for spinners, first because having them appear smoothly
@@ -98,17 +108,22 @@ class FMark : AppCompatActivity() {
       }
       invalidateOptionsMenu()
     }
-    startSignIn()
+    startSignIn(showErrorPageOnFailure = true)
     getNetworking(this) // Prime the singleton
   }
 
-  private fun startSignIn() {
+  private fun startSignIn(showErrorPageOnFailure : Boolean) {
     log("Starting sign in...")
     insertSpinnerVisible = true
     MainScope().launch {
       try {
         log("Getting account...")
-        val root = LiveCache.getRoot { FDrive.Root(this@FMark) }
+        val root = if (showErrorPageOnFailure) {
+          val account = FDrive.fetchAccount(this@FMark, suspendForever = false)?.account ?: throw SignInException(getString(R.string.sign_in_fail_cant_get_account))
+          FDrive.Root(this@FMark, CompletableDeferred(account))
+        }
+        else
+          LiveCache.getRoot { FDrive.Root(this@FMark) }
         log("Account : ${root.account}")
         startClientList(root)
         // else, wait for sign in activity → onActivityResult
@@ -152,7 +167,7 @@ class FMark : AppCompatActivity() {
   @Suppress("MoveLambdaOutsideParentheses") // expected here for readability of the call to SignInErrorFragment
   private fun offlineError(msg : String?) {
     insertSpinnerVisible = false
-    replaceFragment(SignInErrorFragment(msg, ::startSignIn, { startClientList(null) }))
+    replaceFragment(SignInErrorFragment(msg, { startSignIn(showErrorPageOnFailure = true) }, { startSignIn(false) }))
   }
 
   override fun onBackPressed() {
@@ -174,6 +189,7 @@ class FMark : AppCompatActivity() {
     menu.findItem(R.id.action_button_refresh).isVisible = isHome
     menu.findItem(R.id.action_button_clear).isVisible = !isHome
     menu.findItem(R.id.action_button_undo).isVisible = !isHome
+    menu.findItem(R.id.action_button_undo).isEnabled = undoButtonEnabled
     return super.onPrepareOptionsMenu(menu)
   }
 
@@ -224,8 +240,17 @@ class FMark : AppCompatActivity() {
     f.show(transaction, "details")
   }
 
-  private fun startClientList(account : Account?) {
-    GlobalScope.launch(Dispatchers.Main) { startClientList(LiveCache.getRoot { FDrive.Root(this@FMark, account) }) }
+  private fun startClientList(account : Account) {
+    lifecycle.coroutineScope.launch(Dispatchers.Main) {
+      try {
+        startClientList(LiveCache.getRoot { FDrive.Root(this@FMark, CompletableDeferred(account)) })
+      } catch (e : Exception) {
+        // ExecutionException and ApiException are expected when the client is not signed in. When this happens,
+        // creating the Root will run the authentication flow, which when complete will call startClientList again.
+        // Any other exception is unexpected, so rethrow it. Otherwise, simply exit and wait for the flow to complete.
+        if (e !is ExecutionException && e !is ApiException) throw e
+      }
+    }
   }
 
   fun startClientEditor(clientFolder : ClientFolder) : Int {

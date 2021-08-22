@@ -2,6 +2,7 @@ package com.j.fmark
 
 import com.j.fmark.fdrive.FDrive.Root
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
@@ -9,6 +10,7 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.contract
+import kotlin.coroutines.coroutineContext
 import com.google.api.services.drive.model.File as DriveFile
 
 private const val DBG = false
@@ -62,7 +64,7 @@ object LiveCache {
   }
   private suspend fun getFileOrNull(name : String, create : suspend () -> DriveFile?) : DriveFile? {
     log("Get file from live cache, ${name} : ${files[name]}")
-    val result = files.getOrCompute(name) { GlobalScope.async { create() } }
+    val result = files.getOrCompute(name) { CoroutineScope(coroutineContext).async { create() } }
     return result.await()
   }
 

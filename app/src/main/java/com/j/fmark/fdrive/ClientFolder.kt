@@ -97,7 +97,7 @@ class RESTClientFolder(private val root : Root, override val path : String,
 
 private suspend fun readClientsFromDrive(root : Root, name : String? = null, exactMatch : Boolean = false) : List<RESTClientFolder> {
   val rootFile = root.root.await()
-  return FDrive.getFolderList(root.drive, rootFile, name, exactMatch).map {
+  return FDrive.getFolderList(root.drive.await(), rootFile, name, exactMatch).map {
     val cacheDir = root.cache.resolveCache(it.name).mkdir_p()
     val date = it.createdTime.value
     cacheDir.resolve(CREATION_DATE_FILE_NAME).writeBytes(date.toBytes())
@@ -105,7 +105,7 @@ private suspend fun readClientsFromDrive(root : Root, name : String? = null, exa
   }
 }
 
-private suspend fun readClientsFromCache(root : Root, cacheDir : File, name : String? = null, exactMatch : Boolean = false) : List<RESTClientFolder> {
+private suspend fun readClientsFromCache(root : Root, cacheDir : File, name : String? = null, exactMatch : Boolean = false) : List<RESTClientFolder> = withContext(Dispatchers.IO) {
   val scope = CoroutineScope(Dispatchers.IO)
   val fileList = cacheDir.listFiles()?.toList() ?: emptyList()
   val filteredList = when {
@@ -113,9 +113,9 @@ private suspend fun readClientsFromCache(root : Root, cacheDir : File, name : St
     exactMatch   -> fileList.filter { decodeCacheName(it.name) == name }
     else         -> fileList.filter { decodeCacheName(it.name).contains(name) }
   }
-  return filteredList.map {
+  filteredList.map {
     val name = decodeCacheName(it.name)
-    val driveFile = scope.async(start = CoroutineStart.LAZY) { FDrive.createDriveFolder(root.drive, root.root.await(), name) }
+    val driveFile = scope.async(start = CoroutineStart.LAZY) { FDrive.createDriveFolder(root.drive.await(), root.root.await(), name) }
     RESTClientFolder(root, name, decodeName(name), decodeReading(name), decodeComment(name), driveFile, it)
   }
 }
@@ -143,7 +143,7 @@ suspend fun RESTClientFolderList(root : Root, name : String? = null, exactMatch 
   suspend fun fromDrive() = RESTClientFolderList(root, readClientsFromDrive(root, name, exactMatch))
   suspend fun fromCache() = RESTClientFolderList(root, cachedClients)
   suspend fun isCacheFresh() = if (cachedClients.isEmpty()) null else root.cache.lastModified() > now() - PROBABLY_FRESH_DELAY_MS
-  return RESTClientFolderListHolder(root, if (root.drive is NullDrive) null else ::fromDrive, ::fromCache, ::isCacheFresh)
+  return RESTClientFolderListHolder(root, ::fromDrive, ::fromCache, ::isCacheFresh)
 }
 class RESTClientFolderList internal constructor(private val root : Root, private val folders : List<RESTClientFolder>) : ClientFolderList {
   override val count = folders.size

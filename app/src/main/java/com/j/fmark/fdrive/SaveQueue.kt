@@ -14,8 +14,9 @@ import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.fdrive.CommandStatus.CommandResult
+import com.j.fmark.fdrive.CommandStatus.lastCommandListeners
 import com.j.fmark.logAlways
-import kotlinx.coroutines.Deferred
+import java.util.Observable
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlin.coroutines.Continuation
@@ -27,6 +28,7 @@ private const val DBG = false
 @Suppress("NOTHING_TO_INLINE", "ConstantConditionIf") private inline fun log(s : String, e : java.lang.Exception? = null) { if (DBG || LOGEVERYTHING) logAlways("SaveQueue", s, e) }
 
 public enum class Type(val value : Int) {
+  NONE(0),
   CREATE_FOLDER(1),
   RENAME_FILE(2),
   PUT_FILE(3)
@@ -48,6 +50,8 @@ public data class SaveItem(val type : Type, val fileId : String?, val name : Str
 private interface SaveQueueDao {
   @Query("SELECT * FROM SaveItem ORDER BY seq LIMIT 1")
   suspend fun getNext() : SaveItem?
+  @Query("SELECT * FROM SaveItem ORDER BY seq DESC LIMIT 1")
+  suspend fun getLast() : SaveItem?
 
   @Query("DELETE FROM SaveItem WHERE seq = :seq")
   suspend fun markDone(seq : Long)
@@ -68,69 +72,84 @@ private abstract class SaveItemDatabase : RoomDatabase() {
   abstract fun dao() : SaveQueueDao
 }
 
-object CommandStatus {
-  public data class CommandResult(val seq : Long, val driveFile : DriveFile?)
+class ListenerList<T>(initialValue : T) {
   private val lock = ReentrantLock()
-  var lastExecutedCommand = CommandResult(0L, null)
+  private val listeners = ArrayList<(T) -> Unit>()
+  internal var currentValue = initialValue
     get() = lock.withLock { field }
     set(l) = lock.withLock {
       field = l
-      // See the comment below for an explanation of this bizarre loop style
-      var i = listeners.size - 1
-      while (i >= 0) { listeners[i].invoke(l); --i }
-    }
-  private val listeners = ArrayList<(CommandResult) -> Unit>()
-  public fun addListener(listener : (CommandResult) -> Unit) = lock.withLock { listeners.add(listener) }
-  public fun removeListener(listener : (CommandResult) -> Unit) = lock.withLock { listeners.remove(listener) }
-
-  var working : Boolean = false
-    get() = lock.withLock { field }
-    set(b) = lock.withLock {
-      log("Working is ${b}")
-      field = b
       // The following style of loop allows listeners to remove themselves in the listener (a very natural thing to do after all).
       // Removing any *other* listener causes undefined behavior (obviously here it will cause the same listener to be called
       // again if the removed listener happens to be earlier in the list, nothing otherwise, but no guarantees - don't remove others).
       // A for loop with `in` is also annoying because if there are no listeners, size - 1 is -1 and -1..0 is a valid range of invalid indices
       var i = listeners.size - 1
-      while (i >= 0) { workingListeners[i].invoke(b); --i }
+      while (i >= 0) { listeners[i].invoke(l); --i }
     }
-  private val workingListeners = ArrayList<(Boolean) -> Unit>()
-  public fun addWorkingListener(listener : (Boolean) -> Unit) = lock.withLock { workingListeners.add(listener); listener(working) }
-  public fun removeWorkingListener(listener : (Boolean) -> Unit) = lock.withLock { workingListeners.remove(listener) }
+  public fun add(listener : (T) -> Unit) = lock.withLock { listeners.add(listener); listener(currentValue) }
+  public fun remove(listener : (T) -> Unit) = lock.withLock { listeners.remove(listener) }
+}
+
+object CommandStatus {
+  public data class CommandResult(val seq : Long, val driveFile : DriveFile?)
+
+  public val lastCommandListeners = ListenerList(CommandResult(0L, null))
+  var lastExecutedCommand : CommandResult
+    get() = lastCommandListeners.currentValue
+    set(v) { lastCommandListeners.currentValue = v; workPending = lastEnqueuedCommand.seq >= v.seq }
+  public val workingListeners = ListenerList(false)
+  var working : Boolean
+    get() = workingListeners.currentValue
+    set(v) { workingListeners.currentValue = v }
+  public val workPendingListeners = ListenerList(false)
+  private var workPending : Boolean
+    get() = workPendingListeners.currentValue
+    set(v) { workPendingListeners.currentValue = v }
+  internal var lastEnqueuedCommand : SaveItem = SaveItem(Type.NONE, null, null, null, null, 0)
+    set(v) { field = v; workPending = field.seq >= lastExecutedCommand.seq }
 
   private class Blocker(private val continuation : Continuation<Unit>) : (Boolean) -> Unit {
     override fun invoke(working : Boolean) {
       if (working) return
-      removeWorkingListener(this)
+      workingListeners.remove(this)
       continuation.resume(Unit)
     }
   }
-  suspend fun blockUntilQueueIdle() = suspendCoroutine<Unit> { continuation -> addWorkingListener(Blocker(continuation)) }
+  suspend fun suspendUntilQueueIdle() = suspendCoroutine<Unit> { continuation -> workingListeners.add(Blocker(continuation)) }
 }
 
-public inline class CommandId(private val id : Long) {
+@JvmInline public value class CommandId(private val id : Long) {
   private class Listener(private val id : Long, private val continuation : Continuation<CommandResult>) : (CommandResult) -> Unit {
     override fun invoke(lastCommand : CommandResult) {
       if (lastCommand.seq < id) return
-      CommandStatus.removeListener(this)
+      lastCommandListeners.remove(this)
       continuation.resume(lastCommand)
     }
   }
-  suspend fun await() = suspendCoroutine<CommandResult> { continuation -> CommandStatus.addListener(Listener(id, continuation)) }
+  suspend fun await() = suspendCoroutine<CommandResult> { continuation -> lastCommandListeners.add(Listener(id, continuation)) }
 }
 
 public class SaveQueue private constructor(private val restManager : RESTManager, private val dao : SaveQueueDao) {
   companion object {
     @Volatile private lateinit var INSTANCE : SaveQueue
-    public fun get(context : Context) : SaveQueue {
+    public suspend fun get(context : Context) : SaveQueue {
       if (this::INSTANCE.isInitialized) return INSTANCE
       synchronized(this) {
         if (this::INSTANCE.isInitialized) return INSTANCE
         INSTANCE = SaveQueue(RESTManager(context), Room.databaseBuilder(context.applicationContext, SaveItemDatabase::class.java, "SaveItemDatabase").build().dao())
-        return INSTANCE
       }
+      val lastEnqueued = INSTANCE.dao.getLast()
+      if (null != lastEnqueued) { // If null, already initialized everything to 0
+        CommandStatus.lastEnqueuedCommand = lastEnqueued
+        CommandStatus.lastExecutedCommand = CommandResult(lastEnqueued.seq - 1, null)
+      }
+      return INSTANCE
     }
+  }
+
+  private suspend fun insert(item : SaveItem) : Long {
+    CommandStatus.lastEnqueuedCommand = item
+    return dao.insert(item)
   }
 
   public suspend fun getNext() = dao.getNext()
@@ -140,13 +159,13 @@ public class SaveQueue private constructor(private val restManager : RESTManager
   public suspend fun createFolder(parentFolder : DriveFile, name : String) = createFolder(parentFolder.id, name)
   public suspend fun createFolder(parentFolderId : String, name : String) : CommandId {
     log("createFolder")
-    return CommandId(dao.insert(SaveItem(Type.CREATE_FOLDER, fileId = parentFolderId, name = name))).also { restManager.tickle() }
+    return CommandId(insert(SaveItem(Type.CREATE_FOLDER, fileId = parentFolderId, name = name))).also { restManager.tickle() }
   }
 
   public suspend fun renameFile(file : DriveFile, name : String) = renameFile(file.id, name)
   public suspend fun renameFile(fileId : String, newName : String) =
-   CommandId(dao.insert(SaveItem(Type.RENAME_FILE, fileId = fileId, name = newName))).also { restManager.tickle() }
+   CommandId(insert(SaveItem(Type.RENAME_FILE, fileId = fileId, name = newName))).also { restManager.tickle() }
 
   public suspend fun putFile(fileId : String?, name : String?, data : ByteArray, mimeType : String) =
-   CommandId(dao.insert(SaveItem(Type.PUT_FILE, fileId = fileId, name = name, binData = data, metadata = mimeType))).also { restManager.tickle() }
+   CommandId(insert(SaveItem(Type.PUT_FILE, fileId = fileId, name = name, binData = data, metadata = mimeType))).also { restManager.tickle() }
 }

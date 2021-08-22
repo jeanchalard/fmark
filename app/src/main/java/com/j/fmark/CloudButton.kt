@@ -27,10 +27,9 @@ class CloudButton @JvmOverloads constructor(context : Context, attrs : Attribute
     repeatMode = ValueAnimator.REVERSE
   }
 
-  private var network : Network? = null
   private var clean = true
-  private var uploading = false
-
+  private var hasPendingWork = false
+  private var network : Network? = null
   var host : FMark? = null
 
   override fun onClick(v : View?) {
@@ -38,21 +37,35 @@ class CloudButton @JvmOverloads constructor(context : Context, attrs : Attribute
     host?.onOptionsItemSelected(R.id.action_button_save)
   }
 
+  private val pendingListener : (Boolean) -> Unit = { pending ->
+    log("Has pending work : ${pending}")
+    hasPendingWork = pending
+    clean = !pending
+    updateIconLevel()
+  }
+  private val networkListener : (Network?) -> Unit = {
+    network = it
+    log("Network is ${network}")
+    updateIconLevel()
+  }
+
+  override fun onAttachedToWindow() {
+    super.onAttachedToWindow()
+    CommandStatus.workPendingListeners.add(pendingListener)
+    getNetworking(context).addListener(networkListener)
+  }
+
+  override fun onDetachedFromWindow() {
+    super.onDetachedFromWindow()
+    CommandStatus.workPendingListeners.remove(pendingListener)
+    getNetworking(context).removeListener(networkListener)
+  }
+
   init {
+    log("Creating cloud button")
     setImageResource(R.drawable.cloud)
     isSaveEnabled = true
     setPadding(drawable.intrinsicWidth / 2, drawable.intrinsicHeight / 2, drawable.intrinsicWidth / 2, drawable.intrinsicHeight / 2)
-    getNetworking(context).addListener {
-      network = it
-      log("Network is ${network}")
-      updateIconLevel()
-    }
-    CommandStatus.addWorkingListener { working ->
-      log("Is uploading : ${working}")
-      uploading = working
-      if (!working) clean = true
-      updateIconLevel()
-    }
     setOnClickListener(this)
   }
 
@@ -64,12 +77,12 @@ class CloudButton @JvmOverloads constructor(context : Context, attrs : Attribute
 
   private fun updateIconLevel() = post {
     val level = when {
-      clean -> CLEAN // Nothing to save, clean icon : a checkmark on a cloud
+      clean           -> CLEAN // Nothing to save, clean icon : a checkmark on a cloud
       null == network -> NO_NETWORK // No network, impossible to save, no networking icon : a stroked-out cloud
-      uploading -> UPLOADING // Currently uploading, uploading icon : a blinking cloud with an up arrow
-      else -> DIRTY // Data to save, dirty icon : a cloud outline
+      hasPendingWork  -> UPLOADING // Currently uploading, uploading icon : a blinking cloud with an up arrow
+      else            -> DIRTY // Data to save, dirty icon : a cloud outline
     }
-    log("Update icon level to ${level} (clean = ${clean} ; network = ${network} ; uploading = ${uploading})")
+    log("Update icon level to ${level} (clean = ${clean} ; network = ${network} ; uploading = ${hasPendingWork})")
     setImageLevel(level)
     if (UPLOADING == level) animation.start() else {
       animation.cancel()

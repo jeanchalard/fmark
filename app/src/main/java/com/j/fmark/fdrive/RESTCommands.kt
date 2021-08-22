@@ -10,6 +10,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.google.android.gms.common.api.ApiException
 import com.google.api.client.http.InputStreamContent
 import com.j.fmark.LOGEVERYTHING
 import com.j.fmark.LiveCache
@@ -19,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.net.ConnectException
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import com.google.api.services.drive.model.File as DriveFile
 
@@ -37,7 +39,7 @@ class CommandRunner(private val context : Context) {
     if (null == folderName) throw IllegalArgumentException("Folder name can't be null in createFolder")
     try {
       val parent = DriveFile().also { it.id = parentFolderId }
-      return CommandResult(seq, FDrive.createDriveFolder(root.drive, parent, folderName)).also { log("Create folder command succeeded") }
+      return CommandResult(seq, FDrive.createDriveFolder(root.drive.await(), parent, folderName)).also { log("Create folder command succeeded") }
     } catch (e : ConnectException) {
       log("Connection exception while creating folder", e)
       delay(1000) // Just in case the system would rerun this immediately because it hasn't noticed yet
@@ -56,7 +58,7 @@ class CommandRunner(private val context : Context) {
     if (null == newName) throw IllegalArgumentException("New name can't be null in renameFile")
     try {
       val file = DriveFile().also { it.id = fileId }
-      val renamedFile = FDrive.renameFile(root.drive, file, newName) ?: throw IllegalStateException("File with id ${fileId} doesn't exist")
+      val renamedFile = FDrive.renameFile(root.drive.await(), file, newName) ?: throw IllegalStateException("File with id ${fileId} doesn't exist")
       log("Rename file command succeeded")
       return CommandResult(seq, renamedFile)
     } catch (e : ConnectException) {
@@ -78,11 +80,11 @@ class CommandRunner(private val context : Context) {
     try {
       val id = when {
         null != fileId   -> fileId
-        null != fileName -> FDrive.createDriveFile(root.drive, root.root.await(), fileName).id
+        null != fileName -> FDrive.createDriveFile(root.drive.await(), root.root.await(), fileName).id
         else             -> throw IllegalArgumentException("Either fileId or fileName must be non-null in putFile")
       }
       val file = DriveFile().apply { this.mimeType = mimeType }
-      root.drive.files().update(id, file, InputStreamContent(mimeType, data.inputStream())).execute()
+      root.drive.await().files().update(id, file, InputStreamContent(mimeType, data.inputStream())).execute()
       log("Put file command succeeded")
       return CommandResult(seq, file)
     } catch (e : ConnectException) {
@@ -106,10 +108,20 @@ class CommandRunner(private val context : Context) {
       log("Getting next command")
       val command = saveQueue.getNext() ?: break
       log("Command is ${command.type}")
-      val result = when (command.type) {
-        Type.CREATE_FOLDER -> createFolder(command.seq, drive, command.fileId, command.name)
-        Type.RENAME_FILE   -> renameFile(command.seq, drive, command.fileId, command.name)
-        Type.PUT_FILE      -> putFile(command.seq, drive, command.fileId, command.name, command.binData, command.metadata)
+      val result = try {
+        when (command.type) {
+          Type.NONE          -> CommandResult(0L, null)
+          Type.CREATE_FOLDER -> createFolder(command.seq, drive, command.fileId, command.name)
+          Type.RENAME_FILE   -> renameFile(command.seq, drive, command.fileId, command.name)
+          Type.PUT_FILE      -> putFile(command.seq, drive, command.fileId, command.name, command.binData, command.metadata)
+        }
+      } catch (e : Exception) {
+        if (e !is ExecutionException && e !is ApiException) throw e
+        // In case of a login failure, there is no point in retrying until the user logs in again. The commands also should
+        // not be marked done. Returning success() here will stop processing the chain and mark the Work complete, so it
+        // won't be retried after the backoff. The next time the app is run, however, the user will have an opportunity to
+        // log in and the manager will be tickled, retrying the command queue where it was left off.
+        else return Result.success()
       }
       when {
         result == null -> return Result.retry()

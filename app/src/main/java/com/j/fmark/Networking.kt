@@ -51,22 +51,28 @@ open class Networking {
     listeners.add(l)
     l(network)
   }
+  fun removeListener(l : (Network?) -> Unit) = synchronized(listeners) {
+    listeners.remove(l)
+  }
 
   suspend fun waitForNetwork() : Network {
-    val deferred : CompletableDeferred<Network> = CompletableDeferred()
-    val listener = object : (Network?) -> Unit {
-      override fun invoke(n : Network?) {
-        if (null == n) return
-        listeners.remove(this)
-        deferred.complete(n)
-      }
-    }
+    val deferred : CompletableDeferred<Network>
     synchronized(listeners) {
       val net = network
       if (null != net) return net
+      deferred = CompletableDeferred()
+      val listener = object : (Network?) -> Unit {
+        override fun invoke(n : Network?) {
+          if (null == n) return
+          listeners.remove(this)
+          deferred.complete(n)
+        }
+      }
       addListener(listener)
     }
-    return deferred.await()
+    val network = deferred.await()
+    CommandStatus.suspendUntilQueueIdle()
+    return network
   }
 }
 
@@ -142,7 +148,7 @@ fun <T> load(context : Context,
     networking.waitForNetwork()
     val networkAvailable = now()
     log("Waited ${networkAvailable - start}ms for network")
-    CommandStatus.blockUntilQueueIdle()
+    CommandStatus.suspendUntilQueueIdle()
     log("Waited ${now() - networkAvailable}ms for queue to become idle")
     val netData = fromDrive().also { log("Retrieved data from Drive in ${now() - start}ms including waiting time") }
     if (netData != compare) {

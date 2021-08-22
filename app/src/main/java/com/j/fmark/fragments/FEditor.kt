@@ -12,6 +12,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.ViewFlipper
 import androidx.appcompat.widget.AppCompatImageButton
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.coroutineScope
 import androidx.lifecycle.lifecycleScope
@@ -91,6 +92,7 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     private var commentData = SaveString("", false)
     private val brushViews = ArrayList<BrushView>()
 
+    private val commentOverlapsDrawing : Boolean
     private var saveInhibited = false
     override fun setNotOutdated() { saveInhibited = false }
 
@@ -98,7 +100,14 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
       log("Starting editor for ${session}")
       fmarkHost.topSpinnerVisible = true
 
-      view.findViewById<AppCompatImageButton>(R.id.feditor_comment)?.setOnClickListener { switchToComment() }
+      val commentSwitchButton = view.findViewById<AppCompatImageButton>(R.id.feditor_comment)
+      if (null == commentSwitchButton)
+        commentOverlapsDrawing = false
+      else {
+        commentOverlapsDrawing = true
+        commentSwitchButton.setOnClickListener { switchToComment() }
+        fmarkHost.undoButtonEnabled = false
+      }
       view.findViewById<AppCompatImageButton>(R.id.feditor_face).setOnClickListener { switchDrawing(faceCanvas) }
       view.findViewById<AppCompatImageButton>(R.id.feditor_front).setOnClickListener { switchDrawing(frontCanvas) }
       view.findViewById<AppCompatImageButton>(R.id.feditor_back).setOnClickListener { switchDrawing(backCanvas) }
@@ -186,11 +195,13 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
     private fun switchToComment() {
       log("switchToComment")
       commentContainer.visibility = View.VISIBLE
+      if (commentOverlapsDrawing) fmarkHost.undoButtonEnabled = false
     }
 
     private fun switchDrawing(canvas : CanvasView) {
       log("switchDrawing ${canvas}")
       commentContainer?.visibility = View.GONE
+      fmarkHost.undoButtonEnabled = true
       canvasFlipper.flipTo(canvas)
     }
 
@@ -201,8 +212,14 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
       }
       when (itemId) {
         R.id.action_button_save  -> save().also { log("Option save tapped") }
-        R.id.action_button_undo  -> (view.findViewById<ViewFlipper>(R.id.feditor_canvas_flipper)?.shownView as CanvasView).undo().also { log("Option undo tapped") }
-        R.id.action_button_clear -> (view.findViewById<ViewFlipper>(R.id.feditor_canvas_flipper)?.shownView as CanvasView).clear().also { log("Option clear tapped") }
+        // The undo button is supposed to be grayed out when the comment is visible, but if for some reason the message arrives when it's shown, don't
+        // clear whatever view was selected behind it. If the comment doesn't overlap drawing anyway, then always clear of course.
+        R.id.action_button_undo  -> if (commentOverlapsDrawing || !commentContainer.isVisible)
+         (view.findViewById<ViewFlipper>(R.id.feditor_canvas_flipper)?.shownView as CanvasView).undo().also { log("Option undo tapped") }
+        R.id.action_button_clear -> if (commentOverlapsDrawing && commentContainer.isVisible)
+          view.findViewById<EditText>(R.id.feditor_comment_text).setText("")
+        else
+          (view.findViewById<ViewFlipper>(R.id.feditor_canvas_flipper)?.shownView as CanvasView).clear().also { log("Option clear tapped") }
       }
       return true
     }
@@ -250,14 +267,14 @@ class FEditor(private val fmarkHost : FMark, private val session : SessionFolder
 
     /* ***** PROBLÈMES *****
     * ✓ L'image n'a ni le fond, ni le drawable, uniquement le dessin par dessus
-    * ✓ L'image n'est pas sauvegardée quand il faut parce que dirty est mis à jour quand on change de dessin au lieu de quand on le touche ce qui est complètement con
+    * ✓ L'image n'est pas sauvegardée quand il faut parce que dirty est mis à jour quand on change de dessin au lieu de quand on le touche ce qui est complètement con
     * ✓ La sauvegarde est horriblement lente parce que :
     *   ✓ les ids des DriveFile ne sont pas cachés, ce qui fait qu'il faut 800ms pour choper l'ID avant de pouvoir uploader le fichier
     *   ✓ les images sont uploadées séquentiellement au lieu de parallèlement
     *   ✗ par défaut l'upload est multipart au lieu de media, ce qui fait 2 requêtes au lieu d'une... pas pris en charge par l'API
-    * ✓ Les thumbnails et les previews ne marchent pas sur drive, parce qu'apparemment ce connard de drive se repère uniquement à l'extension et pas au type mime
+    * ✓ Les thumbnails et les previews ne marchent pas sur drive, parce qu'apparemment ce connard de drive se repère uniquement à l'extension et pas au type mime
     * ⑤ Si tu coupes le réseau pendant que ça rame, ça plante parce que filelist().execute (ou autre) throw ConnectException
-    * ⑥ Il semblerait que dans certains cas la session est vide (et écrase la bonne session) mais je ne sais pas quand
+    * ✓ Il semblerait que dans certains cas la session est vide (et écrase la bonne session) mais je ne sais pas quand
     * ✓ L'icône de save reste affichée quand un dessin est dirty
     */
   }
